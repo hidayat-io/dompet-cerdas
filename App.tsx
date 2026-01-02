@@ -464,10 +464,35 @@ function App() {
             </div>
             <span className="font-bold" style={{ color: theme.colors.textPrimary }}>DompetCerdas</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Quick Access: AI Button */}
+            <button
+              onClick={() => setCurrentView('AI_ADVISOR')}
+              className="p-2 rounded-full transition-all"
+              style={{
+                backgroundColor: currentView === 'AI_ADVISOR' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+                color: currentView === 'AI_ADVISOR' ? '#8B5CF6' : theme.colors.textMuted
+              }}
+              title="AI Analisis"
+            >
+              <IconDisplay name="Zap" size={18} />
+            </button>
+            {/* Quick Access: Simulasi Button */}
+            <button
+              onClick={() => setCurrentView('SIMULATION')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+              style={{
+                backgroundColor: currentView === 'SIMULATION' ? theme.colors.accent : theme.colors.bgHover,
+                color: currentView === 'SIMULATION' ? '#fff' : theme.colors.textSecondary,
+                border: `1px solid ${currentView === 'SIMULATION' ? theme.colors.accent : theme.colors.border}`
+              }}
+            >
+              <IconDisplay name="Calculator" size={14} />
+              <span>Simulasi</span>
+            </button>
             <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="User" className="w-8 h-8 rounded-full" style={{ border: `1px solid ${theme.colors.border}` }} />
-            <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 p-1 rounded">
-              <IconDisplay name="ArrowRight" size={18} />
+            <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg" style={{ backgroundColor: theme.colors.expenseBg }}>
+              <IconDisplay name="LogOut" size={16} />
             </button>
           </div>
         </header >
@@ -566,14 +591,14 @@ function App() {
           </div>
         </div >
 
-        {/* Mobile Bottom Navigation Bar (5 Items) */}
+        {/* Mobile Bottom Navigation Bar (5 Items + Center FAB Space) */}
         < nav
-          className="md:hidden fixed bottom-0 left-0 right-0 flex justify-between items-center h-16 z-30 px-4 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]"
+          className="md:hidden fixed bottom-0 left-0 right-0 flex justify-around items-center h-16 z-30 px-2 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]"
           style={{ backgroundColor: theme.colors.bgCard, borderTop: `1px solid ${theme.colors.border}` }}
         >
           <button
             onClick={() => setCurrentView('DASHBOARD')}
-            className="flex flex-col items-center justify-center w-12 py-1"
+            className="flex flex-col items-center justify-center flex-1 py-1"
             style={{ color: currentView === 'DASHBOARD' ? theme.colors.accent : theme.colors.textMuted }}
           >
             <IconDisplay name="Home" size={20} />
@@ -581,7 +606,7 @@ function App() {
           </button>
           <button
             onClick={() => setCurrentView('TRANSACTIONS')}
-            className="flex flex-col items-center justify-center w-12 py-1"
+            className="flex flex-col items-center justify-center flex-1 py-1"
             style={{ color: currentView === 'TRANSACTIONS' ? theme.colors.accent : theme.colors.textMuted }}
           >
             <IconDisplay name="BookOpen" size={20} />
@@ -589,19 +614,19 @@ function App() {
           </button>
 
           {/* Center Space for FAB */}
-          <div className="w-8"></div>
+          <div className="w-14 flex-shrink-0"></div>
 
           <button
-            onClick={() => setCurrentView('SIMULATION')}
-            className="flex flex-col items-center justify-center w-12 py-1"
-            style={{ color: currentView === 'SIMULATION' ? theme.colors.accent : theme.colors.textMuted }}
+            onClick={() => setCurrentView('CATEGORIES')}
+            className="flex flex-col items-center justify-center flex-1 py-1"
+            style={{ color: currentView === 'CATEGORIES' ? theme.colors.accent : theme.colors.textMuted }}
           >
-            <IconDisplay name="Calculator" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Simulasi</span>
+            <IconDisplay name="Briefcase" size={20} />
+            <span className="text-[9px] font-medium mt-0.5">Kategori</span>
           </button>
           <button
             onClick={() => setCurrentView('SETTINGS')}
-            className="flex flex-col items-center justify-center w-12 py-1"
+            className="flex flex-col items-center justify-center flex-1 py-1"
             style={{ color: currentView === 'SETTINGS' ? theme.colors.accent : theme.colors.textMuted }}
           >
             <IconDisplay name="Settings" size={20} />
