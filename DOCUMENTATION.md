@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
-> **Last Updated**: January 2026  
-> **Version**: 1.0.0  
+> **Last Updated**: January 2, 2026  
+> **Version**: 1.1.0  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -67,6 +67,14 @@ dompet_cerdas/
 │
 ├── services/
 │   └── geminiService.ts       # AI financial analysis service
+│
+├── public/                    # Static assets (icons, manifest)
+│   ├── icon-512.png           # App icon (512x512)
+│   ├── icon-192.png           # App icon (192x192)
+│   ├── apple-touch-icon.png   # iOS home screen icon
+│   ├── favicon-32.png         # Browser tab icon
+│   ├── favicon-16.png         # Browser tab icon (small)
+│   └── manifest.json          # PWA manifest configuration
 │
 └── dist/                      # Production build output (committed for deployment)
 ```
@@ -323,9 +331,51 @@ const firebaseConfig = {
 1. **No Backend Server**: App is fully client-side, uses Firebase directly
 2. **Real-time Sync**: Firestore listeners update UI automatically
 3. **Responsive Design**: Mobile-first with desktop sidebar
-4. **PWA Ready**: Can be enhanced with service worker
+4. **PWA Ready**: Includes manifest.json and app icons for home screen installation
 5. **Build Committed**: `dist/` folder is in git for low-RAM server deployment
 6. **Indonesian UI**: All user-facing text in Bahasa Indonesia
+7. **Mobile Navigation**: Bottom nav (4 items) + Header quick access (Simulasi & AI)
+
+---
+
+## 📱 Mobile Navigation Layout
+
+### Bottom Navigation Bar (4 items + FAB)
+| Position | Icon | Label | View |
+|----------|------|-------|------|
+| Left 1 | Home | Home | DASHBOARD |
+| Left 2 | BookOpen | Riwayat | TRANSACTIONS |
+| Center | Plus | (FAB) | Add Transaction Modal |
+| Right 1 | Briefcase | Kategori | CATEGORIES |
+| Right 2 | Settings | Setting | SETTINGS |
+
+### Header Quick Access (Mobile Only)
+| Element | Icon | Function |
+|---------|------|----------|
+| AI Button | Zap (⚡) | Opens AI_ADVISOR view |
+| Simulasi Button | Calculator | Opens SIMULATION view |
+| User Avatar | - | Shows logged-in user |
+| Logout Button | LogOut | Signs out user |
+
+---
+
+## 🎨 App Icons & PWA
+
+### Icon Files (in `/public/`)
+| File | Size | Purpose |
+|------|------|----------|
+| `icon-512.png` | 512x512 | PWA install icon (high-res) |
+| `icon-192.png` | 192x192 | PWA icon standard |
+| `apple-touch-icon.png` | 180x180 | iOS home screen |
+| `favicon-32.png` | 32x32 | Browser tab (retina) |
+| `favicon-16.png` | 16x16 | Browser tab (standard) |
+| `manifest.json` | - | PWA configuration |
+
+### PWA Features
+- **Theme Color**: #4F46E5 (Indigo)
+- **Display Mode**: Standalone
+- **Orientation**: Portrait
+- **Installable**: Yes (via browser "Add to Home Screen")
 
 ---
 
