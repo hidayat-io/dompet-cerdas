@@ -4,6 +4,7 @@ import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import ConfirmDialog from './ConfirmDialog';
 import CategoryFormModal from './CategoryFormModal';
+import { processFileForUpload } from '../utils/fileCompression';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -51,6 +52,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
 
   // Category modal state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  // Compression message state
+  const [compressionMessage, setCompressionMessage] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -125,9 +129,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     if (error) setError('');
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Reset states
+    setError('');
+    setCompressionMessage('');
 
     // Validate file type
     const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -138,32 +146,48 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
       return;
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      setError('⚠️ Ukuran file maksimal 5MB.');
+    // Validate initial file size (max 10MB before compression)
+    const maxInitialSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxInitialSize) {
+      setError('⚠️ Ukuran file terlalu besar (maksimal 10MB).');
       return;
     }
 
-    // Set attachment
-    setAttachment(file);
-    setIsAttachmentDeleted(false); // Reset delete flag because we added new one
+    try {
+      // Process file (compress images, validate PDFs)
+      const result = await processFileForUpload(file);
 
-    if (validImageTypes.includes(file.type)) {
-      setAttachmentType('image');
-      setAttachmentPreview(URL.createObjectURL(file));
-    } else {
-      setAttachmentType('pdf');
-      setAttachmentPreview(null);
+      // Set attachment
+      setAttachment(result.file);
+      setIsAttachmentDeleted(false);
+      setAttachmentType(result.type);
+
+      // Set preview for images
+      if (result.type === 'image') {
+        setAttachmentPreview(URL.createObjectURL(result.file));
+      } else {
+        setAttachmentPreview(null);
+      }
+
+      // Show compression message
+      if (result.message) {
+        setCompressionMessage(result.message);
+      }
+
+    } catch (error) {
+      setError(error instanceof Error ? `⚠️ ${error.message}` : '⚠️ Gagal memproses file.');
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-
-    setError('');
   };
 
   const removeAttachment = () => {
     setAttachment(null);
     setAttachmentPreview(null);
     setAttachmentType(null);
+    setCompressionMessage('');
 
     // If there was an existing attachment, mark it as deleted
     if (existingAttachment) {
@@ -244,16 +268,74 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         className="rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all animate-fade-in-up max-h-[90vh] flex flex-col"
         style={{ backgroundColor: theme.colors.bgCard }}
       >
-        <div className="p-4 flex justify-between items-center flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
-          <h3 className="text-white font-semibold text-lg">{initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}</h3>
-          <button onClick={onClose} className="text-white hover:text-indigo-200 focus:outline-none">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        <div className="p-4 flex justify-between items-center gap-3 flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
+          <h3 className="text-white font-semibold text-lg flex-shrink-0">{initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}</h3>
+
+          <div className="flex items-center gap-2">
+            {/* Delete Button (only show when editing) */}
+            {initialData && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                }}
+                title="Hapus Transaksi"
+              >
+                <IconDisplay name="Trash2" size={16} />
+                <span className="text-sm font-medium">Hapus</span>
+              </button>
+            )}
+
+            {/* Save Button */}
+            <button
+              type="submit"
+              form="transaction-form"
+              className="px-3 py-2 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-1.5"
+              style={{
+                backgroundColor: 'white',
+                color: theme.colors.accent
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <IconDisplay name={initialData ? "Check" : "Save"} size={16} />
+              <span className="text-sm font-medium">{initialData ? 'Update' : 'Simpan'}</span>
+            </button>
+
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+              }}
+            >
+              <IconDisplay name="X" size={16} />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+        <form id="transaction-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
 
           {error && (
             <div className="border-l-4 border-red-500 p-3 rounded-md text-sm font-medium flex items-center gap-2 animate-pulse"
@@ -489,37 +571,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 </div>
               </div>
             )}
-            <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>Maksimal 5MB. Format: JPG, PNG, GIF, WEBP, PDF</p>
-          </div>
-
-          <div className="flex gap-3">
-            {initialData && onDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="py-3 px-4 font-bold rounded-lg shadow-sm transition-colors focus:outline-none"
+            <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>Maksimal 10MB. Format: JPG, PNG, GIF, WEBP, PDF</p>
+            {compressionMessage && (
+              <div
+                className="text-xs mt-2 p-2 rounded-md flex items-center gap-2"
                 style={{
-                  backgroundColor: theme.colors.expenseBg,
-                  color: theme.colors.expense
+                  backgroundColor: theme.colors.incomeBg,
+                  color: theme.colors.income
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '0.8';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '1';
-                }}
-                title="Hapus Transaksi"
               >
-                <IconDisplay name="Trash2" size={20} />
-              </button>
+                <IconDisplay name="CheckCircle2" size={14} />
+                <span>{compressionMessage}</span>
+              </div>
             )}
-            <button
-              type="submit"
-              className="flex-1 py-3 px-4 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 focus:outline-none"
-              style={{ backgroundColor: theme.colors.accent }}
-            >
-              {initialData ? 'Update Transaksi' : 'Simpan Transaksi'}
-            </button>
           </div>
         </form>
       </div>

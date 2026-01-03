@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
 > **Last Updated**: January 3, 2026  
-> **Version**: 1.2.0  
+> **Version**: 1.2.1  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -408,6 +408,59 @@ const firebaseConfig = {
 ---
 
 ## 📝 Changelog
+
+### Version 1.3.0 (January 3, 2026)
+**UX Improvements:**
+- 🎯 **Header Action Buttons**: Moved primary action buttons to modal headers for better accessibility
+  - Save/Update and Delete buttons now in header (no need to scroll)
+  - Consistent button sizing across all forms (px-3 py-2 padding)
+  - All icons standardized to size 16
+  - Close button icon-only to save space
+  - Clear text labels on action buttons ("Simpan", "Update", "Hapus")
+- ✨ **Smart File Compression**: Enhanced compression logic
+  - Skip compression for files < 100KB (already optimal)
+  - Use original file if compressed version is larger
+  - No more negative compression ratios
+  - User-friendly feedback messages
+
+**Technical Changes:**
+- Updated `TransactionForm.tsx`:
+  - Moved action buttons to header with form attribute
+  - Standardized button styling and icon sizes
+  - Removed redundant bottom action buttons
+- Updated `CategoryFormModal.tsx`:
+  - Consistent header button layout
+  - Matching styling with TransactionForm
+- Enhanced `utils/fileCompression.ts`:
+  - Added minimum file size check (100KB threshold)
+  - Compare compressed vs original size
+  - Return original if compression ineffective
+
+**Design Consistency:**
+- All modal headers follow same pattern: Title + Actions + Close
+- Button hierarchy: Delete (subtle) → Save (prominent) → Close (subtle)
+- Uniform spacing and sizing across all interactive elements
+
+### Version 1.2.1 (January 3, 2026)
+**New Features:**
+- 🗜️ **File Compression**: Automatic image compression before upload to Firebase Storage
+  - Images automatically resized to max 1920x1920px
+  - JPEG compression at 80% quality
+  - Reduces storage costs and improves upload speed
+  - Shows compression ratio feedback to users (e.g., "Gambar dikompres 65% (2.5 MB → 875 KB)")
+- ✅ **PDF Validation**: Enhanced PDF file size validation (max 2MB)
+- 📦 **Storage Optimization**: Increased initial upload limit to 10MB (before compression)
+
+**Technical Changes:**
+- Created new utility: `utils/fileCompression.ts`
+  - `compressImage()`: Canvas-based image compression with aspect ratio preservation
+  - `validatePdfSize()`: PDF size validation
+  - `processFileForUpload()`: Main file processing function
+  - `formatBytes()`: Human-readable file size formatter
+- Updated `TransactionForm.tsx`:
+  - Async file handling with compression
+  - Compression feedback UI with success message
+  - Better error handling for file processing
 
 ### Version 1.2.0 (January 3, 2026)
 **Improvements:**

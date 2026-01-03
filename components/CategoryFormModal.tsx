@@ -88,18 +88,53 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 className="rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all animate-fade-in-up"
                 style={{ backgroundColor: theme.colors.bgCard }}
             >
-                <div className="p-4 flex justify-between items-center" style={{ backgroundColor: theme.colors.accent }}>
-                    <h3 className="text-white font-semibold text-lg">
+                <div className="p-4 flex justify-between items-center gap-3" style={{ backgroundColor: theme.colors.accent }}>
+                    <h3 className="text-white font-semibold text-lg flex-shrink-0">
                         {editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
                     </h3>
-                    <button onClick={handleClose} className="text-white hover:text-indigo-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+
+                    <div className="flex items-center gap-2">
+                        {/* Save Button */}
+                        <button
+                            type="submit"
+                            form="category-form"
+                            className="px-3 py-2 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-1.5"
+                            style={{
+                                backgroundColor: 'white',
+                                color: theme.colors.accent
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                        >
+                            <IconDisplay name={editingCategory ? "Check" : "Save"} size={16} />
+                            <span className="text-sm font-medium">{editingCategory ? 'Update' : 'Simpan'}</span>
+                        </button>
+
+                        {/* Close Button */}
+                        <button
+                            onClick={handleClose}
+                            className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
+                            style={{
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                color: 'white'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                            }}
+                        >
+                            <IconDisplay name="X" size={16} />
+                        </button>
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+                <form id="category-form" onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
                     {/* Nama & Tipe */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -207,14 +242,6 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                             {newCatType === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
                         </span>
                     </div>
-
-                    <button
-                        type="submit"
-                        className="w-full py-3 text-white rounded-lg font-bold transition-colors shadow-md"
-                        style={{ backgroundColor: theme.colors.accent }}
-                    >
-                        {editingCategory ? 'Simpan Perubahan' : 'Simpan Kategori'}
-                    </button>
                 </form>
             </div>
         </div>
