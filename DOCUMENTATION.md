@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
-> **Last Updated**: January 2, 2026  
-> **Version**: 1.1.0  
+> **Last Updated**: January 3, 2026  
+> **Version**: 1.2.0  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -57,6 +57,7 @@ dompet_cerdas/
 │   ├── TransactionList.tsx    # Transaction history with filters
 │   ├── TransactionForm.tsx    # Add/Edit transaction modal
 │   ├── CategoryManager.tsx    # CRUD categories
+│   ├── CategoryFormModal.tsx  # Reusable category add/edit modal
 │   ├── SimulationManager.tsx  # Budget simulation feature
 │   ├── Settings.tsx           # App settings (theme, delete data)
 │   ├── ConfirmDialog.tsx      # Reusable confirmation dialog & Toast
@@ -86,15 +87,17 @@ dompet_cerdas/
 ### 1. 🏠 Dashboard
 - **Balance summary**: Total income, expense, current balance
 - **Pie chart**: Expense breakdown by category
-- **Bar chart**: Monthly income vs expense comparison
-- **Recent transactions**: Last 5 transactions quick view
+- **Recent transactions**: Last 10 transactions sorted by creation time (newest first)
+- **Transaction count**: Shows "Menampilkan X dari Y transaksi"
 
 ### 2. 📋 Transaksi (Transactions)
 - **CRUD operations**: Add, view, edit, delete transactions
 - **Filters**: By month, by date range
 - **Grouping**: Transactions grouped by date
+- **Smart sorting**: Within each date group, sorted by creation time (newest first)
 - **Attachments**: Support for image (JPG, PNG, GIF, WEBP) and PDF uploads
 - **Long-press edit**: Mobile-friendly edit via long press
+- **Quick add category**: Add new category directly from transaction form
 
 ### 3. 🎯 Simulasi (Simulation)
 - **Budget simulation**: Create "what-if" scenarios
@@ -104,9 +107,11 @@ dompet_cerdas/
 
 ### 4. 📁 Master Kategori (Categories)
 - **CRUD operations**: Add, edit, delete categories
+- **Separated view**: Income and Expense categories displayed in separate sections
 - **Icon selection**: 150+ Lucide icons available
-- **Color picker**: 12 preset colors
+- **Color picker**: 8 preset colors
 - **Type classification**: Income or Expense
+- **Reusable modal**: Same form used in CategoryManager and TransactionForm
 
 ### 5. 🤖 Analisis AI
 - **Gemini AI integration**: Financial advice based on spending patterns
@@ -399,6 +404,32 @@ const firebaseConfig = {
 | Update deployment | `git push` then `git pull` on server |
 | Add new category fields | `types.ts` Category interface |
 | Change AI prompts | `services/geminiService.ts` |
+
+---
+
+## 📝 Changelog
+
+### Version 1.2.0 (January 3, 2026)
+**Improvements:**
+- ✨ **Transaction Sorting**: Transactions now sorted by `createdAt` timestamp (newest first) within each date group in History view
+- ✨ **Dashboard Enhancement**: Increased recent transactions display from 5 to 10 items with smart sorting
+- ✨ **Category Organization**: Income and Expense categories now displayed in separate sections with visual indicators
+- ✨ **Quick Category Creation**: Added shortcut to create new categories directly from transaction form
+- 🔧 **Code Refactoring**: Extracted `CategoryFormModal` as reusable component (DRY principle)
+- 📊 **Better UX**: Added transaction count display in Dashboard ("Menampilkan X dari Y transaksi")
+
+**Technical Changes:**
+- Added `createdAt` field to Transaction interface
+- Created new component: `CategoryFormModal.tsx`
+- Updated `TransactionList.tsx`, `Dashboard.tsx`, `CategoryManager.tsx`, `TransactionForm.tsx`
+- Improved sorting logic across all transaction displays
+
+### Version 1.1.0 (January 2, 2026)
+**Features:**
+- 📱 **Mobile Navigation**: Improved bottom navigation with "Kategori" menu
+- 🚀 **Quick Access**: Added header buttons for "Simulasi" and "AI Analisis" on mobile
+- 🎨 **PWA Support**: Added app icons and manifest for installable web app
+- 📁 **File Attachments**: Support for image and PDF attachments in transactions
 
 ---
 

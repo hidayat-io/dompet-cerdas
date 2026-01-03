@@ -16,6 +16,7 @@ interface TransactionListProps {
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' } | null
   ) => void;
+  onAddCategory?: (category: Omit<Category, 'id'>) => void;
 }
 
 // Modal for viewing attachment (moved up for cleaner structure)
@@ -128,7 +129,7 @@ const generateYearOptions = (): number[] => {
 
 type FilterMode = 'month' | 'range';
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, onDelete, onUpdate }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, onDelete, onUpdate, onAddCategory }) => {
   const { theme } = useTheme();
 
   const [viewingAttachment, setViewingAttachment] = useState<{
@@ -208,6 +209,16 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       }
       groups[t.date].push(t);
     });
+
+    // Sort transactions within each date group by createdAt descending (newest first)
+    Object.keys(groups).forEach(date => {
+      groups[date].sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA; // Descending: newest input at top
+      });
+    });
+
     return groups;
   }, [filteredTransactions]);
 
@@ -711,6 +722,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             initialData={editingTransaction}
             onUpdate={onUpdate}
             onDelete={onDelete}
+            onAddCategory={onAddCategory}
             onClose={() => setEditingTransaction(null)}
           />
         </div>

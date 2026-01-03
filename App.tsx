@@ -513,6 +513,7 @@ function App() {
                 categories={categories}
                 onUpdate={updateTransaction}
                 onDelete={deleteTransaction}
+                onAddCategory={addCategory}
               />
             )}
             {currentView === 'SIMULATION' && (
@@ -661,6 +662,7 @@ function App() {
               categories={categories}
               onClose={() => setShowAddModal(false)}
               onAdd={addTransaction}
+              onAddCategory={addCategory}
             />
           )
         }

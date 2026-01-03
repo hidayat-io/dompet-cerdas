@@ -23,6 +23,7 @@ export interface Transaction {
   date: string;
   description: string;
   categoryId: string;
+  createdAt?: string; // ISO timestamp for sorting
   // New structured attachment
   attachment?: Attachment;
   // Legacy fields (optional) for backward compatibility

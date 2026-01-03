@@ -3,6 +3,7 @@ import { Category, TransactionType, Transaction } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import ConfirmDialog from './ConfirmDialog';
+import CategoryFormModal from './CategoryFormModal';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -23,10 +24,11 @@ interface TransactionFormProps {
     attachment?: { file: File; type: 'image' | 'pdf' } | null
   ) => void;
   onDelete?: (id: string) => void;
+  onAddCategory?: (category: Omit<Category, 'id'>) => void;
   onClose: () => void;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, onAdd, onUpdate, onDelete, onClose }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, onAdd, onUpdate, onDelete, onAddCategory, onClose }) => {
   const { theme } = useTheme();
 
   // Determine initial state based on initialData
@@ -46,6 +48,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
 
   // Delete confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Category modal state
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -314,7 +319,24 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
 
           {/* Category Selection */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>Kategori</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.textMuted }}>Kategori</label>
+              {onAddCategory && (
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(true)}
+                  className="text-xs font-medium flex items-center gap-1 px-2 py-1 rounded-full transition-all"
+                  style={{
+                    backgroundColor: theme.colors.accentLight,
+                    color: theme.colors.accent
+                  }}
+                >
+                  <IconDisplay name="Plus" size={12} />
+                  Baru
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-3 gap-2">
               {filteredCategories.map((cat) => (
                 <button
@@ -344,7 +366,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
               ))}
             </div>
             {filteredCategories.length === 0 && (
-              <p className="text-xs text-center py-2" style={{ color: theme.colors.textMuted }}>Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.</p>
+              <p className="text-xs text-center py-2" style={{ color: theme.colors.textMuted }}>
+                Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.
+                {onAddCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryModal(true)}
+                    className="ml-1 underline font-medium"
+                    style={{ color: theme.colors.accent }}
+                  >
+                    Buat sekarang
+                  </button>
+                )}
+              </p>
             )}
           </div>
 
@@ -513,6 +547,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         type="danger"
         icon="Trash2"
       />
+
+      {/* Category Form Modal */}
+      {onAddCategory && (
+        <CategoryFormModal
+          isOpen={showCategoryModal}
+          defaultType={type}
+          onClose={() => setShowCategoryModal(false)}
+          onSave={(categoryData) => {
+            onAddCategory(categoryData);
+            setShowCategoryModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };

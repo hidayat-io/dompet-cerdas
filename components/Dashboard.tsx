@@ -170,7 +170,14 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, categories }) => {
 
       {/* Transaksi Terakhir (Mobile Clean Style) */}
       <div>
-        <h3 className="font-bold mb-3 px-1" style={{ color: theme.colors.textPrimary }}>Transaksi Terakhir</h3>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div>
+            <h3 className="font-bold" style={{ color: theme.colors.textPrimary }}>Transaksi Terakhir</h3>
+            <p className="text-xs" style={{ color: theme.colors.textMuted }}>
+              {transactions.length > 0 ? `Menampilkan ${Math.min(transactions.length, 10)} dari ${transactions.length} transaksi` : 'Belum ada transaksi'}
+            </p>
+          </div>
+        </div>
         <div
           className="rounded-2xl shadow-sm border overflow-hidden"
           style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
@@ -181,40 +188,48 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, categories }) => {
             </div>
           ) : (
             <div>
-              {transactions.slice(0, 5).map(t => {
-                const cat = categories.find(c => c.id === t.categoryId);
-                const isIncome = cat?.type === 'INCOME';
-                return (
-                  <div
-                    key={t.id}
-                    className="p-4 flex items-center justify-between transition-colors"
-                    style={{ borderBottom: `1px solid ${theme.colors.border}` }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0"
-                        style={{ backgroundColor: cat?.color || '#ccc' }}
-                      >
-                        <IconDisplay name={cat?.icon || 'HelpCircle'} size={18} />
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <p className="text-sm font-semibold truncate pr-2" style={{ color: theme.colors.textPrimary }}>
-                          {cat?.name || 'Tanpa Kategori'}
-                        </p>
-                        <p className="text-xs truncate max-w-[120px] md:max-w-xs" style={{ color: theme.colors.textMuted }}>
-                          {t.description || t.date}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className="font-semibold text-sm whitespace-nowrap"
-                      style={{ color: isIncome ? theme.colors.income : theme.colors.expense }}
+              {[...transactions]
+                .sort((a, b) => {
+                  // Sort by createdAt descending (newest first)
+                  const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                  const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                  return timeB - timeA;
+                })
+                .slice(0, 10)
+                .map(t => {
+                  const cat = categories.find(c => c.id === t.categoryId);
+                  const isIncome = cat?.type === 'INCOME';
+                  return (
+                    <div
+                      key={t.id}
+                      className="p-4 flex items-center justify-between transition-colors"
+                      style={{ borderBottom: `1px solid ${theme.colors.border}` }}
                     >
-                      {isIncome ? '+' : '-'}{formatRp(t.amount)}
-                    </span>
-                  </div>
-                );
-              })}
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0"
+                          style={{ backgroundColor: cat?.color || '#ccc' }}
+                        >
+                          <IconDisplay name={cat?.icon || 'HelpCircle'} size={18} />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <p className="text-sm font-semibold truncate pr-2" style={{ color: theme.colors.textPrimary }}>
+                            {cat?.name || 'Tanpa Kategori'}
+                          </p>
+                          <p className="text-xs truncate max-w-[120px] md:max-w-xs" style={{ color: theme.colors.textMuted }}>
+                            {t.description || t.date}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className="font-semibold text-sm whitespace-nowrap"
+                        style={{ color: isIncome ? theme.colors.income : theme.colors.expense }}
+                      >
+                        {isIncome ? '+' : '-'}{formatRp(t.amount)}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
