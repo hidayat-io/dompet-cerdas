@@ -407,6 +407,74 @@ const firebaseConfig = {
 
 ---
 
+## 🚀 Upcoming Features
+
+### 1. 💾 Backup & Restore Transaksi
+Fitur untuk backup dan restore data transaksi pengguna.
+
+**Backup Features:**
+- Export semua transaksi ke file JSON
+- Include metadata (categories, user info, timestamp)
+- Secure file format dengan validasi checksum
+- Nama file dengan timestamp untuk versioning
+
+**Restore Features:**
+- Upload file backup JSON
+- **Validasi format file** sebelum restore:
+  - Cek struktur JSON sesuai schema
+  - Validasi required fields (id, amount, date, categoryId, description)
+  - Cek format tanggal (YYYY-MM-DD)
+  - Validasi tipe data (amount = number, dll)
+  - Cek referensi categoryId valid
+- Preview data sebelum restore
+- Opsi: Replace all / Merge with existing
+
+**Technical Approach:**
+```typescript
+interface BackupFile {
+  version: string;
+  exportedAt: string;
+  userId: string;
+  transactions: Transaction[];
+  categories: Category[];
+  checksum: string;
+}
+
+// Validation schema
+function validateBackupFile(data: unknown): ValidationResult {
+  // Check structure, types, required fields
+  // Return { valid: boolean, errors: string[] }
+}
+```
+
+### 2. 📊 Export ke Excel
+Fitur untuk export transaksi ke format Excel (.xlsx).
+
+**Export Options:**
+- **By Date Range**: Custom start date - end date
+- **By Bulan & Tahun**: Pilih bulan dan tahun tertentu
+- **All Transactions**: Export semua transaksi
+
+**Excel Format:**
+| Tanggal | Kategori | Tipe | Jumlah | Catatan |
+|---------|----------|------|--------|---------|
+| 2026-01-03 | Makanan | Pengeluaran | Rp 50.000 | Makan siang |
+| 2026-01-03 | Gaji | Pemasukan | Rp 10.000.000 | Gaji Januari |
+
+**Features:**
+- Auto-format currency (Rupiah)
+- Color-coded rows (Income = green, Expense = red)
+- Summary row dengan total income, expense, balance
+- Sheet name with date range
+- Filename: `Transaksi_[start]_[end].xlsx`
+
+**Technical Approach:**
+- Library: SheetJS (xlsx) or ExcelJS
+- Client-side generation (no server needed)
+- Support for large datasets
+
+---
+
 ## 📝 Changelog
 
 ### Version 1.3.0 (January 3, 2026)
