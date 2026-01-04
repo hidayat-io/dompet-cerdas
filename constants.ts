@@ -1,5 +1,10 @@
 import { Category, IconName } from './types';
 
+// App Version
+export const APP_VERSION = '1.4.0';
+export const APP_BUILD_DATE = 'January 4, 2026';
+
+
 export const INITIAL_CATEGORIES: Category[] = [
   { id: 'c1', name: 'Gaji', type: 'INCOME', icon: 'Wallet', color: '#10b981' },
   { id: 'c2', name: 'Bonus', type: 'INCOME', icon: 'Gift', color: '#34d399' },

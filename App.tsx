@@ -6,7 +6,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db, storage } from './firebase';
 
-import { INITIAL_CATEGORIES } from './constants';
+import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
 import { Category, Transaction, Simulation, SimulationItem } from './types';
 import Dashboard from './components/Dashboard';
 import TransactionList from './components/TransactionList';
@@ -397,7 +397,7 @@ function App() {
           <div className="p-2 rounded-lg text-white" style={{ backgroundColor: theme.colors.accent }}>
             <IconDisplay name="Wallet" size={24} />
           </div>
-          <h1 className="text-xl font-bold tracking-tight" style={{ color: theme.colors.textPrimary }}>DompetCerdas</h1>
+          <h1 className="text-xl font-bold tracking-tight" style={{ color: theme.colors.textPrimary }}>DompetCerdas <span className="text-xs font-normal opacity-60">v{APP_VERSION}</span></h1>
         </div>
 
         <div className="px-4 py-4">
@@ -499,7 +499,7 @@ function App() {
             <div className="p-1.5 rounded text-white" style={{ backgroundColor: theme.colors.accent }}>
               <IconDisplay name="Wallet" size={20} />
             </div>
-            <span className="font-bold" style={{ color: theme.colors.textPrimary }}>DompetCerdas</span>
+            <span className="font-bold" style={{ color: theme.colors.textPrimary }}>DompetCerdas <span className="text-xs font-normal opacity-60">v{APP_VERSION}</span></span>
           </div>
           <div className="flex items-center gap-2">
             {/* Quick Access: AI Button */}

@@ -98,6 +98,7 @@ dompet_cerdas/
 - **Pie chart**: Expense breakdown by category
 - **Recent transactions**: Last 10 transactions sorted by creation time (newest first)
 - **Transaction count**: Shows "Menampilkan X dari Y transaksi"
+- **Version display**: App version shown in header (e.g., "v1.4.0")
 
 ### 2. 📋 Transaksi (Transactions)
 - **CRUD operations**: Add, view, edit, delete transactions
@@ -547,6 +548,7 @@ window.addEventListener('offline', showOfflineIndicator);
 - 💫 **Transaction UX Improvements** - Loading states, progress messages, and toast notifications
 - 🔄 **Auto Cache Busting** - Production deployments auto-update without manual cache clearing
 - 🖼️ **Enhanced Attachment Icons** - Proper icons for images and PDFs
+- 🏷️ **Version Display** - App version shown in header for transparency
 
 **Excel Export Features:**
 - Export by date range (Current Month, Custom Range, All Data)

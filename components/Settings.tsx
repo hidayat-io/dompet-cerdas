@@ -4,6 +4,7 @@ import IconDisplay from './IconDisplay';
 import { Toast } from './ConfirmDialog';
 import { Transaction, Category } from '../types';
 import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
+import { APP_VERSION, APP_BUILD_DATE } from '../constants';
 
 interface SettingsProps {
     onDeleteAllTransactions: () => Promise<void>;
@@ -579,6 +580,16 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
                 message={toast.message}
                 type={toast.type}
             />
+
+            {/* Version Info */}
+            <div className="text-center py-6 mt-8 border-t" style={{ borderColor: theme.colors.border }}>
+                <p className="text-sm" style={{ color: theme.colors.textMuted }}>
+                    Dompet Cerdas v{APP_VERSION}
+                </p>
+                <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>
+                    Build: {APP_BUILD_DATE}
+                </p>
+            </div>
         </div>
     );
 };
