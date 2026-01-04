@@ -549,6 +549,7 @@ window.addEventListener('offline', showOfflineIndicator);
 - 🔄 **Auto Cache Busting** - Production deployments auto-update without manual cache clearing
 - 🖼️ **Enhanced Attachment Icons** - Proper icons for images and PDFs
 - 🏷️ **Version Display** - App version shown in header for transparency
+- 📲 **PWA Auto-Update** - Automatic reload when new version is detected (for Add to Home Screen users)
 
 **Excel Export Features:**
 - Export by date range (Current Month, Custom Range, All Data)

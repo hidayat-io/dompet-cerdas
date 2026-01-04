@@ -48,6 +48,31 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // --- Auto-Update Check for PWA ---
+  useEffect(() => {
+    const STORED_VERSION_KEY = 'dompetcerdas_version';
+    const storedVersion = localStorage.getItem(STORED_VERSION_KEY);
+
+    if (storedVersion && storedVersion !== APP_VERSION) {
+      // New version detected - clear cache and reload
+      console.log(`New version detected: ${storedVersion} → ${APP_VERSION}`);
+      localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
+
+      // Clear caches if available
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => caches.delete(name));
+        });
+      }
+
+      // Force reload to get new version
+      window.location.reload();
+    } else if (!storedVersion) {
+      // First time - store current version
+      localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
+    }
+  }, []);
+
   // --- Firestore Listeners ---
   useEffect(() => {
     if (!user) {
