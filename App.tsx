@@ -48,30 +48,43 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // --- Update Banner State ---
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+
   // --- Auto-Update Check for PWA ---
   useEffect(() => {
     const STORED_VERSION_KEY = 'dompetcerdas_version';
     const storedVersion = localStorage.getItem(STORED_VERSION_KEY);
 
     if (storedVersion && storedVersion !== APP_VERSION) {
-      // New version detected - clear cache and reload
-      console.log(`New version detected: ${storedVersion} → ${APP_VERSION}`);
-      localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
-
-      // Clear caches if available
-      if ('caches' in window) {
-        caches.keys().then(names => {
-          names.forEach(name => caches.delete(name));
-        });
-      }
-
-      // Force reload to get new version
-      window.location.reload();
+      // New version detected - show banner
+      console.log(`New version available: ${storedVersion} → ${APP_VERSION}`);
+      setShowUpdateBanner(true);
     } else if (!storedVersion) {
       // First time - store current version
       localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
     }
   }, []);
+
+  // Handle update action
+  const handleUpdate = () => {
+    const STORED_VERSION_KEY = 'dompetcerdas_version';
+    localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
+
+    // Clear caches if available
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name));
+      });
+    }
+
+    // Reload to get new version
+    window.location.reload();
+  };
+
+  const handleDismissUpdate = () => {
+    setShowUpdateBanner(false);
+  };
 
   // --- Firestore Listeners ---
   useEffect(() => {
@@ -412,6 +425,38 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: theme.colors.bgPrimary }}>
+
+      {/* Update Banner */}
+      {showUpdateBanner && (
+        <div
+          className="fixed top-0 left-0 right-0 z-50 p-3 flex items-center justify-between gap-3"
+          style={{
+            backgroundColor: theme.colors.accent,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+          }}
+        >
+          <div className="flex items-center gap-2 text-white">
+            <IconDisplay name="RefreshCw" size={18} />
+            <span className="text-sm font-medium">
+              Versi baru tersedia! (v{APP_VERSION})
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDismissUpdate}
+              className="px-3 py-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors"
+            >
+              Nanti
+            </button>
+            <button
+              onClick={handleUpdate}
+              className="px-3 py-1.5 text-xs font-medium bg-white text-indigo-600 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Update Sekarang
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sidebar Navigation (Desktop) */}
       <aside
