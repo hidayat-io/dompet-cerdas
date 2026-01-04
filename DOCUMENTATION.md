@@ -21,7 +21,7 @@
 
 ---
 
-##  Tech Stack
+## 🛠 Tech Stack
 
 | Category | Technology | Version |
 |----------|------------|---------|
@@ -74,7 +74,9 @@ dompet_cerdas/
 │   └── geminiService.ts       # AI financial analysis service
 │
 ├── utils/
-│   └── excelExport.ts         # Excel export utility with Data URL approach
+│   ├── excelExport.ts         # Excel export utility with Data URL approach
+│   ├── fileCompression.ts     # Image compression utility
+│   └── README.md              # Utils documentation
 │
 ├── public/                    # Static assets (icons, manifest)
 │   ├── icon-512.png           # App icon (512x512)
@@ -207,8 +209,13 @@ users/
 ### ConfirmDialog.tsx
 - **Reusable modal** for delete confirmations
 - **Types**: danger, warning, success, info
-- **Toast component** for success/error notifications
-- **Auto-dismiss** toast after 3 seconds
+- **User confirmation** with text input validation
+
+### Toast.tsx
+- **Standalone toast component** for notifications
+- **Auto-dismiss** after 3 seconds
+- **Types**: success, error, info
+- **Position**: Top-right with smooth animations
 
 ### ThemeContext.tsx
 - **Theme Provider**: Wraps entire app
@@ -407,7 +414,7 @@ const firebaseConfig = {
 
 1. **index.css warning**: Build shows warning about missing `/index.css` - cosmetic only
 2. **Large bundle**: ~1.4MB JS bundle (consider code splitting for optimization)
-3. **No offline support**: Requires internet connection
+3. **Limited offline support**: Basic asset caching (v1.4.0), full PWA with offline data planned
 4. **Single currency**: Only supports IDR (Indonesian Rupiah)
 
 ---
