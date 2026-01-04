@@ -537,6 +537,39 @@ window.addEventListener('offline', showOfflineIndicator);
 - Workbox (Google's PWA toolkit)
 - idb (IndexedDB wrapper)
 
+### 3. 💬 Telegram Bot Integration
+Integrasi dengan Telegram untuk input dan monitoring transaksi via chat.
+
+**Planned Features:**
+- **Quick Input Transaksi via Chat**
+  - Format: `/add 50000 makan siang` atau `/tambah 150000 transport`
+  - Auto-detect kategori berdasarkan keyword
+  - Konfirmasi transaksi berhasil ditambahkan
+
+- **Query Transaksi**
+  - `/today` - Transaksi hari ini
+  - `/week` - Transaksi minggu ini
+  - `/month` - Transaksi bulan ini
+  - `/range 2026-01-01 2026-01-15` - Custom range
+
+- **Summary Report**
+  - `/summary` - Ringkasan keuangan
+  - Total income, expense, balance
+  - Top spending categories
+
+- **Account Linking**
+  - Link Telegram account ke DompetCerdas account
+  - Secure token-based authentication
+  - One-time setup via web app
+
+**Technical Considerations:**
+- Bot API: Telegram Bot API
+- Backend: Firebase Cloud Functions (atau Node.js server)
+- Database: Existing Firestore structure
+- Auth: Telegram user ID linked to Firebase UID
+
+*Detail implementation akan dibahas lebih lanjut.*
+
 ---
 
 ## 📝 Changelog
