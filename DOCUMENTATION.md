@@ -1,12 +1,13 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
 > **Last Updated**: January 4, 2026  
-> **Version**: 1.3.0  
+> **Version**: 1.4.0  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
 
 ## 📋 Table of Contents
+- [Changelog](#-changelog)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Features Overview](#-features-overview)
@@ -17,6 +18,60 @@
 - [Theming System](#-theming-system)
 - [Deployment](#-deployment)
 - [Development Commands](#-development-commands)
+
+---
+
+## 📝 Changelog
+
+### Version 1.4.0 (January 4, 2026)
+
+**🎉 Major Features:**
+- 📊 **Excel Export** - Export transactions to Excel with date range selection
+- 💫 **Transaction UX Improvements** - Loading states, progress messages, and toast notifications
+- 🔄 **Auto Cache Busting** - Production deployments auto-update without manual cache clearing
+- 🖼️ **Enhanced Attachment Icons** - Proper icons for images and PDFs
+
+**Excel Export Features:**
+- Export by date range (Current Month, Custom Range, All Data)
+- Data URL approach for reliable filename preservation
+- File size validation (max 10MB) with user-friendly warnings
+- Auto-format currency and summary rows
+- Proper filename format: `Transaksi_YYYY-MM-DD_YYYY-MM-DD.xlsx`
+- Located in Settings page
+
+**Transaction Improvements:**
+- Added loading states during transaction save
+- Progress messages for attachment uploads ("Mengupload lampiran...", "Menyimpan transaksi...")
+- Toast notifications for success/error feedback
+- Disabled form during submission to prevent double-submit
+- Created standalone `Toast.tsx` component for reusable notifications
+
+**Icon Enhancements:**
+- `Image` icon (green) for photo attachments
+- `FileText` icon (orange) for PDF attachments
+- `LogOut` icon for logout button
+- `Download` and `Database` icons for export feature
+
+**Attachment Management:**
+- Enhanced cleanup on delete/replace operations
+- Added legacy attachment format support
+- Proper MIME types and error handling
+- Verified Firebase Storage deletion in all scenarios
+
+**Cache Busting:**
+- Vite build config with content hashing for all assets
+- HTML meta tags for no-cache policy
+- Auto-updates in production without manual intervention
+- Development: Use incognito or hard refresh
+
+**Technical Changes:**
+- Added `xlsx` (SheetJS) for Excel generation
+- Added `file-saver` for reliable downloads
+- Created `/utils/excelExport.ts` utility
+- Updated Vite config with build optimization
+- Enhanced error handling across components
+
+**Files Changed:** 12 files (+948 lines, -94 lines)
 
 ---
 
