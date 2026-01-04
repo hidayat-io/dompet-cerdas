@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dompet Cerdas - Solusi Cerdas Keuangan Anda</title>
+    <meta name="description"
+        content="Aplikasi pencatat keuangan pintar dengan bantuan AI, simulasi anggaran, dan laporan visual yang intuitif.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../public/favicon-32.png">
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
+                        <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
+                        <path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" />
+                    </svg>
+                </div>
+                <span>DompetCerdas</span>
+            </div>
+            <div class="nav-links">
+                <a href="#fitur">Fitur</a>
+                <a href="#keunggulan">Keunggulan</a>
+                <a href="#ai">Teknologi AI</a>
+                <a href="https://dompas.indoomega.my.id" class="btn-primary-small">Buka Aplikasi</a>
+            </div>
+            <div class="mobile-menu-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="container hero-container">
+            <div class="hero-content">
+                <div class="badge">v1.4.0 Kini Tersedia</div>
+                <h1>Kelola Keuangan Anda dengan <span class="text-gradient">Lebih Cerdas</span></h1>
+                <p>Catat pemasukan, atur pengeluaran, dan dapatkan analisis finansial berbasis AI. Dompet Cerdas
+                    membantu Anda mencapai kebebasan finansial tanpa ribet.</p>
+                <div class="hero-buttons">
+                    <a href="https://dompas.indoomega.my.id" class="btn-primary">
+                        Mulai Sekarang
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14" />
+                            <path d="m12 5 7 7-7 7" />
+                        </svg>
+                    </a>
+                    <a href="#fitur" class="btn-secondary">Pelajari Lebih Lanjut</a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">100%</span>
+                        <span class="stat-label">Gratis & Aman</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">AI</span>
+                        <span class="stat-label">Analisis Cerdas</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">PWA</span>
+                        <span class="stat-label">Install di HP</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-image">
+                <div class="floating-card card-1">
+                    <div class="icon-box income">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                            <polyline points="17 6 23 6 23 12" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="card-label">Pemasukan</div>
+                        <div class="card-value">+Rp 15.000.000</div>
+                    </div>
+                </div>
+                <div class="floating-card card-2">
+                    <div class="icon-box expense">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+                            <polyline points="17 18 23 18 23 12" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="card-label">Pengeluaran</div>
+                        <div class="card-value">-Rp 4.500.000</div>
+                    </div>
+                </div>
+                <div class="app-mockup">
+                    <div class="mockup-header">
+                        <div class="dots">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <div class="address-bar">dompas.indoomega.my.id</div>
+                    </div>
+                    <div class="mockup-content">
+                        <!-- Abstract representation of UI -->
+                        <div class="ui-header">
+                            <div class="ui-avatar"></div>
+                            <div class="ui-text-lines">
+                                <div class="ui-line link"></div>
+                            </div>
+                        </div>
+                        <div class="ui-balance-card">
+                            <div class="ui-line white medium"></div>
+                            <div class="ui-line white large"></div>
+                        </div>
+                        <div class="ui-grid">
+                            <div class="ui-box"></div>
+                            <div class="ui-box"></div>
+                            <div class="ui-box"></div>
+                        </div>
+                        <div class="ui-list">
+                            <div class="ui-list-item"></div>
+                            <div class="ui-list-item"></div>
+                            <div class="ui-list-item"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Why Section -->
+    <section id="keunggulan" class="section bg-light">
+        <div class="container">
+            <div class="section-header text-center">
+                <span class="subtitle">Kenapa Dompet Cerdas?</span>
+                <h2>Solusi Finansial Modern</h2>
+                <p>Kami menggabungkan kemudahan penggunaan dengan teknologi terkini untuk pengalaman terbaik.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="feature-card">
+                    <div class="feature-icon i-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                        </svg>
+                    </div>
+                    <h3>Mudah Digunakan</h3>
+                    <p>Antarmuka intuitif yang dirancang untuk kecepatan. Catat transaksi dalam hitungan detik, bukan
+                        menit.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon i-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                    </div>
+                    <h3>Privasi Terjamin</h3>
+                    <p>Data tersimpan aman di akun Google Anda. Tanpa pihak ketiga yang mengintip data finansial Anda.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon i-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                    </div>
+                    <h3>Export ke Excel</h3>
+                    <p>Butuh laporan detail? Export riwayat transaksi Anda ke format Excel dengan mudah dan rapi.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Features -->
+    <section id="fitur" class="section">
+        <div class="container">
+            <div class="feature-row">
+                <div class="feature-text">
+                    <span class="subtitle">Laporan Visual</span>
+                    <h2>Pahami Kemana Uang Anda Pergi</h2>
+                    <p>Dashboard interaktif menyajikan ringkasan keuangan dan grafik pengeluaran berdasarkan kategori.
+                        Identifikasi kebocoran anggaran dengan cepat.</p>
+                    <ul class="check-list">
+                        <li><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg> Grafik Pie Kategori Interaktif</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg> Ringkasan Saldo Real-time</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg> Riwayat Transaksi Terorganisir</li>
+                    </ul>
+                </div>
+                <div class="feature-visual v-1">
+                    <!-- Visual representation using CSS -->
+                    <div class="chart-visual">
+                        <div class="chart-pie"></div>
+                        <div class="chart-legend">
+                            <div class="legend-item"><span class="dot c-1"></span>Makan</div>
+                            <div class="legend-item"><span class="dot c-2"></span>Transport</div>
+                            <div class="legend-item"><span class="dot c-3"></span>Belanja</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-row reverse">
+                <div class="feature-text">
+                    <span class="subtitle">Simulasi Anggaran</span>
+                    <h2>Rencanakan Tanpa Resiko</h2>
+                    <p>Punya rencana beli gadget baru atau liburan? Gunakan fitur Simulasi untuk melihat dampaknya
+                        terhadap saldo Anda tanpa mengganggu data keuangan asli.</p>
+                    <ul class="check-list">
+                        <li><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg> Buat Skenario "What-If"</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg> Proyeksi Saldo Masa Depan</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg> Konversi ke Transaksi Nyata</li>
+                    </ul>
+                </div>
+                <div class="feature-visual v-2">
+                    <div class="sim-card">
+                        <div class="sim-header">Simulasi Beli Laptop</div>
+                        <div class="sim-item">
+                            <span>Harga Laptop</span>
+                            <span class="negative">-Rp 15.000.000</span>
+                        </div>
+                        <div class="sim-item">
+                            <span>Jual Laptop Lama</span>
+                            <span class="positive">+Rp 5.000.000</span>
+                        </div>
+                        <div class="sim-total">
+                            <span>Proyeksi Saldo:</span>
+                            <strong>Rp 2.500.000</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Section -->
+    <section id="ai" class="section bg-gradient">
+        <div class="container text-center">
+            <div class="ai-badge">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                Powered by Gemini AI
+            </div>
+            <h2>Asisten Keuangan Pribadi 24/7</h2>
+            <p class="max-w-600">Bingung kenapa uang cepat habis? Biarkan AI menganalisis pola belanja Anda dan
+                memberikan saran penghematan yang personal dan actionable.</p>
+
+            <div class="ai-box">
+                <div class="ai-message">
+                    <div class="ai-avatar">AI</div>
+                    <div class="ai-text">
+                        "Halo! Saya perhatikan pengeluaran Anda untuk <strong>Makanan Luar</strong> naik 30% bulan ini.
+                        Jika Anda memasak sendiri di akhir pekan, Anda bisa menghemat sekitar <strong>Rp
+                            500.000</strong> bulan depan."
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Additional Features Grid -->
+    <section class="section">
+        <div class="container">
+            <div class="grid-4">
+                <div class="mini-feature">
+                    <div class="mini-icon">📱</div>
+                    <h4>PWA Support</h4>
+                    <p>Install di homescreen, akses offline.</p>
+                </div>
+                <div class="mini-feature">
+                    <div class="mini-icon">🌙</div>
+                    <h4>Dark Mode</h4>
+                    <p>Nyaman di mata, hemat baterai.</p>
+                </div>
+                <div class="mini-feature">
+                    <div class="mini-icon">📎</div>
+                    <h4>Lampiran Foto</h4>
+                    <p>Simpan struk belanja & bukti transfer.</p>
+                </div>
+                <div class="mini-feature">
+                    <div class="mini-icon">💾</div>
+                    <h4>Auto Backup</h4>
+                    <p>Data selalu aman di cloud.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="section cta-section">
+        <div class="container">
+            <div class="cta-box">
+                <h2>Siap Mengontrol Keuangan Anda?</h2>
+                <p>Bergabunglah sekarang. Gratis selamanya untuk fitur dasar.</p>
+                <a href="https://dompas.indoomega.my.id" class="btn-white">
+                    Buka Dompet Cerdas
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="m12 5 7 7-7 7" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-container">
+            <div class="footer-left">
+                <div class="logo">
+                    <span>DompetCerdas</span>
+                </div>
+                <p>© 2026 Dompet Cerdas. All rights reserved.</p>
+            </div>
+            <div class="footer-right">
+                <a href="https://github.com/mhidayat/dompet-cerdas">GitHub</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <span>v1.4.0</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
