@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import ConfirmDialog from './ConfirmDialog';
 import CategoryFormModal from './CategoryFormModal';
 import { processFileForUpload } from '../utils/fileCompression';
+import Toast from './Toast';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -15,7 +16,7 @@ interface TransactionFormProps {
     date: string,
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' }
-  ) => void;
+  ) => Promise<void>;
   onUpdate?: (
     id: string,
     amount: number,
@@ -23,7 +24,7 @@ interface TransactionFormProps {
     date: string,
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' } | null
-  ) => void;
+  ) => Promise<void>;
   onDelete?: (id: string) => void;
   onAddCategory?: (category: Omit<Category, 'id'>) => void;
   onClose: () => void;
@@ -55,6 +56,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
 
   // Compression message state
   const [compressionMessage, setCompressionMessage] = useState<string>('');
+
+  // Loading state for save operation
+  const [isSaving, setIsSaving] = useState(false);
+  const [savingMessage, setSavingMessage] = useState('');
+
+  // Toast state
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -213,7 +223,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -239,27 +249,57 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
       return;
     }
 
-    // Logic for Update vs Add
-    if (initialData && onUpdate) {
-      let attachmentPayload: { file: File; type: 'image' | 'pdf' } | null | undefined = undefined;
+    // Start loading state
+    setIsSaving(true);
 
-      if (attachment && attachmentType) {
-        attachmentPayload = { file: attachment, type: attachmentType };
-      } else if (isAttachmentDeleted) {
-        attachmentPayload = null;
-      }
-
-      onUpdate(initialData.id, rawAmount, categoryId, date, description, attachmentPayload);
-
-    } else if (onAdd) {
-      if (attachment && attachmentType) {
-        onAdd(rawAmount, categoryId, date, description, { file: attachment, type: attachmentType });
-      } else {
-        onAdd(rawAmount, categoryId, date, description);
-      }
+    // Set appropriate message based on whether there's an attachment
+    if (attachment || (initialData && attachment)) {
+      setSavingMessage('Mengupload lampiran...');
+    } else {
+      setSavingMessage('Menyimpan transaksi...');
     }
 
-    onClose();
+    try {
+      // Logic for Update vs Add
+      if (initialData && onUpdate) {
+        let attachmentPayload: { file: File; type: 'image' | 'pdf' } | null | undefined = undefined;
+
+        if (attachment && attachmentType) {
+          attachmentPayload = { file: attachment, type: attachmentType };
+        } else if (isAttachmentDeleted) {
+          attachmentPayload = null;
+        }
+
+        await onUpdate(initialData.id, rawAmount, categoryId, date, description, attachmentPayload);
+
+      } else if (onAdd) {
+        if (attachment && attachmentType) {
+          await onAdd(rawAmount, categoryId, date, description, { file: attachment, type: attachmentType });
+        } else {
+          await onAdd(rawAmount, categoryId, date, description);
+        }
+      }
+
+      // Show success toast
+      setToastMessage(initialData ? '✅ Transaksi berhasil diupdate!' : '✅ Transaksi berhasil disimpan!');
+      setToastType('success');
+      setShowToast(true);
+
+      // Close modal after short delay to show toast
+      setTimeout(() => {
+        onClose();
+      }, 500);
+
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      setError('⚠️ Gagal menyimpan transaksi. Silakan coba lagi.');
+      setToastMessage('❌ Gagal menyimpan transaksi');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsSaving(false);
+      setSavingMessage('');
+    }
   };
 
   return (
@@ -299,20 +339,30 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
             <button
               type="submit"
               form="transaction-form"
-              className="px-3 py-2 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-1.5"
+              disabled={isSaving}
+              className="px-3 py-2 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                backgroundColor: 'white',
-                color: theme.colors.accent
+                backgroundColor: isSaving ? theme.colors.bgMuted : 'white',
+                color: isSaving ? theme.colors.textMuted : theme.colors.accent
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
+                if (!isSaving) e.currentTarget.style.transform = 'scale(1.05)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             >
-              <IconDisplay name={initialData ? "Check" : "Save"} size={16} />
-              <span className="text-sm font-medium">{initialData ? 'Update' : 'Simpan'}</span>
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+                  <span className="text-sm font-medium">Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <IconDisplay name={initialData ? "Check" : "Save"} size={16} />
+                  <span className="text-sm font-medium">{initialData ? 'Update' : 'Simpan'}</span>
+                </>
+              )}
             </button>
 
             {/* Close Button */}
@@ -336,6 +386,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         </div>
 
         <form id="transaction-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+
+          {/* Loading Message */}
+          {isSaving && savingMessage && (
+            <div className="border-l-4 p-3 rounded-md text-sm font-medium flex items-center gap-2"
+              style={{
+                backgroundColor: theme.colors.accentLight,
+                color: theme.colors.accent,
+                borderColor: theme.colors.accent
+              }}
+            >
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+              <span>{savingMessage}</span>
+            </div>
+          )}
 
           {error && (
             <div className="border-l-4 border-red-500 p-3 rounded-md text-sm font-medium flex items-center gap-2 animate-pulse"
@@ -386,7 +450,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 type="text"
                 value={displayAmount}
                 onChange={handleAmountChange}
-                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-lg"
+                disabled={isSaving}
+                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: theme.colors.bgHover,
                   borderColor: theme.colors.border,
@@ -622,6 +687,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
             onAddCategory(categoryData);
             setShowCategoryModal(false);
           }}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
         />
       )}
     </div>

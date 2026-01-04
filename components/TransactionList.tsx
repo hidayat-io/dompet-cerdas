@@ -15,7 +15,7 @@ interface TransactionListProps {
     date: string,
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' } | null
-  ) => void;
+  ) => Promise<void>;
   onAddCategory?: (category: Omit<Category, 'id'>) => void;
 }
 
@@ -647,20 +647,20 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                                       type: t.attachmentType || 'image'
                                     });
                                   }}
-                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors"
+                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-all"
                                   style={{
-                                    color: theme.colors.accent,
-                                    backgroundColor: theme.colors.accentLight
+                                    color: (t.attachmentType || 'image') === 'image' ? '#10b981' : '#f59e0b',
+                                    backgroundColor: (t.attachmentType || 'image') === 'image' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)'
                                   }}
                                   onMouseEnter={(e) => {
-                                    e.currentTarget.style.opacity = '0.8';
+                                    e.currentTarget.style.transform = 'scale(1.1)';
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.currentTarget.style.opacity = '1';
+                                    e.currentTarget.style.transform = 'scale(1)';
                                   }}
-                                  title="Lihat lampiran"
+                                  title={`Lihat ${(t.attachmentType || 'image') === 'image' ? 'foto' : 'PDF'}`}
                                 >
-                                  <IconDisplay name="Paperclip" size={12} />
+                                  <IconDisplay name={(t.attachmentType || 'image') === 'image' ? 'Image' : 'FileText'} size={12} />
                                 </button>
                               )}
                               {t.attachment && (
@@ -673,20 +673,20 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                                       type: t.attachment!.type
                                     });
                                   }}
-                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors"
+                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-all"
                                   style={{
-                                    color: theme.colors.accent,
-                                    backgroundColor: theme.colors.accentLight
+                                    color: t.attachment.type === 'image' ? '#10b981' : '#f59e0b',
+                                    backgroundColor: t.attachment.type === 'image' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)'
                                   }}
                                   onMouseEnter={(e) => {
-                                    e.currentTarget.style.opacity = '0.8';
+                                    e.currentTarget.style.transform = 'scale(1.1)';
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.currentTarget.style.opacity = '1';
+                                    e.currentTarget.style.transform = 'scale(1)';
                                   }}
-                                  title="Lihat lampiran"
+                                  title={`Lihat ${t.attachment.type === 'image' ? 'foto' : 'PDF'}`}
                                 >
-                                  <IconDisplay name="Paperclip" size={12} />
+                                  <IconDisplay name={t.attachment.type === 'image' ? 'Image' : 'FileText'} size={12} />
                                 </button>
                               )}
                             </div>

@@ -172,7 +172,18 @@ function App() {
         } catch (e) { console.error("Failed to delete old attachment", e); }
       }
       else if (currentData.attachmentUrl) {
-        // Try to delete legacy attachment if possible or ignore
+        // Try to delete legacy attachment by extracting path from URL
+        try {
+          // Extract path from Firebase Storage URL
+          const urlPattern = /\/o\/(.+?)\?/;
+          const match = currentData.attachmentUrl.match(urlPattern);
+          if (match && match[1]) {
+            const filePath = decodeURIComponent(match[1]);
+            await deleteObject(ref(storage, filePath));
+          }
+        } catch (e) {
+          console.error("Failed to delete legacy attachment", e);
+        }
       }
       attachmentData = undefined;
     }
@@ -181,6 +192,19 @@ function App() {
         try {
           await deleteObject(ref(storage, currentData.attachment.path));
         } catch (e) { console.error("Failed to delete old attachment", e); }
+      }
+      else if (currentData.attachmentUrl) {
+        // Try to delete legacy attachment by extracting path from URL
+        try {
+          const urlPattern = /\/o\/(.+?)\?/;
+          const match = currentData.attachmentUrl.match(urlPattern);
+          if (match && match[1]) {
+            const filePath = decodeURIComponent(match[1]);
+            await deleteObject(ref(storage, filePath));
+          }
+        } catch (e) {
+          console.error("Failed to delete legacy attachment", e);
+        }
       }
 
       try {
@@ -226,6 +250,19 @@ function App() {
           await deleteObject(ref(storage, tx.attachment.path));
         } catch (error) {
           console.error("Error deleting file:", error);
+        }
+      }
+      else if (tx.attachmentUrl) {
+        // Try to delete legacy attachment by extracting path from URL
+        try {
+          const urlPattern = /\/o\/(.+?)\?/;
+          const match = tx.attachmentUrl.match(urlPattern);
+          if (match && match[1]) {
+            const filePath = decodeURIComponent(match[1]);
+            await deleteObject(ref(storage, filePath));
+          }
+        } catch (error) {
+          console.error("Error deleting legacy attachment:", error);
         }
       }
     }
@@ -587,6 +624,8 @@ function App() {
               <Settings
                 onDeleteAllTransactions={deleteAllTransactions}
                 transactionCount={transactions.length}
+                transactions={transactions}
+                categories={categories}
               />
             )}
           </div>

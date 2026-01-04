@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
-> **Last Updated**: January 3, 2026  
-> **Version**: 1.2.1  
+> **Last Updated**: January 4, 2026  
+> **Version**: 1.3.0  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -33,6 +33,8 @@
 | **Charts** | Recharts | 3.x |
 | **Icons** | Lucide React | 0.561.x |
 | **AI Service** | Google Gemini AI | 1.34.x |
+| **Excel Export** | SheetJS (xlsx) | Latest |
+| **File Download** | FileSaver.js | Latest |
 | **Styling** | Vanilla CSS + Inline Styles | - |
 
 ---
@@ -55,12 +57,13 @@ dompet_cerdas/
 │   ├── AuthLogin.tsx          # Google login page
 │   ├── Dashboard.tsx          # Main dashboard with summary & charts
 │   ├── TransactionList.tsx    # Transaction history with filters
-│   ├── TransactionForm.tsx    # Add/Edit transaction modal
+│   ├── TransactionForm.tsx    # Add/Edit transaction modal with loading states
 │   ├── CategoryManager.tsx    # CRUD categories
 │   ├── CategoryFormModal.tsx  # Reusable category add/edit modal
 │   ├── SimulationManager.tsx  # Budget simulation feature
-│   ├── Settings.tsx           # App settings (theme, delete data)
-│   ├── ConfirmDialog.tsx      # Reusable confirmation dialog & Toast
+│   ├── Settings.tsx           # App settings (theme, delete data, Excel export)
+│   ├── ConfirmDialog.tsx      # Reusable confirmation dialog
+│   ├── Toast.tsx              # Standalone toast notification component
 │   └── IconDisplay.tsx        # Dynamic Lucide icon renderer
 │
 ├── contexts/
@@ -68,6 +71,9 @@ dompet_cerdas/
 │
 ├── services/
 │   └── geminiService.ts       # AI financial analysis service
+│
+├── utils/
+│   └── excelExport.ts         # Excel export utility with Data URL approach
 │
 ├── public/                    # Static assets (icons, manifest)
 │   ├── icon-512.png           # App icon (512x512)
@@ -96,6 +102,11 @@ dompet_cerdas/
 - **Grouping**: Transactions grouped by date
 - **Smart sorting**: Within each date group, sorted by creation time (newest first)
 - **Attachments**: Support for image (JPG, PNG, GIF, WEBP) and PDF uploads
+  - Image compression before upload
+  - Proper attachment icons (Image/FileText)
+  - Attachment cleanup on delete
+- **Loading states**: Visual feedback during save with progress messages
+- **Toast notifications**: Success/error feedback for all operations
 - **Long-press edit**: Mobile-friendly edit via long press
 - **Quick add category**: Add new category directly from transaction form
 
@@ -120,8 +131,15 @@ dompet_cerdas/
 
 ### 6. ⚙️ Pengaturan (Settings)
 - **Theme toggle**: Light/Dark mode with persistence
+- **Excel Export**: Export transactions to Excel file
+  - Export by date range (Current Month, Custom Range, All Data)
+  - File size validation (max 10MB)
+  - Proper filename: `Transaksi_YYYY-MM-DD_YYYY-MM-DD.xlsx`
+  - Auto-format currency and summary rows
+  - Data URL approach for reliable downloads
 - **Delete all data**: Clear all transactions with confirmation
 - **Account info**: Display logged-in user
+- **Cache busting**: Auto-updates in production via content hashing
 
 ---
 
@@ -447,31 +465,68 @@ function validateBackupFile(data: unknown): ValidationResult {
 }
 ```
 
-### 2. 📊 Export ke Excel
-Fitur untuk export transaksi ke format Excel (.xlsx).
+### 2. 📱 Progressive Web App (PWA) Enhancement
+Upgrade aplikasi menjadi full PWA dengan Service Worker untuk pengalaman yang lebih baik.
 
-**Export Options:**
-- **By Date Range**: Custom start date - end date
-- **By Bulan & Tahun**: Pilih bulan dan tahun tertentu
-- **All Transactions**: Export semua transaksi
+**Service Worker Features:**
+- **Auto-update Detection**
+  - Detect new version available
+  - Notify user dengan toast/banner
+  - Option: "Update Now" atau "Update Later"
+  - Seamless update tanpa reload manual
 
-**Excel Format:**
-| Tanggal | Kategori | Tipe | Jumlah | Catatan |
-|---------|----------|------|--------|---------|
-| 2026-01-03 | Makanan | Pengeluaran | Rp 50.000 | Makan siang |
-| 2026-01-03 | Gaji | Pemasukan | Rp 10.000.000 | Gaji Januari |
+- **Background Sync**
+  - Queue transaksi saat offline
+  - Auto-sync ketika online kembali
+  - Retry failed uploads
+  - Status indicator untuk pending sync
 
-**Features:**
-- Auto-format currency (Rupiah)
-- Color-coded rows (Income = green, Expense = red)
-- Summary row dengan total income, expense, balance
-- Sheet name with date range
-- Filename: `Transaksi_[start]_[end].xlsx`
+- **Offline Support**
+  - Cache static assets (HTML, CSS, JS)
+  - Cache Firebase data dengan IndexedDB
+  - Offline-first strategy
+  - "You're offline" indicator
+
+- **App Install Prompt**
+  - Custom install banner
+  - "Add to Home Screen" prompt
+  - Standalone app experience
+  - App icon & splash screen
 
 **Technical Approach:**
-- Library: SheetJS (xlsx) or ExcelJS
-- Client-side generation (no server needed)
-- Support for large datasets
+```typescript
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => {
+      // Check for updates
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version available
+            showUpdateNotification();
+          }
+        });
+      });
+    });
+}
+
+// Offline Detection
+window.addEventListener('online', syncPendingTransactions);
+window.addEventListener('offline', showOfflineIndicator);
+```
+
+**Benefits:**
+- ✅ Better user experience (faster load, offline access)
+- ✅ Auto-updates tanpa user intervention
+- ✅ Installable sebagai native app
+- ✅ Reduced server load (caching)
+- ✅ Better engagement (push notifications ready)
+
+**Libraries:**
+- Workbox (Google's PWA toolkit)
+- idb (IndexedDB wrapper)
 
 ---
 

@@ -28,7 +28,7 @@ import {
   Smartphone, Laptop, Monitor, Tv, Tablet, Camera,
   Headphones, Speaker, Radio, Wifi, Bluetooth, Battery,
   Cable, Cpu, HardDrive, Printer, Mouse, Keyboard,
-  Gamepad, Joystick,
+  Gamepad, Joystick, Image, Paperclip,
 
   // Home & Utilities
   Home, Bed, Sofa, Lamp, LampDesk,
@@ -71,7 +71,7 @@ import {
   ArrowRight, ArrowLeft, ArrowUp, ArrowDown, RefreshCw,
   Search, Filter, Settings, Menu, MoreHorizontal, MoreVertical,
   AlertCircle, Info, HelpCircle, CheckCircle, XCircle,
-  Calendar, CalendarDays
+  Calendar, CalendarDays, LogOut, Download, Database
 } from 'lucide-react';
 
 interface IconDisplayProps {
@@ -111,7 +111,7 @@ const IconDisplay: React.FC<IconDisplayProps> = ({ name, className = "", size = 
     Smartphone, Laptop, Monitor, Tv, Tablet, Camera,
     Headphones, Speaker, Radio, Wifi, Bluetooth, Battery,
     Cable, Cpu, HardDrive, Printer, Mouse, Keyboard,
-    Gamepad, Joystick,
+    Gamepad, Joystick, Image, Paperclip,
 
     // Home & Utilities
     Home, Bed, Sofa, Lamp, LampDesk,
@@ -154,7 +154,7 @@ const IconDisplay: React.FC<IconDisplayProps> = ({ name, className = "", size = 
     ArrowRight, ArrowLeft, ArrowUp, ArrowDown, RefreshCw,
     Search, Filter, Settings, Menu, MoreHorizontal, MoreVertical,
     AlertCircle, Info, HelpCircle, CheckCircle, XCircle,
-    Calendar, CalendarDays
+    Calendar, CalendarDays, LogOut, Download, Database
   };
 
   const IconComponent = icons[name] || HelpCircle;

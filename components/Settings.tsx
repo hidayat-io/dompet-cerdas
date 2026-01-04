@@ -2,23 +2,39 @@ import React, { useState } from 'react';
 import { useTheme, themes } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
 import { Toast } from './ConfirmDialog';
+import { Transaction, Category } from '../types';
+import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
 
 interface SettingsProps {
     onDeleteAllTransactions: () => Promise<void>;
     transactionCount: number;
+    transactions: Transaction[];
+    categories: Category[];
 }
 
-const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactionCount }) => {
+const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactionCount, transactions, categories }) => {
     const { theme, isDark, toggleTheme } = useTheme();
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
     // Toast state
-    const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({
         show: false,
         message: '',
         type: 'success'
+    });
+
+    // Export Excel states
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportRange, setExportRange] = useState<'current' | 'custom' | 'all'>('current');
+    const [customStartDate, setCustomStartDate] = useState(() => {
+        const { startDate } = getCurrentMonthRange();
+        return startDate;
+    });
+    const [customEndDate, setCustomEndDate] = useState(() => {
+        const { endDate } = getCurrentMonthRange();
+        return endDate;
     });
 
     const handleDeleteAll = async () => {
@@ -37,6 +53,50 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
             setToast({ show: true, message: 'Gagal menghapus transaksi. Silakan coba lagi.', type: 'error' });
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleExportExcel = async () => {
+        setIsExporting(true);
+        try {
+            let startDate: string | undefined;
+            let endDate: string | undefined;
+
+            if (exportRange === 'current') {
+                const range = getCurrentMonthRange();
+                startDate = range.startDate;
+                endDate = range.endDate;
+            } else if (exportRange === 'custom') {
+                startDate = customStartDate;
+                endDate = customEndDate;
+            }
+            // 'all' = no date filter
+
+            const result = exportToExcel({
+                transactions,
+                categories,
+                startDate,
+                endDate
+            });
+
+            setToast({
+                show: true,
+                message: `✅ Berhasil export ${result.recordCount} transaksi ke Excel!`,
+                type: 'success'
+            });
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+
+            // Check if it's a file size error
+            const errorMessage = error instanceof Error ? error.message : 'Gagal export ke Excel. Silakan coba lagi.';
+
+            setToast({
+                show: true,
+                message: `❌ ${errorMessage}`,
+                type: 'error'
+            });
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -182,6 +242,184 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
                             </div>
                         )}
                     </button>
+                </div>
+            </div>
+
+            {/* Export Excel Section */}
+            <div
+                className="rounded-xl border p-6"
+                style={{
+                    backgroundColor: theme.colors.bgCard,
+                    borderColor: theme.colors.border
+                }}
+            >
+                <div className="flex items-center gap-3 mb-4">
+                    <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: theme.colors.incomeBg }}
+                    >
+                        <IconDisplay
+                            name="FileText"
+                            size={24}
+                            style={{ color: theme.colors.income }}
+                        />
+                    </div>
+                    <div>
+                        <h3
+                            className="font-semibold text-lg"
+                            style={{ color: theme.colors.textPrimary }}
+                        >
+                            Export ke Excel
+                        </h3>
+                        <p
+                            className="text-sm"
+                            style={{ color: theme.colors.textSecondary }}
+                        >
+                            Download laporan transaksi dalam format Excel (.xlsx)
+                        </p>
+                    </div>
+                </div>
+
+                {/* Export Options */}
+                <div className="space-y-4">
+                    {/* Range Selection */}
+                    <div>
+                        <label
+                            className="block text-sm font-medium mb-2"
+                            style={{ color: theme.colors.textSecondary }}
+                        >
+                            Pilih Periode:
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {/* Current Month */}
+                            <button
+                                onClick={() => setExportRange('current')}
+                                className={`p-3 rounded-lg border-2 transition-all ${exportRange === 'current' ? 'ring-2 ring-offset-2' : ''
+                                    }`}
+                                style={{
+                                    backgroundColor: exportRange === 'current' ? theme.colors.accentLight : theme.colors.bgHover,
+                                    borderColor: exportRange === 'current' ? theme.colors.accent : theme.colors.border,
+                                    color: theme.colors.textPrimary
+                                }}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <IconDisplay name="Calendar" size={18} style={{ color: exportRange === 'current' ? theme.colors.accent : theme.colors.textMuted }} />
+                                    <div className="text-left">
+                                        <p className="text-sm font-medium">Bulan Ini</p>
+                                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>
+                                            {formatDateRange(getCurrentMonthRange().startDate, getCurrentMonthRange().endDate)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Custom Range */}
+                            <button
+                                onClick={() => setExportRange('custom')}
+                                className={`p-3 rounded-lg border-2 transition-all ${exportRange === 'custom' ? 'ring-2 ring-offset-2' : ''
+                                    }`}
+                                style={{
+                                    backgroundColor: exportRange === 'custom' ? theme.colors.accentLight : theme.colors.bgHover,
+                                    borderColor: exportRange === 'custom' ? theme.colors.accent : theme.colors.border,
+                                    color: theme.colors.textPrimary
+                                }}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <IconDisplay name="CalendarDays" size={18} style={{ color: exportRange === 'custom' ? theme.colors.accent : theme.colors.textMuted }} />
+                                    <div className="text-left">
+                                        <p className="text-sm font-medium">Rentang Custom</p>
+                                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>Pilih tanggal sendiri</p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* All Transactions */}
+                            <button
+                                onClick={() => setExportRange('all')}
+                                className={`p-3 rounded-lg border-2 transition-all ${exportRange === 'all' ? 'ring-2 ring-offset-2' : ''
+                                    }`}
+                                style={{
+                                    backgroundColor: exportRange === 'all' ? theme.colors.accentLight : theme.colors.bgHover,
+                                    borderColor: exportRange === 'all' ? theme.colors.accent : theme.colors.border,
+                                    color: theme.colors.textPrimary
+                                }}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <IconDisplay name="Database" size={18} style={{ color: exportRange === 'all' ? theme.colors.accent : theme.colors.textMuted }} />
+                                    <div className="text-left">
+                                        <p className="text-sm font-medium">Semua Data</p>
+                                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>{transactions.length} transaksi</p>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Custom Date Range Inputs */}
+                    {exportRange === 'custom' && (
+                        <div className="grid grid-cols-2 gap-3 p-4 rounded-lg border" style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}>
+                            <div>
+                                <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.textMuted }}>Dari Tanggal</label>
+                                <input
+                                    type="date"
+                                    value={customStartDate}
+                                    onChange={(e) => setCustomStartDate(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded-lg outline-none text-sm"
+                                    style={{
+                                        backgroundColor: theme.colors.bgCard,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.textPrimary
+                                    }}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.textMuted }}>Sampai Tanggal</label>
+                                <input
+                                    type="date"
+                                    value={customEndDate}
+                                    onChange={(e) => setCustomEndDate(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded-lg outline-none text-sm"
+                                    style={{
+                                        backgroundColor: theme.colors.bgCard,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.textPrimary
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Export Button */}
+                    <button
+                        onClick={handleExportExcel}
+                        disabled={isExporting || transactions.length === 0}
+                        className={`w-full py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${transactions.length === 0 || isExporting
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'hover:scale-[1.02]'
+                            }`}
+                        style={{
+                            backgroundColor: transactions.length > 0 && !isExporting ? theme.colors.income : undefined,
+                            color: transactions.length > 0 && !isExporting ? 'white' : undefined
+                        }}
+                    >
+                        {isExporting ? (
+                            <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                Mengexport...
+                            </>
+                        ) : (
+                            <>
+                                <IconDisplay name="Download" size={20} />
+                                Export ke Excel
+                            </>
+                        )}
+                    </button>
+
+                    {transactions.length === 0 && (
+                        <p className="text-xs text-center" style={{ color: theme.colors.textMuted }}>
+                            Tidak ada transaksi untuk diexport
+                        </p>
+                    )}
                 </div>
             </div>
 
