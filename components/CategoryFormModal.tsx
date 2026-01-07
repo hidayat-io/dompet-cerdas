@@ -93,45 +93,23 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         {editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
                     </h3>
 
-                    <div className="flex items-center gap-2">
-                        {/* Save Button */}
-                        <button
-                            type="submit"
-                            form="category-form"
-                            className="px-3 py-2 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-1.5"
-                            style={{
-                                backgroundColor: 'white',
-                                color: theme.colors.accent
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'scale(1.05)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                        >
-                            <IconDisplay name={editingCategory ? "Check" : "Save"} size={16} />
-                            <span className="text-sm font-medium">{editingCategory ? 'Update' : 'Simpan'}</span>
-                        </button>
-
-                        {/* Close Button */}
-                        <button
-                            onClick={handleClose}
-                            className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
-                            style={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                                color: 'white'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                            }}
-                        >
-                            <IconDisplay name="X" size={16} />
-                        </button>
-                    </div>
+                    {/* Close Button */}
+                    <button
+                        onClick={handleClose}
+                        className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
+                        style={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            color: 'white'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                        }}
+                    >
+                        <IconDisplay name="X" size={16} />
+                    </button>
                 </div>
 
                 <form id="category-form" onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
@@ -241,6 +219,27 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         >
                             {newCatType === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
                         </span>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="flex justify-end pt-4 border-t" style={{ borderColor: theme.colors.border }}>
+                        <button
+                            type="submit"
+                            className="px-6 py-3 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-2 shadow-md hover:shadow-lg"
+                            style={{
+                                backgroundColor: theme.colors.accent,
+                                color: 'white'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                        >
+                            <IconDisplay name={editingCategory ? "Check" : "Save"} size={18} />
+                            <span>{editingCategory ? 'Update' : 'Simpan'}</span>
+                        </button>
                     </div>
                 </form>
             </div>

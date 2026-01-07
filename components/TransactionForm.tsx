@@ -311,78 +311,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         <div className="p-4 flex justify-between items-center gap-3 flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
           <h3 className="text-white font-semibold text-lg flex-shrink-0">{initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}</h3>
 
-          <div className="flex items-center gap-2">
-            {/* Delete Button (only show when editing) */}
-            {initialData && onDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                }}
-                title="Hapus Transaksi"
-              >
-                <IconDisplay name="Trash2" size={16} />
-                <span className="text-sm font-medium">Hapus</span>
-              </button>
-            )}
-
-            {/* Save Button */}
-            <button
-              type="submit"
-              form="transaction-form"
-              disabled={isSaving}
-              className="px-3 py-2 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: isSaving ? theme.colors.bgMuted : 'white',
-                color: isSaving ? theme.colors.textMuted : theme.colors.accent
-              }}
-              onMouseEnter={(e) => {
-                if (!isSaving) e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                  <span className="text-sm font-medium">Menyimpan...</span>
-                </>
-              ) : (
-                <>
-                  <IconDisplay name={initialData ? "Check" : "Save"} size={16} />
-                  <span className="text-sm font-medium">{initialData ? 'Update' : 'Simpan'}</span>
-                </>
-              )}
-            </button>
-
-            {/* Close Button */}
-            <button
-              onClick={onClose}
-              className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-              }}
-            >
-              <IconDisplay name="X" size={16} />
-            </button>
-          </div>
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              color: 'white'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+            }}
+          >
+            <IconDisplay name="X" size={16} />
+          </button>
         </div>
 
         <form id="transaction-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
@@ -649,6 +594,66 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 <span>{compressionMessage}</span>
               </div>
             )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3 pt-4 border-t" style={{ borderColor: theme.colors.border }}>
+            {/* Delete Button (only show when editing) */}
+            {initialData && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-4 py-3 rounded-lg transition-all focus:outline-none flex items-center gap-2 font-medium"
+                style={{
+                  backgroundColor: theme.colors.expenseBg,
+                  color: theme.colors.expense
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.expense;
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
+                  e.currentTarget.style.color = theme.colors.expense;
+                }}
+                title="Hapus Transaksi"
+              >
+                <IconDisplay name="Trash2" size={18} />
+                <span>Hapus</span>
+              </button>
+            )}
+
+            {/* Spacer */}
+            <div className="flex-1"></div>
+
+            {/* Save/Update Button */}
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-6 py-3 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+              style={{
+                backgroundColor: isSaving ? theme.colors.bgMuted : theme.colors.accent,
+                color: 'white'
+              }}
+              onMouseEnter={(e) => {
+                if (!isSaving) e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-current border-t-transparent" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <IconDisplay name={initialData ? "Check" : "Save"} size={18} />
+                  <span>{initialData ? 'Update' : 'Simpan'}</span>
+                </>
+              )}
+            </button>
           </div>
         </form>
       </div>
