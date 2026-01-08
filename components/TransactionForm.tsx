@@ -308,6 +308,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         className="rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all animate-fade-in-up max-h-[90vh] flex flex-col"
         style={{ backgroundColor: theme.colors.bgCard }}
       >
+        {/* Header */}
         <div className="p-4 flex justify-between items-center gap-3 flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
           <h3 className="text-white font-semibold text-lg flex-shrink-0">{initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}</h3>
 
@@ -330,287 +331,306 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           </button>
         </div>
 
-        <form id="transaction-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+        {/* Scrollable Form Content */}
+        <form id="transaction-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+          <div className="p-6 space-y-4">
+            {/* Loading Message */}
+            {isSaving && savingMessage && (
+              <div className="border-l-4 p-3 rounded-md text-sm font-medium flex items-center gap-2"
+                style={{
+                  backgroundColor: theme.colors.accentLight,
+                  color: theme.colors.accent,
+                  borderColor: theme.colors.accent
+                }}
+              >
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+                <span>{savingMessage}</span>
+              </div>
+            )}
 
-          {/* Loading Message */}
-          {isSaving && savingMessage && (
-            <div className="border-l-4 p-3 rounded-md text-sm font-medium flex items-center gap-2"
-              style={{
-                backgroundColor: theme.colors.accentLight,
-                color: theme.colors.accent,
-                borderColor: theme.colors.accent
-              }}
-            >
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-              <span>{savingMessage}</span>
+            {error && (
+              <div className="border-l-4 border-red-500 p-3 rounded-md text-sm font-medium flex items-center gap-2 animate-pulse"
+                style={{
+                  backgroundColor: theme.colors.expenseBg,
+                  color: theme.colors.expense
+                }}
+              >
+                <IconDisplay name="AlertCircle" size={18} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Type Toggle */}
+            <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgMuted }}>
+              <button
+                type="button"
+                onClick={() => setType('EXPENSE')}
+                className="flex-1 py-2 text-sm font-bold rounded-md transition-all shadow-sm"
+                style={{
+                  backgroundColor: type === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
+                  color: type === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted
+                }}
+              >
+                Pengeluaran
+              </button>
+              <button
+                type="button"
+                onClick={() => setType('INCOME')}
+                className="flex-1 py-2 text-sm font-bold rounded-md transition-all shadow-sm"
+                style={{
+                  backgroundColor: type === 'INCOME' ? theme.colors.bgCard : 'transparent',
+                  color: type === 'INCOME' ? theme.colors.income : theme.colors.textMuted
+                }}
+              >
+                Pemasukan
+              </button>
             </div>
-          )}
 
-          {error && (
-            <div className="border-l-4 border-red-500 p-3 rounded-md text-sm font-medium flex items-center gap-2 animate-pulse"
-              style={{
-                backgroundColor: theme.colors.expenseBg,
-                color: theme.colors.expense
-              }}
-            >
-              <IconDisplay name="AlertCircle" size={18} />
-              <span>{error}</span>
+            {/* Amount Input */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>
+                Jumlah (Rp)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-3 font-bold" style={{ color: theme.colors.textMuted }}>Rp</span>
+                <input
+                  type="text"
+                  value={displayAmount}
+                  onChange={handleAmountChange}
+                  disabled={isSaving}
+                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: theme.colors.bgHover,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.textPrimary
+                  }}
+                  placeholder="0"
+                  inputMode="numeric"
+                  autoFocus={!initialData}
+                />
+              </div>
             </div>
-          )}
 
-          {/* Type Toggle */}
-          <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgMuted }}>
-            <button
-              type="button"
-              onClick={() => setType('EXPENSE')}
-              className="flex-1 py-2 text-sm font-bold rounded-md transition-all shadow-sm"
-              style={{
-                backgroundColor: type === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
-                color: type === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted
-              }}
-            >
-              Pengeluaran
-            </button>
-            <button
-              type="button"
-              onClick={() => setType('INCOME')}
-              className="flex-1 py-2 text-sm font-bold rounded-md transition-all shadow-sm"
-              style={{
-                backgroundColor: type === 'INCOME' ? theme.colors.bgCard : 'transparent',
-                color: type === 'INCOME' ? theme.colors.income : theme.colors.textMuted
-              }}
-            >
-              Pemasukan
-            </button>
-          </div>
+            {/* Category Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.textMuted }}>Kategori</label>
+                {onAddCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryModal(true)}
+                    className="text-xs font-medium flex items-center gap-1 px-2 py-1 rounded-full transition-all"
+                    style={{
+                      backgroundColor: theme.colors.accentLight,
+                      color: theme.colors.accent
+                    }}
+                  >
+                    <IconDisplay name="Plus" size={12} />
+                    Baru
+                  </button>
+                )}
+              </div>
 
-          {/* Amount Input */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>
-              Jumlah (Rp)
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-3 font-bold" style={{ color: theme.colors.textMuted }}>Rp</span>
+              <div className="grid grid-cols-3 gap-2">
+                {filteredCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategoryId(cat.id)}
+                    className="p-2 rounded-lg border text-xs font-medium flex flex-col items-center gap-1 transition-all"
+                    style={categoryId === cat.id ? {
+                      backgroundColor: theme.colors.accentLight,
+                      borderColor: theme.colors.accent,
+                      color: theme.colors.textPrimary,
+                      boxShadow: `0 0 0 2px ${theme.colors.accent}`
+                    } : {
+                      backgroundColor: theme.colors.bgHover,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.textPrimary
+                    }}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white mb-1"
+                      style={{ backgroundColor: cat.color }}
+                    >
+                      <IconDisplay name={cat.icon} size={16} />
+                    </div>
+                    <span className="truncate w-full text-center">{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+              {filteredCategories.length === 0 && (
+                <p className="text-xs text-center py-2" style={{ color: theme.colors.textMuted }}>
+                  Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.
+                  {onAddCategory && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryModal(true)}
+                      className="ml-1 underline font-medium"
+                      style={{ color: theme.colors.accent }}
+                    >
+                      Buat sekarang
+                    </button>
+                  )}
+                </p>
+              )}
+            </div>
+
+            {/* Date Input */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>Tanggal</label>
               <input
-                type="text"
-                value={displayAmount}
-                onChange={handleAmountChange}
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
                 disabled={isSaving}
-                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: theme.colors.bgHover,
                   borderColor: theme.colors.border,
                   color: theme.colors.textPrimary
                 }}
-                placeholder="0"
-                inputMode="numeric"
-                autoFocus={!initialData}
               />
             </div>
-          </div>
 
-          {/* Category Selection */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.textMuted }}>Kategori</label>
-              {onAddCategory && (
-                <button
-                  type="button"
-                  onClick={() => setShowCategoryModal(true)}
-                  className="text-xs font-medium flex items-center gap-1 px-2 py-1 rounded-full transition-all"
+            {/* Description Input */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>Catatan</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={isSaving}
+                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: theme.colors.bgHover,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.textPrimary
+                }}
+                rows={2}
+                placeholder="Contoh: Makan siang, Gaji bulanan"
+              />
+            </div>
+
+            {/* Attachment Input */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>
+                Lampiran (opsional)
+              </label>
+
+              {!attachment && !existingAttachment || (isAttachmentDeleted && !attachment) ? (
+                <div
+                  className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors"
                   style={{
-                    backgroundColor: theme.colors.accentLight,
-                    color: theme.colors.accent
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.bgHover
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*,application/pdf"
+                    onChange={handleFileSelect}
+                    disabled={isSaving}
+                  />
+                  <IconDisplay name="Camera" size={24} className="mx-auto mb-2" style={{ color: theme.colors.textMuted }} />
+                  <p className="text-sm" style={{ color: theme.colors.textMuted }}>Tambah Foto atau PDF</p>
+                </div>
+              ) : (
+                <div
+                  className="border rounded-lg p-3"
+                  style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      {/* Check if it's new attachment preview or existing one */}
+                      {(attachmentType === 'image' && attachmentPreview) || (existingAttachment?.type === 'image' && existingAttachment.url && !isAttachmentDeleted) ? (
+                        <img
+                          src={attachmentPreview || existingAttachment?.url}
+                          alt="Preview"
+                          className="w-12 h-12 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: theme.colors.expenseBg }}>
+                          <IconDisplay name="FileText" size={24} style={{ color: theme.colors.expense }} />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: theme.colors.textPrimary }}>
+                          {attachment?.name || existingAttachment?.name}
+                        </p>
+                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>
+                          {attachment ? (attachment.size / 1024).toFixed(1) + ' KB' : 'Terlampir'} • {attachmentType === 'image' || existingAttachment?.type === 'image' ? 'Foto' : 'PDF'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removeAttachment}
+                      disabled={isSaving}
+                      className="p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        color: theme.colors.textMuted
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSaving) {
+                          e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
+                          e.currentTarget.style.color = theme.colors.expense;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = theme.colors.textMuted;
+                      }}
+                    >
+                      <IconDisplay name="X" size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>Maksimal 10MB. Format: JPG, PNG, GIF, WEBP, PDF</p>
+              {compressionMessage && (
+                <div
+                  className="text-xs mt-2 p-2 rounded-md flex items-center gap-2"
+                  style={{
+                    backgroundColor: theme.colors.incomeBg,
+                    color: theme.colors.income
                   }}
                 >
-                  <IconDisplay name="Plus" size={12} />
-                  Baru
-                </button>
+                  <IconDisplay name="CheckCircle2" size={14} />
+                  <span>{compressionMessage}</span>
+                </div>
               )}
             </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {filteredCategories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategoryId(cat.id)}
-                  className="p-2 rounded-lg border text-xs font-medium flex flex-col items-center gap-1 transition-all"
-                  style={categoryId === cat.id ? {
-                    backgroundColor: theme.colors.accentLight,
-                    borderColor: theme.colors.accent,
-                    color: theme.colors.textPrimary,
-                    boxShadow: `0 0 0 2px ${theme.colors.accent}`
-                  } : {
-                    backgroundColor: theme.colors.bgHover,
-                    borderColor: theme.colors.border,
-                    color: theme.colors.textPrimary
-                  }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white mb-1"
-                    style={{ backgroundColor: cat.color }}
-                  >
-                    <IconDisplay name={cat.icon} size={16} />
-                  </div>
-                  <span className="truncate w-full text-center">{cat.name}</span>
-                </button>
-              ))}
-            </div>
-            {filteredCategories.length === 0 && (
-              <p className="text-xs text-center py-2" style={{ color: theme.colors.textMuted }}>
-                Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.
-                {onAddCategory && (
-                  <button
-                    type="button"
-                    onClick={() => setShowCategoryModal(true)}
-                    className="ml-1 underline font-medium"
-                    style={{ color: theme.colors.accent }}
-                  >
-                    Buat sekarang
-                  </button>
-                )}
-              </p>
-            )}
           </div>
+        </form>
 
-          {/* Date Input */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>Tanggal</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-              style={{
-                backgroundColor: theme.colors.bgHover,
-                borderColor: theme.colors.border,
-                color: theme.colors.textPrimary
-              }}
-            />
-          </div>
-
-          {/* Description Input */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>Catatan</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-              style={{
-                backgroundColor: theme.colors.bgHover,
-                borderColor: theme.colors.border,
-                color: theme.colors.textPrimary
-              }}
-              rows={2}
-              placeholder="Contoh: Makan siang, Gaji bulanan"
-            />
-          </div>
-
-          {/* Attachment Input */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>
-              Lampiran (opsional)
-            </label>
-
-            {!attachment && !existingAttachment || (isAttachmentDeleted && !attachment) ? (
-              <div
-                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors"
-                style={{
-                  borderColor: theme.colors.border,
-                  backgroundColor: theme.colors.bgHover
-                }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept="image/*,application/pdf"
-                  onChange={handleFileSelect}
-                />
-                <IconDisplay name="Camera" size={24} className="mx-auto mb-2" style={{ color: theme.colors.textMuted }} />
-                <p className="text-sm" style={{ color: theme.colors.textMuted }}>Tambah Foto atau PDF</p>
-              </div>
-            ) : (
-              <div
-                className="border rounded-lg p-3"
-                style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    {/* Check if it's new attachment preview or existing one */}
-                    {(attachmentType === 'image' && attachmentPreview) || (existingAttachment?.type === 'image' && existingAttachment.url && !isAttachmentDeleted) ? (
-                      <img
-                        src={attachmentPreview || existingAttachment?.url}
-                        alt="Preview"
-                        className="w-12 h-12 object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: theme.colors.expenseBg }}>
-                        <IconDisplay name="FileText" size={24} style={{ color: theme.colors.expense }} />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: theme.colors.textPrimary }}>
-                        {attachment?.name || existingAttachment?.name}
-                      </p>
-                      <p className="text-xs" style={{ color: theme.colors.textMuted }}>
-                        {attachment ? (attachment.size / 1024).toFixed(1) + ' KB' : 'Terlampir'} • {attachmentType === 'image' || existingAttachment?.type === 'image' ? 'Foto' : 'PDF'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={removeAttachment}
-                    className="p-1 rounded transition-colors"
-                    style={{
-                      color: theme.colors.textMuted
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
-                      e.currentTarget.style.color = theme.colors.expense;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = theme.colors.textMuted;
-                    }}
-                  >
-                    <IconDisplay name="X" size={18} />
-                  </button>
-                </div>
-              </div>
-            )}
-            <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>Maksimal 10MB. Format: JPG, PNG, GIF, WEBP, PDF</p>
-            {compressionMessage && (
-              <div
-                className="text-xs mt-2 p-2 rounded-md flex items-center gap-2"
-                style={{
-                  backgroundColor: theme.colors.incomeBg,
-                  color: theme.colors.income
-                }}
-              >
-                <IconDisplay name="CheckCircle2" size={14} />
-                <span>{compressionMessage}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3 pt-4 border-t" style={{ borderColor: theme.colors.border }}>
+        {/* Sticky Footer with Action Buttons */}
+        <div 
+          className="p-4 border-t flex-shrink-0" 
+          style={{ 
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.bgCard
+          }}
+        >
+          <div className="flex items-center gap-3">
             {/* Delete Button (only show when editing) */}
             {initialData && onDelete && (
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-4 py-3 rounded-lg transition-all focus:outline-none flex items-center gap-2 font-medium"
+                disabled={isSaving}
+                className="px-4 py-3 rounded-lg transition-all focus:outline-none flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: theme.colors.expenseBg,
                   color: theme.colors.expense
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.expense;
-                  e.currentTarget.style.color = 'white';
+                  if (!isSaving) {
+                    e.currentTarget.style.backgroundColor = theme.colors.expense;
+                    e.currentTarget.style.color = 'white';
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
@@ -629,6 +649,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
             {/* Save/Update Button */}
             <button
               type="submit"
+              form="transaction-form"
               disabled={isSaving}
               className="px-6 py-3 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
               style={{
@@ -655,7 +676,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
               )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
 
       {/* Delete Confirmation Dialog */}

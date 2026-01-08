@@ -85,10 +85,11 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
             <div
-                className="rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all animate-fade-in-up"
+                className="rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all animate-fade-in-up max-h-[90vh] flex flex-col"
                 style={{ backgroundColor: theme.colors.bgCard }}
             >
-                <div className="p-4 flex justify-between items-center gap-3" style={{ backgroundColor: theme.colors.accent }}>
+                {/* Header */}
+                <div className="p-4 flex justify-between items-center gap-3 flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
                     <h3 className="text-white font-semibold text-lg flex-shrink-0">
                         {editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
                     </h3>
@@ -112,119 +113,131 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                     </button>
                 </div>
 
-                <form id="category-form" onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
-                    {/* Nama & Tipe */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1" style={{ color: theme.colors.textPrimary }}>Nama Kategori</label>
-                            <input
-                                type="text"
-                                required
-                                value={newCatName}
-                                onChange={(e) => setNewCatName(e.target.value)}
-                                className="w-full px-4 py-2 border rounded-lg outline-none"
-                                placeholder="Contoh: Investasi"
-                                autoFocus
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary
-                                }}
-                            />
+                {/* Scrollable Form Content */}
+                <form id="category-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+                    <div className="p-6 space-y-5">
+                        {/* Nama & Tipe */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1" style={{ color: theme.colors.textPrimary }}>Nama Kategori</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={newCatName}
+                                    onChange={(e) => setNewCatName(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg outline-none"
+                                    placeholder="Contoh: Investasi"
+                                    autoFocus
+                                    style={{
+                                        backgroundColor: theme.colors.bgHover,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.textPrimary
+                                    }}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1" style={{ color: theme.colors.textPrimary }}>Tipe Transaksi</label>
+                                <select
+                                    value={newCatType}
+                                    onChange={(e) => setNewCatType(e.target.value as TransactionType)}
+                                    className="w-full px-4 py-2 border rounded-lg outline-none"
+                                    style={{
+                                        backgroundColor: theme.colors.bgHover,
+                                        borderColor: theme.colors.border,
+                                        color: theme.colors.textPrimary
+                                    }}
+                                >
+                                    <option value="EXPENSE">Pengeluaran</option>
+                                    <option value="INCOME">Pemasukan</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1" style={{ color: theme.colors.textPrimary }}>Tipe Transaksi</label>
-                            <select
-                                value={newCatType}
-                                onChange={(e) => setNewCatType(e.target.value as TransactionType)}
-                                className="w-full px-4 py-2 border rounded-lg outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary
-                                }}
-                            >
-                                <option value="EXPENSE">Pengeluaran</option>
-                                <option value="INCOME">Pemasukan</option>
-                            </select>
-                        </div>
-                    </div>
 
-                    {/* Pilih Ikon */}
-                    <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>Pilih Ikon</label>
-                        <div
-                            className="p-3 rounded-xl border max-h-40 overflow-y-auto custom-scrollbar"
-                            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                        >
-                            <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                                {AVAILABLE_ICONS.map(icon => (
+                        {/* Pilih Ikon */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>Pilih Ikon</label>
+                            <div
+                                className="p-3 rounded-xl border max-h-40 overflow-y-auto custom-scrollbar"
+                                style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
+                            >
+                                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                                    {AVAILABLE_ICONS.map(icon => (
+                                        <button
+                                            key={icon}
+                                            type="button"
+                                            onClick={() => setNewCatIcon(icon)}
+                                            className="p-2 rounded-lg transition-all flex justify-center items-center aspect-square border"
+                                            style={{
+                                                backgroundColor: newCatIcon === icon ? theme.colors.accent : theme.colors.bgCard,
+                                                color: newCatIcon === icon ? 'white' : theme.colors.textMuted,
+                                                borderColor: newCatIcon === icon ? theme.colors.accent : theme.colors.border,
+                                                boxShadow: newCatIcon === icon ? '0 2px 4px rgba(0,0,0,0.2)' : 'none'
+                                            }}
+                                            title={icon}
+                                        >
+                                            <IconDisplay name={icon} size={20} />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pilih Warna */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>Pilih Warna</label>
+                            <div className="flex flex-wrap gap-3 p-1">
+                                {COLORS.map(color => (
                                     <button
-                                        key={icon}
+                                        key={color}
                                         type="button"
-                                        onClick={() => setNewCatIcon(icon)}
-                                        className="p-2 rounded-lg transition-all flex justify-center items-center aspect-square border"
-                                        style={{
-                                            backgroundColor: newCatIcon === icon ? theme.colors.accent : theme.colors.bgCard,
-                                            color: newCatIcon === icon ? 'white' : theme.colors.textMuted,
-                                            borderColor: newCatIcon === icon ? theme.colors.accent : theme.colors.border,
-                                            boxShadow: newCatIcon === icon ? '0 2px 4px rgba(0,0,0,0.2)' : 'none'
-                                        }}
-                                        title={icon}
-                                    >
-                                        <IconDisplay name={icon} size={20} />
-                                    </button>
+                                        onClick={() => setNewCatColor(color)}
+                                        className={`w-8 h-8 rounded-full transition-transform shadow-sm ${newCatColor === color ? 'scale-125 ring-2 ring-offset-2 ring-gray-400' : 'hover:scale-110'
+                                            }`}
+                                        style={{ backgroundColor: color }}
+                                        title={color}
+                                    />
                                 ))}
                             </div>
                         </div>
-                    </div>
 
-                    {/* Pilih Warna */}
-                    <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>Pilih Warna</label>
-                        <div className="flex flex-wrap gap-3 p-1">
-                            {COLORS.map(color => (
-                                <button
-                                    key={color}
-                                    type="button"
-                                    onClick={() => setNewCatColor(color)}
-                                    className={`w-8 h-8 rounded-full transition-transform shadow-sm ${newCatColor === color ? 'scale-125 ring-2 ring-offset-2 ring-gray-400' : 'hover:scale-110'
-                                        }`}
-                                    style={{ backgroundColor: color }}
-                                    title={color}
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Preview */}
-                    <div
-                        className="flex items-center gap-3 p-3 rounded-lg border border-dashed"
-                        style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                    >
-                        <span className="text-xs font-medium uppercase" style={{ color: theme.colors.textMuted }}>Preview:</span>
+                        {/* Preview */}
                         <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm"
-                            style={{ backgroundColor: newCatColor }}
+                            className="flex items-center gap-3 p-3 rounded-lg border border-dashed"
+                            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
                         >
-                            <IconDisplay name={newCatIcon} size={16} />
+                            <span className="text-xs font-medium uppercase" style={{ color: theme.colors.textMuted }}>Preview:</span>
+                            <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm"
+                                style={{ backgroundColor: newCatColor }}
+                            >
+                                <IconDisplay name={newCatIcon} size={16} />
+                            </div>
+                            <span className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>{newCatName || 'Nama Kategori'}</span>
+                            <span
+                                className="text-xs px-2 py-0.5 rounded-full ml-auto"
+                                style={{
+                                    backgroundColor: newCatType === 'INCOME' ? theme.colors.incomeBg : theme.colors.expenseBg,
+                                    color: newCatType === 'INCOME' ? theme.colors.income : theme.colors.expense
+                                }}
+                            >
+                                {newCatType === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
+                            </span>
                         </div>
-                        <span className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>{newCatName || 'Nama Kategori'}</span>
-                        <span
-                            className="text-xs px-2 py-0.5 rounded-full ml-auto"
-                            style={{
-                                backgroundColor: newCatType === 'INCOME' ? theme.colors.incomeBg : theme.colors.expenseBg,
-                                color: newCatType === 'INCOME' ? theme.colors.income : theme.colors.expense
-                            }}
-                        >
-                            {newCatType === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
-                        </span>
                     </div>
+                </form>
 
-                    {/* Action Button */}
-                    <div className="flex justify-end pt-4 border-t" style={{ borderColor: theme.colors.border }}>
+                {/* Sticky Footer with Action Button */}
+                <div
+                    className="p-4 border-t flex-shrink-0"
+                    style={{
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.bgCard
+                    }}
+                >
+                    <div className="flex justify-end">
                         <button
                             type="submit"
+                            form="category-form"
                             className="px-6 py-3 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-2 shadow-md hover:shadow-lg"
                             style={{
                                 backgroundColor: theme.colors.accent,
@@ -241,7 +254,7 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                             <span>{editingCategory ? 'Update' : 'Simpan'}</span>
                         </button>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     );
