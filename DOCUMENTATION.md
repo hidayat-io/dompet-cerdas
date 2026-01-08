@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
-> **Last Updated**: January 4, 2026  
-> **Version**: 1.4.0  
+> **Last Updated**: January 8, 2026  
+> **Version**: 1.5.0  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -573,6 +573,67 @@ Integrasi dengan Telegram untuk input dan monitoring transaksi via chat.
 ---
 
 ## 📝 Changelog
+
+### Version 1.5.0 (January 8, 2026)
+
+**🎨 Major UX Overhaul:**
+- 📱 **Full Screen Forms on Mobile** - Better space utilization and native app feel
+- ✨ **Beautiful Gradient FAB** - Floating Action Button with purple gradient and glow effect
+- 🎬 **Smooth Animations** - Slide-up for mobile, fade-in for desktop
+- ⌨️ **Keyboard Issue Fixed** - FAB always visible above keyboard on mobile
+- 🔙 **Native Navigation** - Back button with arrow icon on mobile
+- 🎯 **Improved Button Placement** - Delete button moved to header for easy access
+
+**Mobile Experience (< 768px):**
+- Full screen form layout instead of cramped modal
+- Smooth slide-up animation from bottom (0.3s ease-out)
+- Gradient FAB (64x64px) with purple gradient (#667eea → #764ba2)
+- Soft glow shadow effect for premium look
+- Touch feedback with scale animation (0.9x on press)
+- Back button (←) in header for intuitive navigation
+- Delete button in header (doesn't take footer space)
+- Bottom padding (pb-24) to prevent content hidden by FAB
+- No more keyboard covering buttons issue!
+
+**Desktop Experience (≥ 768px):**
+- Centered modal with backdrop blur
+- Fade-in animation with scale effect (0.2s)
+- Traditional footer with action buttons
+- Close button (X) in header
+- Delete button in footer (when editing)
+- Hover effects on all buttons
+
+**Design Improvements:**
+- **Gradient FAB**: `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`
+- **Glow Shadow**: `0 10px 30px rgba(102, 126, 234, 0.5)`
+- **Touch Feedback**: Scale to 0.9x on touch, back to 1.0x on release
+- **Responsive Breakpoint**: md (768px) for mobile/desktop switch
+- **Consistent Pattern**: Both TransactionForm and CategoryFormModal use same design
+
+**Technical Changes:**
+- Added CSS animations in `index.html`:
+  - `@keyframes slide-up` for mobile entrance
+  - `@keyframes fade-in` for desktop entrance
+- Updated TransactionForm.tsx:
+  - Responsive classes with Tailwind breakpoints
+  - Touch event handlers (onTouchStart, onTouchEnd)
+  - Conditional rendering for mobile/desktop layouts
+- Updated CategoryFormModal.tsx:
+  - Same full screen + FAB pattern
+  - Consistent with TransactionForm
+- Fixed IconDisplay color prop usage (use style instead)
+
+**Benefits:**
+- ✅ More screen space on mobile (full viewport)
+- ✅ No keyboard issues (FAB always visible)
+- ✅ Better visual appeal (gradient + animations)
+- ✅ Native app feel (slide-up + back button)
+- ✅ Consistent UX across both forms
+- ✅ Improved accessibility (larger touch targets)
+
+**Files Changed:** 3 files (+150 lines, -50 lines)
+
+---
 
 ### Version 1.4.0 (January 4, 2026)
 
