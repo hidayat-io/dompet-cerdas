@@ -303,37 +303,84 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 md:bg-black md:bg-opacity-50 md:backdrop-blur-sm md:flex md:items-center md:justify-center md:p-4">
       <div
-        className="rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all animate-fade-in-up max-h-[90vh] flex flex-col"
+        className="h-full w-full md:h-auto md:w-auto md:max-w-md md:max-h-[90vh] md:rounded-2xl shadow-xl overflow-hidden transform transition-all animate-slide-up md:animate-fade-in flex flex-col"
         style={{ backgroundColor: theme.colors.bgCard }}
       >
         {/* Header */}
         <div className="p-4 flex justify-between items-center gap-3 flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
-          <h3 className="text-white font-semibold text-lg flex-shrink-0">{initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}</h3>
+          <div className="flex items-center gap-3 flex-1">
+            {/* Back/Close Button */}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center md:hidden"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+              }}
+            >
+              <IconDisplay name="ArrowLeft" size={20} />
+            </button>
 
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              color: 'white'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-            }}
-          >
-            <IconDisplay name="X" size={16} />
-          </button>
+            <h3 className="text-white font-semibold text-lg flex-shrink-0">{initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}</h3>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Delete Button (Header - Mobile & Desktop) */}
+            {initialData && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSaving}
+                className="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSaving) {
+                    e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                }}
+                title="Hapus Transaksi"
+              >
+                <IconDisplay name="Trash2" size={18} />
+              </button>
+            )}
+
+            {/* Close Button (Desktop only) */}
+            <button
+              onClick={onClose}
+              className="hidden md:flex p-2 rounded-lg transition-all focus:outline-none items-center justify-center"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+              }}
+            >
+              <IconDisplay name="X" size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Form Content */}
         <form id="transaction-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-4">
+          <div className="p-4 md:p-6 space-y-4 pb-24 md:pb-6">
             {/* Loading Message */}
             {isSaving && savingMessage && (
               <div className="border-l-4 p-3 rounded-md text-sm font-medium flex items-center gap-2"
@@ -606,15 +653,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           </div>
         </form>
 
-        {/* Sticky Footer with Action Buttons */}
-        <div 
-          className="p-4 border-t flex-shrink-0" 
-          style={{ 
+        {/* Desktop Footer (Hidden on Mobile) */}
+        <div
+          className="hidden md:flex p-4 border-t flex-shrink-0"
+          style={{
             borderColor: theme.colors.border,
             backgroundColor: theme.colors.bgCard
           }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full">
             {/* Delete Button (only show when editing) */}
             {initialData && onDelete && (
               <button
@@ -646,7 +693,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
             {/* Spacer */}
             <div className="flex-1"></div>
 
-            {/* Save/Update Button */}
+            {/* Save/Update Button (Desktop) */}
             <button
               type="submit"
               form="transaction-form"
@@ -677,6 +724,35 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
             </button>
           </div>
         </div>
+
+        {/* Mobile FAB (Floating Action Button) */}
+        <button
+          type="submit"
+          form="transaction-form"
+          disabled={isSaving}
+          className="md:hidden fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed z-50"
+          style={{
+            background: isSaving
+              ? theme.colors.bgMuted
+              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            boxShadow: isSaving
+              ? '0 4px 12px rgba(0,0,0,0.15)'
+              : '0 10px 30px rgba(102, 126, 234, 0.5)',
+            transform: isSaving ? 'scale(0.95)' : 'scale(1)'
+          }}
+          onTouchStart={(e) => {
+            if (!isSaving) e.currentTarget.style.transform = 'scale(0.9)';
+          }}
+          onTouchEnd={(e) => {
+            if (!isSaving) e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          {isSaving ? (
+            <div className="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent" />
+          ) : (
+            <IconDisplay name={initialData ? "Check" : "Save"} size={28} style={{ color: 'white' }} />
+          )}
+        </button>
       </div>
 
       {/* Delete Confirmation Dialog */}

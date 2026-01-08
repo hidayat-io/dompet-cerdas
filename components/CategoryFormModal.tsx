@@ -83,21 +83,41 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] md:bg-black md:bg-opacity-50 md:backdrop-blur-sm md:flex md:items-center md:justify-center md:p-4">
             <div
-                className="rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all animate-fade-in-up max-h-[90vh] flex flex-col"
+                className="h-full w-full md:h-auto md:w-auto md:max-w-lg md:max-h-[90vh] md:rounded-2xl shadow-xl overflow-hidden transform transition-all animate-slide-up md:animate-fade-in flex flex-col"
                 style={{ backgroundColor: theme.colors.bgCard }}
             >
                 {/* Header */}
                 <div className="p-4 flex justify-between items-center gap-3 flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
-                    <h3 className="text-white font-semibold text-lg flex-shrink-0">
-                        {editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
-                    </h3>
+                    <div className="flex items-center gap-3 flex-1">
+                        {/* Back Button (Mobile) */}
+                        <button
+                            onClick={handleClose}
+                            className="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center md:hidden"
+                            style={{
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                color: 'white'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                            }}
+                        >
+                            <IconDisplay name="ArrowLeft" size={20} />
+                        </button>
 
-                    {/* Close Button */}
+                        <h3 className="text-white font-semibold text-lg flex-shrink-0">
+                            {editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
+                        </h3>
+                    </div>
+
+                    {/* Close Button (Desktop only) */}
                     <button
                         onClick={handleClose}
-                        className="px-3 py-2 rounded-lg transition-all focus:outline-none flex items-center gap-1.5"
+                        className="hidden md:flex p-2 rounded-lg transition-all focus:outline-none items-center justify-center"
                         style={{
                             backgroundColor: 'rgba(255, 255, 255, 0.2)',
                             color: 'white'
@@ -109,13 +129,13 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                             e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
                         }}
                     >
-                        <IconDisplay name="X" size={16} />
+                        <IconDisplay name="X" size={18} />
                     </button>
                 </div>
 
                 {/* Scrollable Form Content */}
                 <form id="category-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-                    <div className="p-6 space-y-5">
+                    <div className="p-4 md:p-6 space-y-5 pb-24 md:pb-6">
                         {/* Nama & Tipe */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -226,15 +246,15 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                     </div>
                 </form>
 
-                {/* Sticky Footer with Action Button */}
+                {/* Desktop Footer (Hidden on Mobile) */}
                 <div
-                    className="p-4 border-t flex-shrink-0"
+                    className="hidden md:flex p-4 border-t flex-shrink-0"
                     style={{
                         borderColor: theme.colors.border,
                         backgroundColor: theme.colors.bgCard
                     }}
                 >
-                    <div className="flex justify-end">
+                    <div className="flex justify-end w-full">
                         <button
                             type="submit"
                             form="category-form"
@@ -255,6 +275,25 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         </button>
                     </div>
                 </div>
+
+                {/* Mobile FAB (Floating Action Button) */}
+                <button
+                    type="submit"
+                    form="category-form"
+                    className="md:hidden fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 z-50"
+                    style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        boxShadow: '0 10px 30px rgba(102, 126, 234, 0.5)'
+                    }}
+                    onTouchStart={(e) => {
+                        e.currentTarget.style.transform = 'scale(0.9)';
+                    }}
+                    onTouchEnd={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                >
+                    <IconDisplay name={editingCategory ? "Check" : "Save"} size={28} style={{ color: 'white' }} />
+                </button>
             </div>
         </div>
     );
