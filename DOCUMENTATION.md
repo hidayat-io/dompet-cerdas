@@ -586,6 +586,11 @@ Integrasi dengan Telegram untuk input dan monitoring transaksi via chat.
 ### Version 1.6.0 (January 24, 2026)
 
 **✨ New Features:**
+- 🛡️ **Category Similarity Validation**
+  - **Offline Check**: Prevents duplicate or redundant categories (e.g., "Food" vs "Makanan")
+  - **Synonym Detection**: Built-in dictionary for common financial terms
+  - **Typo Detection**: Finds similar names to prevent accidental duplicates (e.g., "Makann" vs "Makan")
+  - **Warning UI**: Shows a list of conflicting categories before saving
 - 🎯 **Edit Simulation Items** - Full edit capability for simulation items
   - Edit button (pencil icon) on each simulation item
   - Modal form with pre-filled data (name, amount, type, category)

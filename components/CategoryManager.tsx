@@ -64,6 +64,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
       <CategoryFormModal
         isOpen={isAdding || editingCategory !== null}
         editingCategory={editingCategory}
+        categories={categories}
         onClose={handleCloseModal}
         onSave={handleSaveCategory}
         onUpdate={handleUpdateCategory}

@@ -3,10 +3,12 @@ import { Category, IconName, TransactionType } from '../types';
 import { AVAILABLE_ICONS, COLORS } from '../constants';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
+import { checkCategorySimilarity, SimilarityResult } from '../utils/categoryValidation';
 
 interface CategoryFormModalProps {
     isOpen: boolean;
     editingCategory?: Category | null; // If provided, it's edit mode
+    categories: Category[]; // List of existing categories for validation
     defaultType?: TransactionType; // Default type when adding new
     onClose: () => void;
     onSave: (category: Omit<Category, 'id'>) => void;
@@ -16,6 +18,7 @@ interface CategoryFormModalProps {
 const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     isOpen,
     editingCategory,
+    categories,
     defaultType = 'EXPENSE',
     onClose,
     onSave,
@@ -28,6 +31,9 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     const [newCatType, setNewCatType] = useState<TransactionType>(defaultType);
     const [newCatIcon, setNewCatIcon] = useState<IconName>('Utensils');
     const [newCatColor, setNewCatColor] = useState(COLORS[0]);
+
+    // Validation Warning State
+    const [warning, setWarning] = useState<SimilarityResult | null>(null);
 
     // Initialize form when editing
     useEffect(() => {
@@ -50,12 +56,29 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         setNewCatType(defaultType);
         setNewCatIcon('Utensils');
         setNewCatColor(COLORS[0]);
+        setWarning(null);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent, forceSave = false) => {
         e.preventDefault();
         if (!newCatName.trim()) {
             return;
+        }
+
+        // Run validation if not forced
+        if (!forceSave && !editingCategory) {
+            // We only validate for NEW categories or if name changed significantly (but for now let's just do new)
+            // Or if editing, checks against OTHER categories.
+            const categoriesToCheck = editingCategory
+                ? categories.filter(c => c.id !== editingCategory.id)
+                : categories;
+
+            const validation = checkCategorySimilarity(newCatName, categoriesToCheck);
+
+            if (validation.isSimilar) {
+                setWarning(validation);
+                return;
+            }
         }
 
         const categoryData = {
@@ -134,7 +157,65 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 </div>
 
                 {/* Scrollable Form Content */}
-                <form id="category-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+                <form id="category-form" onSubmit={(e) => handleSubmit(e, false)} className="flex-1 overflow-y-auto relative">
+                    {/* Warning Overlay */}
+                    {warning && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm rounded-xl">
+                            <div className="bg-white p-6 rounded-2xl shadow-2xl border border-red-100 max-w-sm w-full animate-bounce-in">
+                                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4 mx-auto">
+                                    <IconDisplay name="AlertTriangle" size={24} />
+                                </div>
+                                <h4 className="text-lg font-bold text-center text-gray-800 mb-2">Perhatian!</h4>
+
+                                <div className="mb-6 text-center">
+                                    <p className="text-gray-600 text-sm mb-3">{warning.message}</p>
+
+                                    <div className="bg-gray-50 rounded-lg p-3 text-left max-h-32 overflow-y-auto border border-gray-100">
+                                        <ul className="space-y-2">
+                                            <div className="bg-gray-50 rounded-lg p-3 text-left max-h-32 overflow-y-auto border border-gray-100">
+                                                <ul className="space-y-2">
+                                                    {warning.conflictingCategories.map((cat) => (
+                                                        <li key={cat.id} className="flex items-center gap-2 text-sm text-gray-700">
+                                                            <div
+                                                                className="w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                                                                style={{ backgroundColor: cat.color }}
+                                                            >
+                                                                <IconDisplay name={cat.icon} size={12} />
+                                                            </div>
+                                                            <span>{cat.name}</span>
+                                                            <span className="text-xs text-gray-400 ml-auto">
+                                                                {cat.type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </ul>
+                                    </div>
+
+                                    <p className="text-xs text-gray-500 mt-3">Apakah Anda yakin ingin tetap menyimpan?</p>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setWarning(null)}
+                                        className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleSubmit(e as any, true)}
+                                        className="flex-1 py-2 rounded-lg bg-orange-500 text-white font-medium hover:bg-orange-600 transition-colors shadow-md"
+                                    >
+                                        Tetap Simpan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="p-4 md:p-6 space-y-5 pb-24 md:pb-6">
                         {/* Nama & Tipe */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

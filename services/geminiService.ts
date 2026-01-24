@@ -46,3 +46,48 @@ export const getFinancialAdvice = async (
     return "Terjadi kesalahan saat menghubungi asisten AI.";
   }
 };
+
+export const validateCategoryWithAI = async (
+  newName: string,
+  existingCategories: Category[]
+): Promise<string[]> => {
+  if (!apiKey) return [];
+
+  // Optimization: If list is empty, no need to check
+  if (existingCategories.length === 0) return [];
+
+  const categoryNames = existingCategories.map(c => c.name).join(", ");
+
+  const prompt = `
+    Bertindaklah sebagai sistem validasi data yang cerdas.
+    Tugas Anda adalah mengecek apakah nama kategori baru yang diinput user memiliki kemiripan makna (sinonim) atau kemiripan penulisan (typo) dengan daftar kategori yang sudah ada.
+
+    Kategori Baru: "${newName}"
+    Daftar Kategori Existing: [${categoryNames}]
+
+    Instruksi:
+    1. Bandingkan "Kategori Baru" dengan setiap item di "Daftar Kategori Existing".
+    2. Cari yang artinya SAMA PERCIS, MIRIP (Synonym), atau TYPO (e.g. "Fud" vs "Food", "Bill" vs "Tagihan").
+    3. Jika dtemukan kemiripan yang signifikan, sebutkan nama kategori existing tersebut.
+    4. JANGAN sebutkan jika maknanya berbeda jauh (misal "Investasi" vs "Makan" itu beda).
+    5. Outputkan HANYA dalam format JSON Array string berisi nama-nama kategori existing yang konflik. Contoh: ["Makan", "Jajan"].
+    6. Jika tidak ada yang mirip, outputkan array kosong: [].
+    
+    Hanya outputkan JSON murni tanpa markdown block.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-1.5-flash',
+      contents: prompt,
+    });
+
+    const text = response.text || "[]";
+    // Clean up markdown code blocks if any
+    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson);
+  } catch (error) {
+    console.error("Gemini Validation Error:", error);
+    return [];
+  }
+};
