@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
-> **Last Updated**: January 8, 2026  
-> **Version**: 1.5.0  
+> **Last Updated**: January 24, 2026  
+> **Version**: 1.6.0  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -57,13 +57,14 @@ dompet_cerdas/
 ├── components/
 │   ├── AuthLogin.tsx          # Google login page
 │   ├── Dashboard.tsx          # Main dashboard with summary & charts
-│   ├── TransactionList.tsx    # Transaction history with filters
+│   ├── TransactionList.tsx    # Transaction history with filters & attachment preview
 │   ├── TransactionForm.tsx    # Add/Edit transaction modal with loading states
 │   ├── CategoryManager.tsx    # CRUD categories
 │   ├── CategoryFormModal.tsx  # Reusable category add/edit modal
-│   ├── SimulationManager.tsx  # Budget simulation feature
+│   ├── SimulationManager.tsx  # Budget simulation with edit feature
 │   ├── Settings.tsx           # App settings (theme, delete data, Excel export)
 │   ├── ConfirmDialog.tsx      # Reusable confirmation dialog
+│   ├── NotificationModal.tsx  # Centered popup notifications (success/error/warning/loading)
 │   ├── Toast.tsx              # Standalone toast notification component
 │   └── IconDisplay.tsx        # Dynamic Lucide icon renderer
 │
@@ -109,16 +110,24 @@ dompet_cerdas/
   - Image compression before upload
   - Proper attachment icons (Image/FileText)
   - Attachment cleanup on delete
+  - **Loading indicator**: Shows spinner while loading attachment preview
 - **Loading states**: Visual feedback during save with progress messages
-- **Toast notifications**: Success/error feedback for all operations
+- **Popup notifications**: Centered modal notifications for all actions
+- **Red delete button**: Solid red delete button by default (no hover required)
 - **Long-press edit**: Mobile-friendly edit via long press
 - **Quick add category**: Add new category directly from transaction form
 
 ### 3. 🎯 Simulasi (Simulation)
 - **Budget simulation**: Create "what-if" scenarios
 - **Multiple simulations**: Can have multiple simulation sets
+- **Edit simulation items**: Full edit capability with modal form
+  - Edit name, amount, type, and category
+  - Pre-filled form with existing data
+  - Changes saved to Firestore immediately
+- **Add item popup**: Add new items via popup modal (consistent UX)
 - **Apply to real**: Convert simulation items to real transactions
 - **Balance preview**: See projected balance after simulation
+- **Improved layout**: Category as main text, item name as secondary, price displayed below
 
 ### 4. 📁 Master Kategori (Categories)
 - **CRUD operations**: Add, edit, delete categories
@@ -573,6 +582,52 @@ Integrasi dengan Telegram untuk input dan monitoring transaksi via chat.
 ---
 
 ## 📝 Changelog
+
+### Version 1.6.0 (January 24, 2026)
+
+**✨ New Features:**
+- 🎯 **Edit Simulation Items** - Full edit capability for simulation items
+  - Edit button (pencil icon) on each simulation item
+  - Modal form with pre-filled data (name, amount, type, category)
+  - Changes saved to Firestore immediately
+  - Simulation totals auto-update after edit
+- 📝 **Add Item Popup Modal** - Add simulation items via popup (consistent with edit)
+  - Replaced inline form with popup modal
+  - "+ Tambah Item ke Simulasi" button with dashed border
+  - Same form design as edit modal
+
+**🎨 UI/UX Improvements:**
+- 📐 **Simulation Item Layout** - Better visual hierarchy
+  - Price displayed below item (not beside)
+  - Category as main text (bold, large)
+  - Item name as secondary info (small, muted)
+  - Cleaner vertical layout
+- 🔴 **Red Delete Button** - Delete button now red by default
+  - Solid red (#ef4444) without hover
+  - Darker red (#dc2626) on hover
+  - Applied to both desktop and mobile views
+- ⏳ **Attachment Loading** - Loading indicator for attachment preview
+  - Spinner animation while loading image/PDF
+  - "Memuat lampiran..." text
+  - Loading positioned in content area (not covered by header)
+  - Auto-hides when attachment fully loaded
+
+**🌐 Internationalization:**
+- 🇮🇩 **100% Indonesian UI** - All English text translated
+  - Navigation: "Home" → "Beranda", "Setting" → "Pengaturan"
+  - Simulation: "Mode Sandbox" → "Mode Simulasi", "X Item" → "X Transaksi", "Add Real" → "Tambah ke Utama"
+  - Settings: "Toggle theme" → "Ganti tema", "Export ke Excel" → "Ekspor ke Excel"
+
+**Technical Changes:**
+- Added `updateSimulationItem` handler in App.tsx
+- Enhanced SimulationManager.tsx with edit state and modal
+- Updated TransactionForm.tsx delete button styling
+- Added loading state to AttachmentModal in TransactionList.tsx
+- Translated UI text across App.tsx, SimulationManager.tsx, Settings.tsx
+
+**Files Changed:** 7 files (+922 lines, -436 lines)
+
+---
 
 ### Version 1.5.0 (January 8, 2026)
 
