@@ -154,7 +154,7 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
                             backgroundColor: isDark ? theme.colors.accent : theme.colors.bgMuted
                         }}
                     >
-                        <span className="sr-only">Toggle theme</span>
+                        <span className="sr-only">Ganti tema</span>
                         <span
                             className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${isDark ? 'translate-x-8' : 'translate-x-1'
                                 }`}
@@ -270,7 +270,7 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
                             className="font-semibold text-lg"
                             style={{ color: theme.colors.textPrimary }}
                         >
-                            Export ke Excel
+                            Ekspor ke Excel
                         </h3>
                         <p
                             className="text-sm"
@@ -411,7 +411,7 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
                         ) : (
                             <>
                                 <IconDisplay name="Download" size={20} />
-                                Export ke Excel
+                                Ekspor ke Excel
                             </>
                         )}
                     </button>

@@ -6,6 +6,7 @@ import ConfirmDialog from './ConfirmDialog';
 import CategoryFormModal from './CategoryFormModal';
 import { processFileForUpload } from '../utils/fileCompression';
 import Toast from './Toast';
+import { NotificationType } from './NotificationModal';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -28,9 +29,10 @@ interface TransactionFormProps {
   onDelete?: (id: string) => void;
   onAddCategory?: (category: Omit<Category, 'id'>) => void;
   onClose: () => void;
+  onShowNotification?: (type: NotificationType, title: string, message: string, autoClose?: boolean) => void;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, onAdd, onUpdate, onDelete, onAddCategory, onClose }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
   const { theme } = useTheme();
 
   // Determine initial state based on initialData
@@ -230,33 +232,58 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     const rawAmount = parseInt(displayAmount.replace(/\./g, ''), 10);
 
     if (!rawAmount || rawAmount <= 0) {
-      setError("⚠️ Mohon isi jumlah uang dengan nominal yang valid.");
+      if (onShowNotification) {
+        onShowNotification('warning', 'Jumlah Tidak Valid', 'Mohon isi jumlah uang dengan nominal yang valid.', false);
+      } else {
+        setError("⚠️ Mohon isi jumlah uang dengan nominal yang valid.");
+      }
       return;
     }
 
     if (!categoryId) {
-      setError("⚠️ Kategori transaksi wajib dipilih.");
+      if (onShowNotification) {
+        onShowNotification('warning', 'Kategori Wajib Dipilih', 'Kategori transaksi wajib dipilih.', false);
+      } else {
+        setError("⚠️ Kategori transaksi wajib dipilih.");
+      }
       return;
     }
 
     if (!date) {
-      setError("⚠️ Tanggal transaksi harus diisi.");
+      if (onShowNotification) {
+        onShowNotification('warning', 'Tanggal Harus Diisi', 'Tanggal transaksi harus diisi.', false);
+      } else {
+        setError("⚠️ Tanggal transaksi harus diisi.");
+      }
       return;
     }
 
     if (!description.trim()) {
-      setError("⚠️ Catatan tidak boleh kosong.");
+      if (onShowNotification) {
+        onShowNotification('warning', 'Catatan Tidak Boleh Kosong', 'Catatan tidak boleh kosong.', false);
+      } else {
+        setError("⚠️ Catatan tidak boleh kosong.");
+      }
       return;
     }
 
     // Start loading state
     setIsSaving(true);
 
-    // Set appropriate message based on whether there's an attachment
-    if (attachment || (initialData && attachment)) {
-      setSavingMessage('Mengupload lampiran...');
+    // Show loading notification popup
+    if (onShowNotification) {
+      if (attachment || (initialData && attachment)) {
+        onShowNotification('loading', 'Mengupload...', 'Sedang mengupload lampiran, mohon tunggu.', false);
+      } else {
+        onShowNotification('loading', 'Menyimpan...', 'Sedang menyimpan transaksi, mohon tunggu.', false);
+      }
     } else {
-      setSavingMessage('Menyimpan transaksi...');
+      // Fallback to old method
+      if (attachment || (initialData && attachment)) {
+        setSavingMessage('Mengupload lampiran...');
+      } else {
+        setSavingMessage('Menyimpan transaksi...');
+      }
     }
 
     try {
@@ -280,22 +307,30 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         }
       }
 
-      // Show success toast
-      setToastMessage(initialData ? '✅ Transaksi berhasil diupdate!' : '✅ Transaksi berhasil disimpan!');
-      setToastType('success');
-      setShowToast(true);
+      // Show success notification
+      if (onShowNotification) {
+        onShowNotification('success', 'Berhasil!', initialData ? 'Transaksi berhasil diupdate!' : 'Transaksi berhasil disimpan!', true);
+      } else {
+        setToastMessage(initialData ? '✅ Transaksi berhasil diupdate!' : '✅ Transaksi berhasil disimpan!');
+        setToastType('success');
+        setShowToast(true);
+      }
 
-      // Close modal after short delay to show toast
+      // Close modal after short delay
       setTimeout(() => {
         onClose();
-      }, 500);
+      }, onShowNotification ? 1000 : 500);
 
     } catch (error) {
       console.error('Error saving transaction:', error);
-      setError('⚠️ Gagal menyimpan transaksi. Silakan coba lagi.');
-      setToastMessage('❌ Gagal menyimpan transaksi');
-      setToastType('error');
-      setShowToast(true);
+      if (onShowNotification) {
+        onShowNotification('error', 'Gagal Menyimpan', 'Gagal menyimpan transaksi. Silakan coba lagi.');
+      } else {
+        setError('⚠️ Gagal menyimpan transaksi. Silakan coba lagi.');
+        setToastMessage('❌ Gagal menyimpan transaksi');
+        setToastType('error');
+        setShowToast(true);
+      }
     } finally {
       setIsSaving(false);
       setSavingMessage('');
@@ -341,16 +376,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 disabled={isSaving}
                 className="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  backgroundColor: '#ef4444',
                   color: 'white'
                 }}
                 onMouseEnter={(e) => {
                   if (!isSaving) {
-                    e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+                    e.currentTarget.style.backgroundColor = '#dc2626';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.backgroundColor = '#ef4444';
                 }}
                 title="Hapus Transaksi"
               >
@@ -381,19 +416,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         {/* Scrollable Form Content */}
         <form id="transaction-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-4 md:p-6 space-y-4 pb-24 md:pb-6">
-            {/* Loading Message */}
-            {isSaving && savingMessage && (
-              <div className="border-l-4 p-3 rounded-md text-sm font-medium flex items-center gap-2"
-                style={{
-                  backgroundColor: theme.colors.accentLight,
-                  color: theme.colors.accent,
-                  borderColor: theme.colors.accent
-                }}
-              >
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                <span>{savingMessage}</span>
-              </div>
-            )}
+            {/* Loading Message - now handled by popup notification */}
 
             {error && (
               <div className="border-l-4 border-red-500 p-3 rounded-md text-sm font-medium flex items-center gap-2 animate-pulse"
@@ -668,20 +691,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 type="button"
                 onClick={handleDelete}
                 disabled={isSaving}
-                className="px-4 py-3 rounded-lg transition-all focus:outline-none flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2"
                 style={{
-                  backgroundColor: theme.colors.expenseBg,
-                  color: theme.colors.expense
+                  backgroundColor: '#ef4444',
+                  color: 'white'
                 }}
                 onMouseEnter={(e) => {
                   if (!isSaving) {
-                    e.currentTarget.style.backgroundColor = theme.colors.expense;
-                    e.currentTarget.style.color = 'white';
+                    e.currentTarget.style.backgroundColor = '#dc2626';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
-                  e.currentTarget.style.color = theme.colors.expense;
+                  e.currentTarget.style.backgroundColor = '#ef4444';
                 }}
                 title="Hapus Transaksi"
               >

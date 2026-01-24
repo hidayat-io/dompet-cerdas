@@ -3,6 +3,7 @@ import { Transaction, Category } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import TransactionForm from './TransactionForm';
+import { NotificationType } from './NotificationModal';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -17,6 +18,7 @@ interface TransactionListProps {
     attachment?: { file: File; type: 'image' | 'pdf' } | null
   ) => Promise<void>;
   onAddCategory?: (category: Omit<Category, 'id'>) => void;
+  onShowNotification?: (type: NotificationType, title: string, message: string, autoClose?: boolean) => void;
 }
 
 // Modal for viewing attachment (moved up for cleaner structure)
@@ -27,6 +29,7 @@ const AttachmentModal: React.FC<{
   onClose: () => void;
 }> = ({ url, name, type, onClose }) => {
   const { theme } = useTheme();
+  const [isLoading, setIsLoading] = useState(true);
 
   return (
     <div
@@ -81,21 +84,36 @@ const AttachmentModal: React.FC<{
           </div>
         </div>
         <div
-          className="overflow-auto flex-1 p-4 flex items-center justify-center"
+          className="overflow-auto flex-1 p-4 flex items-center justify-center relative"
           style={{ backgroundColor: theme.colors.bgPrimary }}
         >
+          {/* Loading Indicator */}
+          {isLoading && (
+            <div className="flex flex-col items-center gap-3 z-10">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent" style={{ borderColor: theme.colors.accent, borderTopColor: 'transparent' }}></div>
+              <p className="text-sm font-medium" style={{ color: theme.colors.textMuted }}>Memuat lampiran...</p>
+            </div>
+          )}
+
           {type === 'image' ? (
             <img
               src={url}
               alt={name}
               className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+              onLoad={() => setIsLoading(false)}
+              onError={() => setIsLoading(false)}
+              style={{ display: isLoading ? 'none' : 'block' }}
             />
           ) : (
             <iframe
               src={url}
               title={name}
               className="w-full h-[70vh] rounded-lg border"
-              style={{ borderColor: theme.colors.border }}
+              style={{
+                borderColor: theme.colors.border,
+                display: isLoading ? 'none' : 'block'
+              }}
+              onLoad={() => setIsLoading(false)}
             />
           )}
         </div>
@@ -129,7 +147,7 @@ const generateYearOptions = (): number[] => {
 
 type FilterMode = 'month' | 'range';
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, onDelete, onUpdate, onAddCategory }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
   const { theme } = useTheme();
 
   const [viewingAttachment, setViewingAttachment] = useState<{
@@ -724,6 +742,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             onDelete={onDelete}
             onAddCategory={onAddCategory}
             onClose={() => setEditingTransaction(null)}
+            onShowNotification={onShowNotification}
           />
         </div>
       )}

@@ -10,6 +10,7 @@ interface SimulationManagerProps {
     onCreateSimulation: (title: string) => void;
     onDeleteSimulation: (id: string) => void;
     onAddSimulationItem: (simId: string, item: Omit<SimulationItem, 'id'>) => void;
+    onUpdateSimulationItem: (simId: string, itemId: string, item: Omit<SimulationItem, 'id'>) => void;
     onDeleteSimulationItem: (simId: string, itemId: string) => void;
     onApplyItemToReal: (item: SimulationItem, date: string) => void;
 }
@@ -21,6 +22,7 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
     onCreateSimulation,
     onDeleteSimulation,
     onAddSimulationItem,
+    onUpdateSimulationItem,
     onDeleteSimulationItem,
     onApplyItemToReal
 }) => {
@@ -38,6 +40,16 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
     const [applyModalOpen, setApplyModalOpen] = useState(false);
     const [itemToApply, setItemToApply] = useState<SimulationItem | null>(null);
     const [applyDate, setApplyDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // State untuk Edit Item
+    const [editingItem, setEditingItem] = useState<SimulationItem | null>(null);
+    const [editItemName, setEditItemName] = useState('');
+    const [editItemAmount, setEditItemAmount] = useState('');
+    const [editItemType, setEditItemType] = useState<TransactionType>('EXPENSE');
+    const [editItemCategory, setEditItemCategory] = useState('');
+
+    // State untuk Add Item Modal
+    const [showAddModal, setShowAddModal] = useState(false);
 
     // Format Helper
     const formatRp = (val: number) => {
@@ -80,6 +92,7 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
 
         setNewItemName('');
         setNewItemAmount('');
+        setShowAddModal(false);
     };
 
     const openApplyModal = (item: SimulationItem) => {
@@ -94,6 +107,31 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
             setApplyModalOpen(false);
             setItemToApply(null);
         }
+    };
+
+    const handleEditClick = (item: SimulationItem) => {
+        setEditingItem(item);
+        setEditItemName(item.name);
+        setEditItemAmount(formatRupiahInput(item.amount.toString()));
+        setEditItemType(item.type);
+        setEditItemCategory(item.categoryId);
+    };
+
+    const handleUpdateItem = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeSimId || !editingItem) return;
+
+        const amount = parseInt(editItemAmount.replace(/\./g, ''), 10);
+        onUpdateSimulationItem(activeSimId, editingItem.id, {
+            name: editItemName,
+            amount,
+            type: editItemType,
+            categoryId: editItemCategory
+        });
+
+        setEditingItem(null);
+        setEditItemName('');
+        setEditItemAmount('');
     };
 
     // --- Render ---
@@ -126,7 +164,7 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                     style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
                 >
                     <h2 className="text-2xl font-bold mb-1" style={{ color: theme.colors.textPrimary }}>{sim.title}</h2>
-                    <p className="text-sm mb-4" style={{ color: theme.colors.textMuted }}>Mode Sandbox: Angka di sini tidak mempengaruhi saldo utama sampai Anda menerapkannya.</p>
+                    <p className="text-sm mb-4" style={{ color: theme.colors.textMuted }}>Mode Simulasi: Angka di sini tidak mempengaruhi saldo utama sampai Anda menerapkannya.</p>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div
@@ -155,93 +193,19 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                     </div>
                 </div>
 
-                {/* Form Tambah Item Simulasi */}
-                <div
-                    className="rounded-2xl p-5 shadow-sm border"
-                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+                {/* Button Tambah Item */}
+                <button
+                    onClick={() => setShowAddModal(true)}
+                    className="w-full p-4 rounded-xl border-2 border-dashed transition-all hover:border-solid flex items-center justify-center gap-2 font-medium"
+                    style={{
+                        borderColor: theme.colors.accent,
+                        color: theme.colors.accent,
+                        backgroundColor: theme.colors.accentLight
+                    }}
                 >
-                    <h3 className="font-bold mb-3" style={{ color: theme.colors.textPrimary }}>Tambah Item ke Simulasi</h3>
-                    <form onSubmit={handleAddItem} className="flex flex-col md:flex-row gap-3 items-end">
-                        <div className="w-full md:w-auto">
-                            <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgHover }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setNewItemType('EXPENSE')}
-                                    className="px-4 py-2 rounded-md text-xs font-bold"
-                                    style={{
-                                        backgroundColor: newItemType === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
-                                        color: newItemType === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted,
-                                        boxShadow: newItemType === 'EXPENSE' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
-                                    }}
-                                >Keluar</button>
-                                <button
-                                    type="button"
-                                    onClick={() => setNewItemType('INCOME')}
-                                    className="px-4 py-2 rounded-md text-xs font-bold"
-                                    style={{
-                                        backgroundColor: newItemType === 'INCOME' ? theme.colors.bgCard : 'transparent',
-                                        color: newItemType === 'INCOME' ? theme.colors.income : theme.colors.textMuted,
-                                        boxShadow: newItemType === 'INCOME' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
-                                    }}
-                                >Masuk</button>
-                            </div>
-                        </div>
-                        <div className="w-full md:flex-1">
-                            <input
-                                type="text"
-                                placeholder="Nama Item (mis: Tiket Liburan)"
-                                value={newItemName}
-                                onChange={e => setNewItemName(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary
-                                }}
-                            />
-                        </div>
-                        <div className="w-full md:flex-1 relative">
-                            <span className="absolute left-3 top-2 text-sm" style={{ color: theme.colors.textMuted }}>Rp</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                placeholder="0"
-                                value={newItemAmount}
-                                onChange={e => setNewItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
-                                className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm font-semibold outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary
-                                }}
-                            />
-                        </div>
-                        <div className="w-full md:w-1/4">
-                            <select
-                                value={newItemCategory}
-                                onChange={e => setNewItemCategory(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary
-                                }}
-                            >
-                                <option value="">Pilih Kategori...</option>
-                                {filteredCategories.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <button
-                            type="submit"
-                            className="w-full md:w-auto px-5 py-2 text-white rounded-lg font-medium text-sm transition-colors"
-                            style={{ backgroundColor: theme.colors.accent }}
-                        >
-                            Tambah
-                        </button>
-                    </form>
-                </div>
+                    <IconDisplay name="Plus" size={20} />
+                    Tambah Item ke Simulasi
+                </button>
 
                 {/* List Items */}
                 <div className="space-y-3">
@@ -256,22 +220,19 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                             return (
                                 <div
                                     key={item.id}
-                                    className="p-4 rounded-xl border flex items-center justify-between group"
+                                    className="p-4 rounded-xl border group"
                                     style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${cat ? '' : 'bg-gray-300'}`} style={{ backgroundColor: cat?.color }}>
-                                            <IconDisplay name={cat?.icon || 'HelpCircle'} size={18} />
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${cat ? '' : 'bg-gray-300'}`} style={{ backgroundColor: cat?.color }}>
+                                                <IconDisplay name={cat?.icon || 'HelpCircle'} size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{cat?.name || 'Tanpa Kategori'}</p>
+                                                <p className="text-xs" style={{ color: theme.colors.textMuted }}>{item.name}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{item.name}</p>
-                                            <p className="text-xs" style={{ color: theme.colors.textMuted }}>{cat?.name || 'Tanpa Kategori'}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <span className="font-bold" style={{ color: item.type === 'INCOME' ? theme.colors.income : theme.colors.expense }}>
-                                            {item.type === 'INCOME' ? '+' : '-'}{formatRp(item.amount)}
-                                        </span>
                                         <div className="flex items-center gap-1">
                                             <button
                                                 onClick={() => openApplyModal(item)}
@@ -279,7 +240,15 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                                                 title="Tambahkan ke Transaksi Utama"
                                                 style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
                                             >
-                                                <IconDisplay name="Save" size={14} /> <span className="hidden sm:inline">Add Real</span>
+                                                <IconDisplay name="Save" size={14} /> <span className="hidden sm:inline">Tambah ke Utama</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleEditClick(item)}
+                                                className="p-2 rounded-lg transition-colors"
+                                                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
+                                                title="Edit Item"
+                                            >
+                                                <IconDisplay name="Edit" size={14} />
                                             </button>
                                             <button
                                                 onClick={() => onDeleteSimulationItem(sim.id, item.id)}
@@ -288,6 +257,11 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                                                 <IconDisplay name="Trash2" size={16} />
                                             </button>
                                         </div>
+                                    </div>
+                                    <div className="pl-[52px]">
+                                        <span className="font-bold text-lg" style={{ color: item.type === 'INCOME' ? theme.colors.income : theme.colors.expense }}>
+                                            {item.type === 'INCOME' ? '+' : '-'}{formatRp(item.amount)}
+                                        </span>
                                     </div>
                                 </div>
                             );
@@ -333,6 +307,243 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                                     Konfirmasi Simpan
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal Edit Item */}
+                {editingItem && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                        <div
+                            className="rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in-up"
+                            style={{ backgroundColor: theme.colors.bgCard }}
+                        >
+                            <h3 className="text-lg font-bold mb-4" style={{ color: theme.colors.textPrimary }}>Edit Item Simulasi</h3>
+                            <form onSubmit={handleUpdateItem} className="space-y-4">
+                                {/* Type Toggle */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Tipe</label>
+                                    <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgHover }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditItemType('EXPENSE')}
+                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
+                                            style={{
+                                                backgroundColor: editItemType === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
+                                                color: editItemType === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted,
+                                                boxShadow: editItemType === 'EXPENSE' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
+                                            }}
+                                        >Pengeluaran</button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditItemType('INCOME')}
+                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
+                                            style={{
+                                                backgroundColor: editItemType === 'INCOME' ? theme.colors.bgCard : 'transparent',
+                                                color: editItemType === 'INCOME' ? theme.colors.income : theme.colors.textMuted,
+                                                boxShadow: editItemType === 'INCOME' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
+                                            }}
+                                        >Pemasukan</button>
+                                    </div>
+                                </div>
+
+                                {/* Name */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Nama Item</label>
+                                    <input
+                                        type="text"
+                                        value={editItemName}
+                                        onChange={e => setEditItemName(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
+                                        style={{
+                                            backgroundColor: theme.colors.bgHover,
+                                            borderColor: theme.colors.border,
+                                            color: theme.colors.textPrimary
+                                        }}
+                                        required
+                                    />
+                                </div>
+
+                                {/* Amount */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Jumlah</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-sm" style={{ color: theme.colors.textMuted }}>Rp</span>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={editItemAmount}
+                                            onChange={e => setEditItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
+                                            className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm font-semibold outline-none"
+                                            style={{
+                                                backgroundColor: theme.colors.bgHover,
+                                                borderColor: theme.colors.border,
+                                                color: theme.colors.textPrimary
+                                            }}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Category */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Kategori</label>
+                                    <select
+                                        value={editItemCategory}
+                                        onChange={e => setEditItemCategory(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
+                                        style={{
+                                            backgroundColor: theme.colors.bgHover,
+                                            borderColor: theme.colors.border,
+                                            color: theme.colors.textPrimary
+                                        }}
+                                        required
+                                    >
+                                        {categories.filter(c => c.type === editItemType).map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Buttons */}
+                                <div className="flex gap-2 justify-end pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingItem(null)}
+                                        className="px-4 py-2 rounded-lg text-sm font-medium"
+                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 text-white rounded-lg text-sm font-medium"
+                                        style={{ backgroundColor: theme.colors.accent }}
+                                    >
+                                        Simpan Perubahan
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal Add Item */}
+                {showAddModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                        <div
+                            className="rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in-up"
+                            style={{ backgroundColor: theme.colors.bgCard }}
+                        >
+                            <h3 className="text-lg font-bold mb-4" style={{ color: theme.colors.textPrimary }}>Tambah Item Simulasi</h3>
+                            <form onSubmit={handleAddItem} className="space-y-4">
+                                {/* Type Toggle */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Tipe</label>
+                                    <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgHover }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewItemType('EXPENSE')}
+                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
+                                            style={{
+                                                backgroundColor: newItemType === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
+                                                color: newItemType === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted,
+                                                boxShadow: newItemType === 'EXPENSE' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
+                                            }}
+                                        >Pengeluaran</button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewItemType('INCOME')}
+                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
+                                            style={{
+                                                backgroundColor: newItemType === 'INCOME' ? theme.colors.bgCard : 'transparent',
+                                                color: newItemType === 'INCOME' ? theme.colors.income : theme.colors.textMuted,
+                                                boxShadow: newItemType === 'INCOME' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
+                                            }}
+                                        >Pemasukan</button>
+                                    </div>
+                                </div>
+
+                                {/* Name */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Nama Item</label>
+                                    <input
+                                        type="text"
+                                        placeholder="mis: Tiket Liburan"
+                                        value={newItemName}
+                                        onChange={e => setNewItemName(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
+                                        style={{
+                                            backgroundColor: theme.colors.bgHover,
+                                            borderColor: theme.colors.border,
+                                            color: theme.colors.textPrimary
+                                        }}
+                                        required
+                                    />
+                                </div>
+
+                                {/* Amount */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Jumlah</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-sm" style={{ color: theme.colors.textMuted }}>Rp</span>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            placeholder="0"
+                                            value={newItemAmount}
+                                            onChange={e => setNewItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
+                                            className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm font-semibold outline-none"
+                                            style={{
+                                                backgroundColor: theme.colors.bgHover,
+                                                borderColor: theme.colors.border,
+                                                color: theme.colors.textPrimary
+                                            }}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Category */}
+                                <div>
+                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Kategori</label>
+                                    <select
+                                        value={newItemCategory}
+                                        onChange={e => setNewItemCategory(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
+                                        style={{
+                                            backgroundColor: theme.colors.bgHover,
+                                            borderColor: theme.colors.border,
+                                            color: theme.colors.textPrimary
+                                        }}
+                                        required
+                                    >
+                                        <option value="">Pilih Kategori...</option>
+                                        {categories.filter(c => c.type === newItemType).map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Buttons */}
+                                <div className="flex gap-2 justify-end pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddModal(false)}
+                                        className="px-4 py-2 rounded-lg text-sm font-medium"
+                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 text-white rounded-lg text-sm font-medium"
+                                        style={{ backgroundColor: theme.colors.accent }}
+                                    >
+                                        Tambah Item
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 )}
@@ -417,7 +628,7 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                                     <span
                                         className="text-xs px-2 py-1 rounded-md"
                                         style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textMuted }}
-                                    >{sim.items.length} Item</span>
+                                    >{sim.items.length} Transaksi</span>
                                     <div className="text-right">
                                         <p className="text-xs uppercase" style={{ color: theme.colors.textMuted }}>Total Efek</p>
                                         <p className="font-bold text-lg" style={{ color: total >= 0 ? theme.colors.income : theme.colors.expense }}>

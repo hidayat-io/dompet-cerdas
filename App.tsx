@@ -18,6 +18,7 @@ import Settings from './components/Settings';
 import { getFinancialAdvice } from './services/geminiService';
 import IconDisplay from './components/IconDisplay';
 import { useTheme } from './contexts/ThemeContext';
+import NotificationModal, { NotificationType } from './components/NotificationModal';
 
 // ... (skip content)
 
@@ -38,6 +39,23 @@ function App() {
 
   const [aiAnalysis, setAiAnalysis] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+
+  // Notification State
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type: NotificationType;
+    title: string;
+    message: string;
+    autoClose?: boolean;
+  }>({ isOpen: false, type: 'info', title: '', message: '' });
+
+  const showNotification = (type: NotificationType, title: string, message: string, autoClose = true) => {
+    setNotification({ isOpen: true, type, title, message, autoClose });
+  };
+
+  const closeNotification = () => {
+    setNotification(prev => ({ ...prev, isOpen: false }));
+  };
 
   // --- Auth Listener ---
   useEffect(() => {
@@ -97,21 +115,31 @@ function App() {
 
     // 1. Categories Listener
     const catQuery = query(collection(db, 'users', user.uid, 'categories'));
-    const unsubCat = onSnapshot(catQuery, (snapshot) => {
+    const unsubCat = onSnapshot(catQuery, async (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Category));
       setCategories(data);
 
-      // Seed Initial Data if empty
+      // Seed Initial Data if empty - with user metadata check to prevent duplicates
       if (data.length === 0 && !snapshot.metadata.hasPendingWrites) {
-        const batch = writeBatch(db);
-        INITIAL_CATEGORIES.forEach(cat => {
-          // Gunakan ID manual dari constants agar konsisten atau biarkan auto-id
-          // Disini kita biarkan firestore generate ID untuk keamanan, atau pakai ID constants
-          // Untuk simple case, kita buat dokumen baru
-          const ref = doc(collection(db, 'users', user.uid, 'categories'));
-          batch.set(ref, { ...cat, id: ref.id });
-        });
-        batch.commit().catch(console.error);
+        // Check if we've already seeded for this user
+        const userMetaRef = doc(db, 'users', user.uid);
+        const userMetaSnap = await getDoc(userMetaRef);
+        const hasSeededCategories = userMetaSnap.exists() && userMetaSnap.data()?.categoriesSeeded;
+
+        if (!hasSeededCategories) {
+          const batch = writeBatch(db);
+
+          // Add initial categories
+          INITIAL_CATEGORIES.forEach(cat => {
+            const ref = doc(collection(db, 'users', user.uid, 'categories'));
+            batch.set(ref, { ...cat, id: ref.id });
+          });
+
+          // Mark as seeded in user metadata
+          batch.set(userMetaRef, { categoriesSeeded: true, createdAt: new Date().toISOString() }, { merge: true });
+
+          batch.commit().catch(console.error);
+        }
       }
     });
 
@@ -171,7 +199,7 @@ function App() {
         };
       } catch (err) {
         console.error("Upload failed", err);
-        alert("Gagal mengupload lampiran, transaksi tetap disimpan tanpa lampiran.");
+        showNotification('error', 'Upload Gagal', 'Gagal mengupload lampiran, transaksi tetap disimpan tanpa lampiran.');
       }
     }
 
@@ -262,7 +290,7 @@ function App() {
         };
       } catch (err) {
         console.error("Upload update failed", err);
-        alert("Gagal mengupload lampiran baru.");
+        showNotification('error', 'Upload Gagal', 'Gagal mengupload lampiran baru.');
         return;
       }
     }
@@ -323,7 +351,7 @@ function App() {
     if (!user) return;
     const isUsed = transactions.some(t => t.categoryId === id);
     if (isUsed) {
-      alert("Kategori ini tidak bisa dihapus karena masih digunakan dalam transaksi.");
+      showNotification('error', 'Tidak Dapat Dihapus', 'Kategori ini tidak bisa dihapus karena masih digunakan dalam transaksi.', false);
       return;
     }
     await deleteDoc(doc(db, 'users', user.uid, 'categories', id));
@@ -360,6 +388,18 @@ function App() {
     }
   };
 
+  const updateSimulationItem = async (simId: string, itemId: string, updatedItem: Omit<SimulationItem, 'id'>) => {
+    if (!user) return;
+    const simRef = doc(db, 'users', user.uid, 'simulations', simId);
+    const simulation = simulations.find(s => s.id === simId);
+    if (simulation) {
+      const updatedItems = simulation.items.map(i =>
+        i.id === itemId ? { ...updatedItem, id: itemId } : i
+      );
+      await setDoc(simRef, { items: updatedItems }, { merge: true });
+    }
+  };
+
   const deleteSimulationItem = async (simId: string, itemId: string) => {
     if (!user) return;
     const simRef = doc(db, 'users', user.uid, 'simulations', simId);
@@ -372,7 +412,7 @@ function App() {
 
   const applySimulationItemToReal = (item: SimulationItem, date: string) => {
     addTransaction(item.amount, item.categoryId, date, `[Dari Simulasi] ${item.name} `);
-    alert("Transaksi berhasil disalin ke buku utama!");
+    showNotification('success', 'Berhasil!', 'Transaksi berhasil disalin ke buku utama!', true);
   };
 
   const handleLogout = () => {
@@ -621,6 +661,7 @@ function App() {
                 onUpdate={updateTransaction}
                 onDelete={deleteTransaction}
                 onAddCategory={addCategory}
+                onShowNotification={showNotification}
               />
             )}
             {currentView === 'SIMULATION' && (
@@ -631,6 +672,7 @@ function App() {
                 onCreateSimulation={createSimulation}
                 onDeleteSimulation={deleteSimulation}
                 onAddSimulationItem={addSimulationItem}
+                onUpdateSimulationItem={updateSimulationItem}
                 onDeleteSimulationItem={deleteSimulationItem}
                 onApplyItemToReal={applySimulationItemToReal}
               />
@@ -712,7 +754,7 @@ function App() {
             style={{ color: currentView === 'DASHBOARD' ? theme.colors.accent : theme.colors.textMuted }}
           >
             <IconDisplay name="Home" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Home</span>
+            <span className="text-[9px] font-medium mt-0.5">Beranda</span>
           </button>
           <button
             onClick={() => setCurrentView('TRANSACTIONS')}
@@ -740,7 +782,7 @@ function App() {
             style={{ color: currentView === 'SETTINGS' ? theme.colors.accent : theme.colors.textMuted }}
           >
             <IconDisplay name="Settings" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Setting</span>
+            <span className="text-[9px] font-medium mt-0.5">Pengaturan</span>
           </button>
         </nav >
 
@@ -772,9 +814,20 @@ function App() {
               onClose={() => setShowAddModal(false)}
               onAdd={addTransaction}
               onAddCategory={addCategory}
+              onShowNotification={showNotification}
             />
           )
         }
+
+        {/* Notification Modal */}
+        <NotificationModal
+          isOpen={notification.isOpen}
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+          onClose={closeNotification}
+          autoClose={notification.autoClose}
+        />
       </main >
     </div >
   );
