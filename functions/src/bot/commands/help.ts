@@ -37,6 +37,7 @@ Bot ini menggunakan bahasa natural - kamu bisa ngobrol seperti biasa!
 ⚙️ *Commands:*
 /start - Hubungkan akun
 /link - Generate link token
+/unlink - Putuskan koneksi akun
 /help - Panduan ini
 
 💡 *Tips:*

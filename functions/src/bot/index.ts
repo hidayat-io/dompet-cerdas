@@ -5,7 +5,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { handleStartCommand } from './commands/start';
 import { handleHelpCommand } from './commands/help';
-import { checkTelegramLink, updateLastInteraction } from '../services/linkService';
+import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from '../services/linkService';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
@@ -122,12 +122,55 @@ async function handleCommand(msg: TelegramBot.Message): Promise<void> {
             await handleStartCommand(getBot(), msg);
             break;
 
+        case '/unlink':
+        case '/disconnect':
+            await handleUnlinkCommand(msg);
+            break;
+
         default:
             await getBot().sendMessage(
                 msg.chat.id,
                 '❓ Command tidak dikenal. Ketik /help untuk melihat panduan.'
             );
     }
+}
+
+/**
+ * Handle /unlink command
+ */
+async function handleUnlinkCommand(msg: TelegramBot.Message): Promise<void> {
+    const telegramId = msg.from!.id;
+    const chatId = msg.chat.id;
+
+    // Check if account is linked
+    const userId = await checkTelegramLink(telegramId);
+    if (!userId) {
+        await getBot().sendMessage(
+            chatId,
+            '⚠️ Akun kamu belum terhubung dengan DompetCerdas.\n\n' +
+            'Ketik /start untuk menghubungkan akun.'
+        );
+        return;
+    }
+
+    // Ask for confirmation with inline keyboard
+    await getBot().sendMessage(
+        chatId,
+        '❓ *Konfirmasi Disconnect*\n\n' +
+        'Apakah kamu yakin ingin memutuskan koneksi antara Telegram dan akun DompetCerdas?\n\n' +
+        'Setelah disconnect, kamu bisa hubungkan lagi dengan akun yang berbeda menggunakan /start.',
+        {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '✅ Ya, Disconnect', callback_data: 'confirm_unlink' },
+                        { text: '❌ Batal', callback_data: 'cancel_unlink' }
+                    ]
+                ]
+            }
+        }
+    );
 }
 
 /**
@@ -167,10 +210,71 @@ async function handleTextMessage(
 async function handleCallbackQuery(
     query: TelegramBot.CallbackQuery
 ): Promise<void> {
-    // TODO: Implement callback handlers in later phases
-    await getBot().answerCallbackQuery(query.id, {
-        text: 'Fitur ini akan segera hadir!',
-    });
+    const callbackData = query.data;
+    const chatId = query.message!.chat.id;
+    const messageId = query.message!.message_id;
+    const telegramId = query.from.id;
+
+    // Handle unlink confirmation
+    if (callbackData === 'confirm_unlink') {
+        try {
+            const success = await unlinkTelegramAccount(telegramId);
+
+            if (success) {
+                // Delete the confirmation message
+                await getBot().deleteMessage(chatId, messageId);
+
+                // Send success message
+                await getBot().sendMessage(
+                    chatId,
+                    '✅ *Akun berhasil di-disconnect!*\n\n' +
+                    'Koneksi antara Telegram dan DompetCerdas telah diputuskan.\n\n' +
+                    'Kamu bisa:\n' +
+                    '• Hubungkan lagi dengan akun yang sama\n' +
+                    '• Hubungkan dengan akun DompetCerdas yang berbeda\n\n' +
+                    'Ketik /start untuk menghubungkan akun lagi.',
+                    { parse_mode: 'Markdown' }
+                );
+
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Akun berhasil di-disconnect'
+                });
+            } else {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Gagal disconnect - akun tidak terhubung',
+                    show_alert: true
+                });
+            }
+        } catch (error) {
+            console.error('Error unlinking account:', error);
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Terjadi kesalahan. Silakan coba lagi.',
+                show_alert: true
+            });
+        }
+    }
+    // Handle cancel unlink
+    else if (callbackData === 'cancel_unlink') {
+        // Delete the confirmation message
+        await getBot().deleteMessage(chatId, messageId);
+
+        // Send cancel message
+        await getBot().sendMessage(
+            chatId,
+            '❌ Disconnect dibatalkan.\n\n' +
+            'Akun kamu tetap terhubung dengan DompetCerdas. 👍'
+        );
+
+        await getBot().answerCallbackQuery(query.id, {
+            text: 'Dibatalkan'
+        });
+    }
+    // Handle other callbacks
+    else {
+        await getBot().answerCallbackQuery(query.id, {
+            text: 'Fitur ini akan segera hadir!',
+        });
+    }
 }
 
 export { bot };

@@ -171,3 +171,28 @@ export async function updateLastInteraction(telegramId: number): Promise<void> {
             lastInteraction: admin.firestore.Timestamp.now(),
         });
 }
+
+/**
+ * Unlink Telegram account from user
+ * Soft delete - sets active to false instead of deleting
+ * @param telegramId - Telegram user ID
+ */
+export async function unlinkTelegramAccount(telegramId: number): Promise<boolean> {
+    const userId = await checkTelegramLink(telegramId);
+
+    if (!userId) {
+        return false; // Account not linked
+    }
+
+    await getDb()
+        .collection('users')
+        .doc(userId)
+        .collection('telegram_link')
+        .doc('main')
+        .update({
+            active: false,
+            unlinkedAt: admin.firestore.Timestamp.now(),
+        });
+
+    return true;
+}
