@@ -10,6 +10,13 @@ import { initBot, processUpdate } from './bot';
 admin.initializeApp();
 
 /**
+ * Get Firestore database reference
+ */
+export function getDb() {
+    return admin.firestore();
+}
+
+/**
  * Telegram Webhook Handler
  * Receives updates from Telegram Bot API
  */

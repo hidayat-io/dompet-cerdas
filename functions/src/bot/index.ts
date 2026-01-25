@@ -6,6 +6,9 @@ import TelegramBot from 'node-telegram-bot-api';
 import { handleStartCommand } from './commands/start';
 import { handleHelpCommand } from './commands/help';
 import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from '../services/linkService';
+import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
+import { createTransactionFromReceipt } from '../services/transactionService';
+import { getDb } from '../index';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
@@ -175,18 +178,85 @@ async function handleUnlinkCommand(msg: TelegramBot.Message): Promise<void> {
 
 /**
  * Handle photo messages (receipt upload)
- * TODO: Implement in Phase 2
  */
 async function handlePhotoMessage(
     msg: TelegramBot.Message,
     userId: string
 ): Promise<void> {
-    await getBot().sendMessage(
-        msg.chat.id,
-        '📸 Fitur upload struk akan segera hadir di Phase 2!\n\n' +
-        'Untuk saat ini, kamu bisa tambah transaksi manual dengan mengetik:\n' +
-        '"tambah 50000 makan siang"'
-    );
+    const chatId = msg.chat.id;
+    const photo = msg.photo![msg.photo!.length - 1]; // Get highest resolution
+
+    try {
+        // Validate file size (5MB max)
+        if (photo.file_size && photo.file_size > 5 * 1024 * 1024) {
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Ukuran foto terlalu besar!\n\nMaksimal 5MB. Silakan kompres foto terlebih dahulu.'
+            );
+            return;
+        }
+
+        // Send analyzing message
+        const analyzingMsg = await getBot().sendMessage(
+            chatId,
+            '📸 Menganalisis struk...\n\nMohon tunggu beberapa detik...'
+        );
+
+        // Download photo from Telegram
+        const fileLink = await getBot().getFileLink(photo.file_id);
+        const response = await fetch(fileLink);
+
+        if (!response.ok) {
+            throw new Error('Failed to download photo');
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const imageBuffer = Buffer.from(arrayBuffer);
+
+        // Analyze receipt with Gemini Vision
+        const receiptData = await analyzeReceipt(imageBuffer);
+
+        // Create session ID for confirmation
+        // Create session ID (short random string max 10 chars)
+        const sessionId = require('crypto').randomBytes(4).toString('hex');
+
+        // Store in Firestore temporary session
+        await getDb().collection('receipt_sessions').doc(sessionId).set({
+            userId,
+            telegramId: msg.from!.id,
+            receiptData,
+            photoFileId: photo.file_id,
+            status: 'pending',
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+        });
+
+        // Format confirmation message
+        const confirmationText = formatReceiptData(receiptData);
+
+        // Edit analyzing message with confirmation
+        await getBot().editMessageText(
+            confirmationText,
+            {
+                chat_id: chatId,
+                message_id: analyzingMsg.message_id,
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '✅ Ya, Simpan', callback_data: `c_${sessionId}` },
+                        { text: '❌ Batal', callback_data: `x_${sessionId}` }
+                    ]]
+                }
+            }
+        );
+
+    } catch (error) {
+        console.error('Error handling photo:', error);
+        await getBot().sendMessage(
+            chatId,
+            '❌ Terjadi kesalahan saat memproses foto.\n\nSilakan coba lagi atau hubungi developer.'
+        );
+    }
 }
 
 /**
@@ -268,6 +338,105 @@ async function handleCallbackQuery(
         await getBot().answerCallbackQuery(query.id, {
             text: 'Dibatalkan'
         });
+    }
+    // Handle receipt confirmation
+    else if (callbackData?.startsWith('c_')) {
+        const sessionId = callbackData.replace('c_', '');
+
+        try {
+            const sessionDoc = await getDb().collection('receipt_sessions').doc(sessionId).get();
+
+            if (!sessionDoc.exists || sessionDoc.data()!.status !== 'pending') {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Session expired. Silakan upload struk lagi.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const { receiptData, userId, telegramId } = sessionDoc.data()!;
+
+            // Save transaction to Firestore
+            try {
+                const transactionId = await createTransactionFromReceipt(
+                    userId,
+                    receiptData,
+                    telegramId
+                );
+
+                console.log(`Saved transaction ${transactionId} from receipt session ${sessionId}`);
+
+                // Mark session as confirmed
+                await sessionDoc.ref.update({
+                    status: 'confirmed',
+                    confirmedAt: new Date(),
+                    transactionId
+                });
+            } catch (error) {
+                console.error('Error saving transaction:', error);
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Gagal menyimpan transaksi. Coba lagi.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const formattedAmount = receiptData.totalAmount.toLocaleString('id-ID');
+
+            await getBot().editMessageText(
+                `✅ *Transaksi berhasil disimpan!*\n\n` +
+                `💰 Total: Rp ${formattedAmount}\n` +
+                `🏪 Merchant: ${receiptData.merchant}\n` +
+                `📁 Kategori: ${receiptData.categorySuggestion}\n\n` +
+                `Data sudah tersimpan ke DompetCerdas! 🎉`,
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                }
+            );
+
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Tersimpan! ✅'
+            });
+        } catch (error) {
+            console.error('Error confirming receipt:', error);
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Terjadi kesalahan. Silakan coba lagi.',
+                show_alert: true
+            });
+        }
+    }
+    // Handle receipt cancellation
+    else if (callbackData?.startsWith('x_')) {
+        const sessionId = callbackData.replace('x_', '');
+
+        try {
+            const sessionDoc = await getDb().collection('receipt_sessions').doc(sessionId).get();
+
+            if (sessionDoc.exists) {
+                await sessionDoc.ref.update({ status: 'cancelled', cancelledAt: new Date() });
+            }
+
+            await getBot().editMessageText(
+                '❌ *Dibatalkan*\n\nData struk tidak disimpan.',
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                }
+            );
+
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Dibatalkan'
+            });
+        } catch (error) {
+            console.error('Error cancelling receipt:', error);
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Terjadi kesalahan.',
+                show_alert: true
+            });
+        }
     }
     // Handle other callbacks
     else {
