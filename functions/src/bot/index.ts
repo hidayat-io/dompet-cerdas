@@ -199,6 +199,16 @@ async function handlePhotoMessage(
     const photo = msg.photo![msg.photo!.length - 1]; // Get highest resolution
 
     try {
+        // Reject albums (multiple photos)
+        if (msg.media_group_id) {
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Mohon kirim 1 foto saja.\n\nSistem memproses struk satu per satu untuk akurasi terbaik.',
+                { reply_to_message_id: msg.message_id }
+            );
+            return;
+        }
+
         // Validate file size (5MB max)
         if (photo.file_size && photo.file_size > 5 * 1024 * 1024) {
             await getBot().sendMessage(
