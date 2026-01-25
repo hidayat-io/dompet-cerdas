@@ -99,6 +99,15 @@ async function handleMessage(msg: TelegramBot.Message): Promise<void> {
         return;
     }
 
+    // Reject documents/files (PDF, etc)
+    if (msg.document) {
+        await getBot().sendMessage(
+            chatId,
+            '⚠️ Format file tidak didukung.\n\nMohon kirim foto struk langsung sebagai gambar (JPG/PNG).\nJangan kirim sebagai file/dokumen.'
+        );
+        return;
+    }
+
     // Handle text (natural language query)
     if (text) {
         await handleTextMessage(msg, userId);
@@ -431,14 +440,45 @@ async function handleCallbackQuery(
                 return;
             }
 
-            const { receiptData, userId, telegramId } = sessionDoc.data()!;
+            const { receiptData, userId, telegramId, photoFileId } = sessionDoc.data()!;
+
+            // Download photo for upload (if photoFileId exists)
+            let attachmentData;
+            try {
+                if (photoFileId) {
+                    // Get file path from Telegram
+                    // Note: We need to get the file path again as file links expire
+                    const file = await getBot().getFile(photoFileId);
+                    if (file.file_path) {
+                        const fileLink = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+                        const response = await fetch(fileLink);
+
+                        if (response.ok) {
+                            const arrayBuffer = await response.arrayBuffer();
+                            const buffer = Buffer.from(arrayBuffer);
+
+                            // Upload to Firebase Storage
+                            const { uploadReceiptImage } = require('../services/storageService');
+                            attachmentData = await uploadReceiptImage(
+                                userId,
+                                buffer,
+                                `telegram_receipt_${photoFileId}.jpg`
+                            );
+                        }
+                    }
+                }
+            } catch (uploadError) {
+                console.error('Error uploading attachment:', uploadError);
+                // Continue without attachment if upload fails
+            }
 
             // Save transaction to Firestore
             try {
                 const transactionId = await createTransactionFromReceipt(
                     userId,
                     receiptData,
-                    telegramId
+                    telegramId,
+                    attachmentData
                 );
 
                 console.log(`Saved transaction ${transactionId} from receipt session ${sessionId}`);
