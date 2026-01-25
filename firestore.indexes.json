@@ -1,0 +1,19 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "telegram_link",
+            "queryScope": "COLLECTION_GROUP",
+            "fields": [
+                {
+                    "fieldPath": "telegramId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "active",
+                    "order": "ASCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

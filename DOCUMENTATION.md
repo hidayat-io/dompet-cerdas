@@ -547,37 +547,86 @@ window.addEventListener('offline', showOfflineIndicator);
 - idb (IndexedDB wrapper)
 
 ### 3. 💬 Telegram Bot Integration
-Integrasi dengan Telegram untuk input dan monitoring transaksi via chat.
+Integrasi dengan Telegram untuk input dan monitoring transaksi via chat dengan **deep Gemini AI integration**.
 
-**Planned Features:**
-- **Quick Input Transaksi via Chat**
-  - Format: `/add 50000 makan siang` atau `/tambah 150000 transport`
-  - Auto-detect kategori berdasarkan keyword
-  - Konfirmasi transaksi berhasil ditambahkan
+> 📄 **Detailed Technical Plan**: [TELEGRAM_BOT_TECHNICAL_PLAN.md](./TELEGRAM_BOT_TECHNICAL_PLAN.md)
 
-- **Query Transaksi**
-  - `/today` - Transaksi hari ini
-  - `/week` - Transaksi minggu ini
-  - `/month` - Transaksi bulan ini
-  - `/range 2026-01-01 2026-01-15` - Custom range
+**Core Features:**
 
-- **Summary Report**
-  - `/summary` - Ringkasan keuangan
-  - Total income, expense, balance
-  - Top spending categories
+1. **🧠 Natural Language Interface** (Gemini AI)
+   - No rigid commands - chat naturally in Indonesian!
+   - Examples:
+     - "berapa pengeluaran minggu ini?"
+     - "tambah 50000 makan siang"
+     - "kategori apa yang paling boros?"
+     - "bandingkan bulan ini vs bulan lalu"
+   - AI understands context and intent
+   - Smart follow-up conversations
 
-- **Account Linking**
-  - Link Telegram account ke DompetCerdas account
-  - Secure token-based authentication
-  - One-time setup via web app
+2. **📸 Receipt Vision Analysis** (Gemini Vision API)
+   - Upload foto struk → Auto-extract transaction data
+   - Detects: Merchant, total amount, date, items, category
+   - Supports: Retail, restaurant, transport, bill receipts
+   - Confidence scoring (high/medium/low)
+   - Confirmation flow before saving
+   - 1 receipt = 1 transaction (security limit)
+   - Max 5MB, formats: JPG, PNG, WEBP
 
-**Technical Considerations:**
-- Bot API: Telegram Bot API
-- Backend: Firebase Cloud Functions (atau Node.js server)
-- Database: Existing Firestore structure
-- Auth: Telegram user ID linked to Firebase UID
+3. **🔐 Secure Account Linking** (OAuth-style)
+   - `/start` → Bot generates unique token
+   - Click link → Opens web app
+   - Auto-validates with existing Google Auth
+   - Links Telegram ID to Firebase UID
+   - Token expires in 5 minutes
+   - Privacy-friendly (no phone number required)
 
-*Detail implementation akan dibahas lebih lanjut.*
+4. **📊 Smart Queries & Reports**
+   - Financial summaries with charts
+   - Category breakdowns
+   - Time period comparisons
+   - Spending trends
+   - Rich text formatting with emojis
+
+**Minimal Commands:**
+- `/start` - Welcome & account linking
+- `/link` - Generate link token
+- `/help` - Usage guide
+- **Everything else = Natural language!**
+
+**Technical Stack:**
+- **Bot Framework**: node-telegram-bot-api
+- **Backend**: Firebase Cloud Functions (Node.js 20.x)
+- **AI Service**: Google Gemini 2.0 Flash (multimodal)
+- **Database**: Firebase Firestore (existing structure)
+- **Storage**: Firebase Storage (receipt images)
+
+**Security & Rate Limiting:**
+- Photo uploads: 20/day, 5/hour per user
+- Max file size: 5MB
+- Token-based authentication
+- Input sanitization
+- Rate limit tracking in Firestore
+
+**Implementation Phases:**
+- **Phase 1** (Week 1): Foundation & account linking
+- **Phase 2** (Week 2): Receipt vision analysis
+- **Phase 3** (Week 3): Natural language interface
+- **Phase 4** (Week 4): Security, testing, polish
+
+**Cost Estimation (1,000 users):**
+- Gemini API: ~$10/month
+- Firebase Cloud Functions: ~$5/month
+- Firestore: ~$3/month
+- Storage: ~$0.50/month
+- **Total**: ~$18.50/month
+
+**Future Enhancements:**
+- Multi-language support (English)
+- Budget alerts & proactive notifications
+- Daily reminders
+- Recurring transactions
+- Voice input (speech-to-text)
+- Group chat support (shared expenses)
 
 ---
 

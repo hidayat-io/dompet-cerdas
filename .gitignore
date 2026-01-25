@@ -30,3 +30,12 @@ deploy/
 # Temporary files
 *.tmp
 *.temp
+
+# Firebase
+functions/lib/
+functions/node_modules/
+functions/.env
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

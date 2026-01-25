@@ -15,6 +15,7 @@ import TransactionForm from './components/TransactionForm';
 import SimulationManager from './components/SimulationManager';
 import AuthLogin from './components/AuthLogin';
 import Settings from './components/Settings';
+import LinkTelegram from './components/LinkTelegram';
 import { getFinancialAdvice } from './services/geminiService';
 import IconDisplay from './components/IconDisplay';
 import { useTheme } from './contexts/ThemeContext';
@@ -28,6 +29,9 @@ function App() {
   const { theme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // Check if current path is /link-telegram
+  const isLinkTelegramRoute = window.location.pathname === '/link-telegram';
 
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -450,6 +454,11 @@ function App() {
 
 
   // --- RENDER ---
+
+  // Handle link-telegram route
+  if (isLinkTelegramRoute) {
+    return <LinkTelegram />;
+  }
 
   if (authLoading) {
     return (
