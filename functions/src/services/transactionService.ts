@@ -39,15 +39,14 @@ export async function createTransactionFromReceipt(
     const db = admin.firestore();
 
     // Parse date from receipt or use today
-    let transactionDate: admin.firestore.Timestamp;
+    let transactionDate: Date;
     try {
-        const parsedDate = new Date(receiptData.date);
-        transactionDate = admin.firestore.Timestamp.fromDate(parsedDate);
+        transactionDate = new Date(receiptData.date);
     } catch (error) {
-        transactionDate = admin.firestore.Timestamp.now();
+        transactionDate = new Date();
     }
 
-    // Map category suggestion to existing category
+    // Map category suggestion to category name
     const categoryMapping: { [key: string]: string } = {
         'Makanan': 'Food',
         'Belanja Harian': 'Shopping',
@@ -58,21 +57,47 @@ export async function createTransactionFromReceipt(
         'Lainnya': 'Other'
     };
 
-    const mappedCategory = categoryMapping[receiptData.categorySuggestion] || 'Other';
+    const mappedCategoryName = categoryMapping[receiptData.categorySuggestion] || 'Other';
 
-    // Create transaction object
-    const transaction: Transaction = {
+    // Get categoryId from categories collection
+    const categoriesSnapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .where('name', '==', mappedCategoryName)
+        .where('type', '==', 'EXPENSE')
+        .limit(1)
+        .get();
+
+    let categoryId: string;
+    if (categoriesSnapshot.empty) {
+        // Fallback: get any expense category
+        const fallbackSnapshot = await db
+            .collection('users')
+            .doc(userId)
+            .collection('categories')
+            .where('type', '==', 'EXPENSE')
+            .limit(1)
+            .get();
+
+        if (fallbackSnapshot.empty) {
+            throw new Error('No expense categories found for user');
+        }
+        categoryId = fallbackSnapshot.docs[0].id;
+    } else {
+        categoryId = categoriesSnapshot.docs[0].id;
+    }
+
+    // Format date as YYYY-MM-DD
+    const dateString = transactionDate.toISOString().split('T')[0];
+
+    // Create transaction object matching web app schema
+    const transaction = {
         amount: receiptData.totalAmount,
-        category: mappedCategory,
+        categoryId,  // Use categoryId instead of category string
         description: receiptData.merchant || 'Receipt purchase',
-        merchant: receiptData.merchant,
-        date: transactionDate,
-        type: 'expense', // Receipts are always expenses
-        source: 'receipt',
-        createdAt: admin.firestore.Timestamp.now(),
-        createdBy: 'telegram',
-        telegramId,
-        receiptConfidence: receiptData.confidence
+        date: dateString, // YYYY-MM-DD format
+        createdAt: new Date().toISOString()
     };
 
     // Add to user's transactions collection
@@ -92,7 +117,7 @@ export async function createTransactionFromReceipt(
  * @param userId - Firebase user ID
  * @param amount - Transaction amount
  * @param description - Transaction description
- * @param category - Transaction category
+ * @param categoryName - Transaction category name (will be mapped to ID)
  * @param telegramId - Telegram user ID
  * @returns Transaction ID
  */
@@ -100,21 +125,48 @@ export async function createManualTransaction(
     userId: string,
     amount: number,
     description: string,
-    category: string,
+    categoryName: string,
     telegramId?: number
 ): Promise<string> {
     const db = admin.firestore();
 
-    const transaction: Transaction = {
+    // Get categoryId from categories collection
+    const categoriesSnapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .where('name', '==', categoryName)
+        .limit(1)
+        .get();
+
+    let categoryId: string;
+    if (categoriesSnapshot.empty) {
+        // Fallback: get first category of type EXPENSE
+        const fallbackSnapshot = await db
+            .collection('users')
+            .doc(userId)
+            .collection('categories')
+            .where('type', '==', 'EXPENSE')
+            .limit(1)
+            .get();
+
+        if (fallbackSnapshot.empty) {
+            throw new Error('No categories found for user');
+        }
+        categoryId = fallbackSnapshot.docs[0].id;
+    } else {
+        categoryId = categoriesSnapshot.docs[0].id;
+    }
+
+    // Format date as YYYY-MM-DD
+    const dateString = new Date().toISOString().split('T')[0];
+
+    const transaction = {
         amount,
-        category,
+        categoryId,
         description,
-        date: admin.firestore.Timestamp.now(),
-        type: amount < 0 ? 'income' : 'expense',
-        source: 'manual',
-        createdAt: admin.firestore.Timestamp.now(),
-        createdBy: 'telegram',
-        telegramId
+        date: dateString,
+        createdAt: new Date().toISOString()
     };
 
     const docRef = await db
