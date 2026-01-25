@@ -238,6 +238,26 @@ async function handlePhotoMessage(
         // Analyze receipt with Gemini Vision
         const receiptData = await analyzeReceipt(imageBuffer);
 
+        // Validation: Check if it's a receipt
+        if (receiptData.is_receipt === false) {
+            await getBot().deleteMessage(chatId, analyzingMsg.message_id);
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Foto ini sepertinya bukan struk belanja.\n\nMohon upload foto struk, invoice, atau bukti bayar yang valid.'
+            );
+            return;
+        }
+
+        // Validation: Check total amount
+        if (!receiptData.totalAmount || receiptData.totalAmount <= 0) {
+            await getBot().deleteMessage(chatId, analyzingMsg.message_id);
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Struk terdeteksi tapi nominal total tidak ditemukan.\n\nMohon foto ulang dengan pencahayaan yang baik dan pastikan angka "Total" terlihat jelas.\n\nTips: Pastikan kertas tidak terlipat.'
+            );
+            return;
+        }
+
         // Create session ID for confirmation
         // Create session ID (short random string max 10 chars)
         const sessionId = require('crypto').randomBytes(4).toString('hex');

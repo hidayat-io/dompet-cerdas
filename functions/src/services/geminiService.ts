@@ -11,6 +11,9 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 /**
  * Receipt data structure returned by Gemini Vision
  */
+/**
+ * Receipt data structure returned by Gemini Vision
+ */
 export interface ReceiptData {
     merchant: string;
     totalAmount: number;
@@ -21,6 +24,7 @@ export interface ReceiptData {
     confidence: 'high' | 'medium' | 'low';
     currency: string;
     notes?: string;
+    is_receipt?: boolean;
 }
 
 /**
@@ -35,8 +39,9 @@ Analyze this Indonesian receipt image and extract transaction information.
 
 Return ONLY valid JSON (no markdown, no code blocks):
 {
+  "is_receipt": boolean (true if image is a receipt/invoice/bill, false otherwise),
   "merchant": "store/restaurant name",
-  "totalAmount": number (final total only, not subtotals),
+  "totalAmount": number (final total only, not subtotals. Return 0 if not found),
   "date": "YYYY-MM-DD" (if found, else today's date),
   "items": ["item1", "item2"],
   "categorySuggestion": "Makanan | Belanja Harian | Transport | Kesehatan | Hiburan | Tagihan | Lainnya",
@@ -47,18 +52,20 @@ Return ONLY valid JSON (no markdown, no code blocks):
 }
 
 Rules:
-1. Extract ONLY the final total (Grand Total / Total Bayar / Total)
-2. Ignore tax, service charge, subtotals individually
-3. If date not found, use today's date
-4. Suggest category based on merchant type and items
-5. For handwritten receipts, mark confidence as "medium" or "low"
-6. Return only the JSON object, no other text
+1. Set "is_receipt" to false if the image does not look like a shopping receipt, invoice, or payment proof.
+2. Extract ONLY the final total (Grand Total / Total Bayar / Total).
+3. Ignore tax, service charge, subtotals individually.
+4. If date not found, use today's date.
+5. Suggest category based on merchant type and items.
+6. For handwritten receipts, mark confidence as "medium" or "low".
+7. Return only the JSON object, no other text.
 
 Examples:
 - Indomaret receipt → category: "Belanja Harian", type: "retail"
 - Restaurant receipt → category: "Makanan", type: "restaurant"
 - Grab/Gojek receipt → category: "Transport", type: "transport"
 - PLN/PDAM bill → category: "Tagihan", type: "bill"
+- Cat photo → is_receipt: false
 `.trim();
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
@@ -82,11 +89,7 @@ Examples:
         // Parse JSON response
         const receiptData: ReceiptData = JSON.parse(cleanText);
 
-        // Validate required fields
-        if (!receiptData.merchant || !receiptData.totalAmount) {
-            throw new Error('Missing required fields in vision response');
-        }
-
+        // Validation happens in the bot handler now
         return receiptData;
 
     } catch (error) {
