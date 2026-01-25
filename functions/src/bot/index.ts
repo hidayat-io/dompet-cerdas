@@ -7,7 +7,10 @@ import { handleStartCommand } from './commands/start';
 import { handleHelpCommand } from './commands/help';
 import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from '../services/linkService';
 import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
-import { createTransactionFromReceipt } from '../services/transactionService';
+import { createTransactionFromReceipt, createManualTransaction } from '../services/transactionService';
+import { parseIntent, isActionable } from '../services/nluService';
+import { getTotalExpenses, getCategoryBreakdown, formatTimeRange } from '../services/queryService';
+import * as responseFormatter from '../services/responseFormatter';
 import { getDb } from '../index';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -261,17 +264,91 @@ async function handlePhotoMessage(
 
 /**
  * Handle text messages (natural language)
- * TODO: Implement in Phase 3
  */
 async function handleTextMessage(
     msg: TelegramBot.Message,
     userId: string
 ): Promise<void> {
-    await getBot().sendMessage(
-        msg.chat.id,
-        '🤖 Fitur natural language akan segera hadir di Phase 3!\n\n' +
-        'Untuk saat ini, gunakan command /help untuk melihat panduan.'
-    );
+    const chatId = msg.chat.id;
+    const text = msg.text || '';
+
+    try {
+        // Parse intent using Gemini NLU
+        const parsedIntent = await parseIntent(text);
+
+        // Handle low confidence or need clarification
+        if (!isActionable(parsedIntent)) {
+            if (parsedIntent.clarification_needed) {
+                await getBot().sendMessage(chatId, responseFormatter.formatClarification(parsedIntent.clarification_needed), { parse_mode: 'Markdown' });
+            } else {
+                await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
+            }
+            return;
+        }
+
+        // Handle different intents
+        switch (parsedIntent.intent) {
+            case 'query_expenses': {
+                const timeRange = parsedIntent.parameters.time_range || 'this_month';
+                const { total, count } = await getTotalExpenses(userId, timeRange);
+                const timeRangeText = formatTimeRange(timeRange);
+                const response = responseFormatter.formatExpenseResponse(total, count, timeRangeText);
+                await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                break;
+            }
+
+            case 'category_breakdown': {
+                const timeRange = parsedIntent.parameters.time_range || 'this_month';
+                const categories = await getCategoryBreakdown(userId, timeRange);
+                const timeRangeText = formatTimeRange(timeRange);
+                const response = responseFormatter.formatCategoryBreakdown(categories, timeRangeText);
+                await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                break;
+            }
+
+            case 'add_transaction': {
+                const { amount, description, category_hint } = parsedIntent.parameters;
+
+                if (!amount || !description) {
+                    await getBot().sendMessage(chatId, '❌ Jumlah atau deskripsi tidak ditemukan.\n\nContoh: "tambah 50000 makan siang"');
+                    return;
+                }
+
+                // Map category hint to actual category
+                const categoryMap: { [key: string]: string } = {
+                    'Food': 'Food',
+                    'Transportation': 'Transportation',
+                    'Shopping': 'Shopping',
+                    'Health': 'Health',
+                    'Entertainment': 'Entertainment',
+                    'Bills': 'Bills'
+                };
+                const category = categoryMap[category_hint || 'Other'] || 'Other';
+
+                // Create transaction
+                const transactionId = await createManualTransaction(
+                    userId,
+                    amount,
+                    description,
+                    category,
+                    msg.from?.id
+                );
+
+                console.log(`Created manual transaction ${transactionId} for user ${userId}`);
+
+                const response = responseFormatter.formatTransactionAdded(amount, category, description);
+                await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                break;
+            }
+
+            default:
+                await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
+        }
+
+    } catch (error) {
+        console.error('Error handling text message:', error);
+        await getBot().sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
+    }
 }
 
 /**
