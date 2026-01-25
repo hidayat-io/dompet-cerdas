@@ -48,13 +48,10 @@ export async function createTransactionFromReceipt(
 
     const db = admin.firestore();
 
-    // Parse date from receipt or use today
-    let transactionDate: Date;
-    try {
-        transactionDate = new Date(receiptData.date);
-    } catch (error) {
-        transactionDate = new Date();
-    }
+    // Use today's date instead of receipt date
+    const transactionDate = new Date();
+
+    console.log('[TRANSACTION] Using today\'s date:', transactionDate.toISOString());
 
     // Map category suggestion to category name
     const categoryMapping: { [key: string]: string } = {
@@ -126,17 +123,33 @@ export async function createTransactionFromReceipt(
     }
 
     console.log('[TRANSACTION] Transaction object:', JSON.stringify(transaction));
+    console.log('[TRANSACTION] About to write to Firestore path:', `users/${userId}/transactions`);
 
     // Add to user's transactions collection
-    const docRef = await db
-        .collection('users')
-        .doc(userId)
-        .collection('transactions')
-        .add(transaction);
+    try {
+        const docRef = await db
+            .collection('users')
+            .doc(userId)
+            .collection('transactions')
+            .add(transaction);
 
-    console.log('[TRANSACTION] SUCCESS! Created transaction:', docRef.id);
+        console.log('[TRANSACTION] Firestore write completed successfully');
+        console.log('[TRANSACTION] Document path:', docRef.path);
+        console.log('[TRANSACTION] SUCCESS! Created transaction:', docRef.id);
 
-    return docRef.id;
+        // Verify the write by reading it back
+        const verifyDoc = await docRef.get();
+        if (verifyDoc.exists) {
+            console.log('[TRANSACTION] VERIFIED: Document exists in Firestore');
+        } else {
+            console.error('[TRANSACTION] ERROR: Document not found after write!');
+        }
+
+        return docRef.id;
+    } catch (writeError) {
+        console.error('[TRANSACTION] Firestore write FAILED:', writeError);
+        throw writeError;
+    }
 }
 
 /**

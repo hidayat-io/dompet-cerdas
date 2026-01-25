@@ -15,35 +15,49 @@ export async function handleHelpCommand(
 📚 *Panduan DompetCerdas Bot*
 
 🤖 *Cara Pakai:*
-Bot ini menggunakan bahasa natural - kamu bisa ngobrol seperti biasa!
+Bot ini menggunakan bahasa natural - ngobrol seperti biasa!
 
-📝 *Contoh Pertanyaan:*
+━━━━━━━━━━━━━━━━━━━━━
+
+📊 *Cek Pengeluaran:*
 • "berapa pengeluaran minggu ini?"
-• "total belanja bulan ini berapa?"
-• "kategori apa yang paling boros?"
-• "saldo saya berapa?"
-• "bandingkan bulan ini vs bulan lalu"
+• "total belanja bulan ini"
+• "pengeluaran hari ini berapa?"
 
-➕ *Tambah Transaksi:*
-• Ketik: "tambah 50000 makan siang"
-• Atau upload foto struk 📸
+📈 *Analisis Kategori:*
+• "kategori apa yang paling boros?"
+• "breakdown pengeluaran bulan ini"
+
+💰 *Cek Saldo:*
+• "saldo saya berapa?"
+• "total uang saya"
+
+➕ *Tambah Transaksi Manual:*
+• "tambah 50000 makan siang"
+• "catat 25000 ongkos ojol"
+• "beli kopi 35000"
+
+━━━━━━━━━━━━━━━━━━━━━
 
 📸 *Upload Struk:*
-1. Kirim foto struk belanja
-2. Bot akan analisis otomatis
-3. Konfirmasi data yang terdeteksi
-4. Selesai! ✅
+1️⃣ Kirim 1 foto struk (JPG/PNG)
+2️⃣ Bot analisis dengan AI
+3️⃣ Konfirmasi data yang terdeteksi
+4️⃣ Tersimpan otomatis! ✅
+
+⚠️ *Syarat Foto Struk:*
+• Hanya 1 foto per upload
+• Format: JPG atau PNG saja
+• Ukuran: Max 5MB
+• Pastikan angka total terlihat jelas
+• PDF/dokumen tidak diterima
+
+━━━━━━━━━━━━━━━━━━━━━
 
 ⚙️ *Commands:*
 /start - Hubungkan akun
-/link - Generate link token
-/unlink - Putuskan koneksi akun
+/unlink - Disconnect akun
 /help - Panduan ini
-
-💡 *Tips:*
-• Foto struk harus jelas
-• Max 5MB per foto
-• Limit 20 struk/hari
 
 Butuh bantuan? Tanya aja! 😊
   `.trim();
