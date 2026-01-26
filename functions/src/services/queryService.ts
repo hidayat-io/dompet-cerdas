@@ -296,6 +296,7 @@ export interface TransactionDetail {
     amount: number;
     category: string;
     date: string;
+    createdAt: string;
 }
 
 /**
@@ -330,15 +331,13 @@ export async function getTransactionDetails(
         }
     });
 
-    // Query transactions by date
+    // Query transactions by date (no orderBy to avoid index requirement)
     const snapshot = await db
         .collection('users')
         .doc(userId)
         .collection('transactions')
         .where('date', '>=', startStr)
         .where('date', '<=', endStr)
-        .orderBy('date', 'desc')
-        .orderBy('createdAt', 'desc')
         .get();
 
     // Build transaction details (only expenses)
@@ -360,8 +359,16 @@ export async function getTransactionDetails(
             description: data.description || '-',
             amount: data.amount || 0,
             category: categoryName,
-            date: data.date
+            date: data.date,
+            createdAt: data.createdAt || data.date
         });
+    });
+
+    // Sort in memory: by date desc, then by createdAt desc
+    details.sort((a, b) => {
+        const dateCompare = b.date.localeCompare(a.date);
+        if (dateCompare !== 0) return dateCompare;
+        return b.createdAt.localeCompare(a.createdAt);
     });
 
     return details;
