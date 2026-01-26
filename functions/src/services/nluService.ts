@@ -33,9 +33,11 @@ export interface ParsedIntent {
     confidence: 'high' | 'medium' | 'low';
     parameters: {
         time_range?: TimeRange;
+        days_ago?: number;
         amount?: number;
         description?: string;
         category_hint?: string;
+        category_filter?: string;
     };
     clarification_needed?: string;
 }
@@ -58,10 +60,12 @@ Return ONLY valid JSON (no markdown, no code blocks):
   "intent": "query_expenses | query_income | query_balance | add_transaction | category_breakdown | query_details | unknown",
   "confidence": "high | medium | low",
   "parameters": {
-    "time_range": "today | this_week | this_month | last_month",
+    "time_range": "today | yesterday | this_week | last_week | this_month | last_month",
+    "days_ago": number (jika user tanya "N hari lalu" contoh: "2 hari lalu" = 2, "3 hari lalu" = 3),
     "amount": number (hanya untuk add_transaction),
     "description": "string" (hanya untuk add_transaction),
-    "category_hint": "string" (optional, tebak kategori dari deskripsi)
+    "category_hint": "string" (optional, tebak kategori dari deskripsi),
+    "category_filter": "string" (jika user menyebut kategori spesifik untuk filter, contoh: 'Bill', 'Food', 'Shopping')
   },
   "clarification_needed": "string atau null jika tidak jelas"
 }
@@ -69,6 +73,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
 Rules:
 1. Intent "query_expenses" = tanya total pengeluaran (berapa/total)
 2. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian)
+   - Jika menyebut kategori spesifik ("detailkan kategori Bill"), isi category_filter
 3. Intent "add_transaction" = tambah/catat transaksi manual
 4. Intent "category_breakdown" = tanya breakdown/rincian per kategori, atau tanya kategori paling boros/paling banyak
 5. Time range mapping - BACA DENGAN TELITI:
@@ -87,7 +92,12 @@ Rules:
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
 "pengeluaran 7 hari terakhir" → intent: query_expenses, time_range: last_week, confidence: high
+"transaksi 2 hari lalu" → intent: query_details, days_ago: 2, confidence: high
+"pengeluaran 3 hari lalu berapa" → intent: query_expenses, days_ago: 3, confidence: high
+"detailkan 5 hari yang lalu" → intent: query_details, days_ago: 5, confidence: high
 "detailkan transaksi 7 hari terakhir" → intent: query_details, time_range: last_week, confidence: high
+"detailkan kategori Bill bulan ini" → intent: query_details, time_range: this_month, category_filter: "Bill", confidence: high
+"rincian Food minggu ini" → intent: query_details, time_range: this_week, category_filter: "Food", confidence: high
 "kategori paling boros bulan ini" → intent: category_breakdown, time_range: this_month, confidence: high
 "bulan ini transaksi paling boros apa" → intent: category_breakdown, time_range: this_month, confidence: high
 "apa aja pengeluaran hari ini?" → intent: query_details, time_range: today, confidence: high

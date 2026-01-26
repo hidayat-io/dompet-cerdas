@@ -311,6 +311,12 @@ async function handleTextMessage(
     const chatId = msg.chat.id;
     const text = msg.text || '';
 
+    // Send processing message immediately
+    const processingMsg = await getBot().sendMessage(
+        chatId,
+        '⏳ Mohon tunggu, permintaan sedang diproses...'
+    );
+
     try {
         // Parse intent using Gemini NLU
         const parsedIntent = await parseIntent(text);
@@ -322,33 +328,61 @@ async function handleTextMessage(
             } else {
                 await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
             }
+            // Delete processing message
+            await getBot().deleteMessage(chatId, processingMsg.message_id);
             return;
         }
 
         // Handle different intents
         switch (parsedIntent.intent) {
             case 'query_expenses': {
-                const timeRange = parsedIntent.parameters.time_range || 'this_month';
-                const { total, count } = await getTotalExpenses(userId, timeRange);
-                const timeRangeText = formatTimeRange(timeRange);
+                const timeRange = parsedIntent.parameters.time_range;
+                const daysAgo = parsedIntent.parameters.days_ago;
+                const { total, count } = await getTotalExpenses(userId, timeRange || 'this_month', daysAgo);
+                
+                let timeRangeText: string;
+                if (daysAgo !== undefined) {
+                    timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
+                } else {
+                    timeRangeText = formatTimeRange(timeRange || 'this_month');
+                }
+                
                 const response = responseFormatter.formatExpenseResponse(total, count, timeRangeText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
 
             case 'query_details': {
-                const timeRange = parsedIntent.parameters.time_range || 'today';
-                const details = await getTransactionDetails(userId, timeRange);
-                const timeRangeText = formatTimeRange(timeRange);
-                const response = responseFormatter.formatTransactionDetails(details, timeRangeText);
+                const timeRange = parsedIntent.parameters.time_range;
+                const categoryFilter = parsedIntent.parameters.category_filter;
+                const daysAgo = parsedIntent.parameters.days_ago;
+                const details = await getTransactionDetails(userId, timeRange || 'today', categoryFilter, daysAgo);
+                
+                let timeRangeText: string;
+                if (daysAgo !== undefined) {
+                    timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
+                } else {
+                    timeRangeText = formatTimeRange(timeRange || 'today');
+                }
+                
+                const categoryText = categoryFilter ? ` kategori ${categoryFilter}` : '';
+                const response = responseFormatter.formatTransactionDetails(details, timeRangeText + categoryText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
 
             case 'category_breakdown': {
-                const timeRange = parsedIntent.parameters.time_range || 'this_month';
-                const categories = await getCategoryBreakdown(userId, timeRange);
-                const timeRangeText = formatTimeRange(timeRange);
+                const timeRange = parsedIntent.parameters.time_range;
+                const daysAgo = parsedIntent.parameters.days_ago;
+                const categories = await getCategoryBreakdown(userId, timeRange || 'this_month', daysAgo);
+                
+                let timeRangeText: string;
+                if (daysAgo !== undefined) {
+                    timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
+                } else {
+                    timeRangeText = formatTimeRange(timeRange || 'this_month');
+                }
+                
                 const response = responseFormatter.formatCategoryBreakdown(categories, timeRangeText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -359,6 +393,7 @@ async function handleTextMessage(
 
                 if (!amount || !description) {
                     await getBot().sendMessage(chatId, '❌ Jumlah atau deskripsi tidak ditemukan.\n\nContoh: "tambah 50000 makan siang"');
+                    await getBot().deleteMessage(chatId, processingMsg.message_id);
                     return;
                 }
 
@@ -393,9 +428,18 @@ async function handleTextMessage(
                 await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
         }
 
+        // Delete processing message after response is sent
+        await getBot().deleteMessage(chatId, processingMsg.message_id);
+
     } catch (error) {
         console.error('Error handling text message:', error);
         await getBot().sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
+        // Try to delete processing message even on error
+        try {
+            await getBot().deleteMessage(chatId, processingMsg.message_id);
+        } catch (deleteError) {
+            // Ignore delete errors
+        }
     }
 }
 

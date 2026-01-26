@@ -17,6 +17,15 @@ export interface CategoryData {
 }
 
 /**
+ * Get specific date string for N days ago
+ */
+function getDateForDaysAgo(daysAgo: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    return date.toISOString().split('T')[0];
+}
+
+/**
  * Calculate date range from time range string
  */
 function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
@@ -71,18 +80,29 @@ function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
 }
 
 /**
- * Get total expenses for a time range
+ * Get total expenses for a time range or specific days ago
  */
 export async function getTotalExpenses(
     userId: string,
-    timeRange: TimeRange = 'this_month'
+    timeRange?: TimeRange,
+    daysAgo?: number
 ): Promise<{ total: number; count: number }> {
     const db = admin.firestore();
-    const { start, end } = getDateRange(timeRange);
 
-    // Format dates as YYYY-MM-DD string to match web app schema
-    const startStr = start.toISOString().split('T')[0];
-    const endStr = end.toISOString().split('T')[0];
+    // Get date range
+    let startStr: string;
+    let endStr: string;
+    
+    if (daysAgo !== undefined) {
+        // Specific day N days ago
+        startStr = getDateForDaysAgo(daysAgo);
+        endStr = startStr;
+    } else {
+        // Use time range
+        const { start, end } = getDateRange(timeRange || 'today');
+        startStr = start.toISOString().split('T')[0];
+        endStr = end.toISOString().split('T')[0];
+    }
 
     // Query by date string (web app uses string format, not Timestamp)
     const snapshot = await db
@@ -219,14 +239,25 @@ export async function getBalance(userId: string): Promise<number> {
  */
 export async function getCategoryBreakdown(
     userId: string,
-    timeRange: TimeRange = 'this_month'
+    timeRange?: TimeRange,
+    daysAgo?: number
 ): Promise<CategoryData[]> {
     const db = admin.firestore();
-    const { start, end } = getDateRange(timeRange);
 
-    // Format dates as YYYY-MM-DD string to match web app schema
-    const startStr = start.toISOString().split('T')[0];
-    const endStr = end.toISOString().split('T')[0];
+    // Get date range
+    let startStr: string;
+    let endStr: string;
+    
+    if (daysAgo !== undefined) {
+        // Specific day N days ago
+        startStr = getDateForDaysAgo(daysAgo);
+        endStr = startStr;
+    } else {
+        // Use time range
+        const { start, end } = getDateRange(timeRange || 'this_month');
+        startStr = start.toISOString().split('T')[0];
+        endStr = end.toISOString().split('T')[0];
+    }
 
     // Get categories first
     const categoriesSnapshot = await db
@@ -311,14 +342,26 @@ export interface TransactionDetail {
  */
 export async function getTransactionDetails(
     userId: string,
-    timeRange: TimeRange = 'today'
+    timeRange?: TimeRange,
+    categoryFilter?: string,
+    daysAgo?: number
 ): Promise<TransactionDetail[]> {
     const db = admin.firestore();
-    const { start, end } = getDateRange(timeRange);
 
-    // Format dates as YYYY-MM-DD string
-    const startStr = start.toISOString().split('T')[0];
-    const endStr = end.toISOString().split('T')[0];
+    // Get date range
+    let startStr: string;
+    let endStr: string;
+    
+    if (daysAgo !== undefined) {
+        // Specific day N days ago
+        startStr = getDateForDaysAgo(daysAgo);
+        endStr = startStr;
+    } else {
+        // Use time range
+        const { start, end } = getDateRange(timeRange || 'today');
+        startStr = start.toISOString().split('T')[0];
+        endStr = end.toISOString().split('T')[0];
+    }
 
     // Get categories first
     const categoriesSnapshot = await db
@@ -361,6 +404,11 @@ export async function getTransactionDetails(
 
         const categoryInfo = categories.get(categoryId);
         const categoryName = categoryInfo?.name || 'Other';
+
+        // Apply category filter if specified
+        if (categoryFilter && categoryName.toLowerCase() !== categoryFilter.toLowerCase()) {
+            return;
+        }
 
         details.push({
             description: data.description || '-',

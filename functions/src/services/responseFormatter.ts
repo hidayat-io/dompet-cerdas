@@ -117,12 +117,11 @@ export function formatTransactionDetails(
     }
 
     const total = details.reduce((sum, item) => sum + item.amount, 0);
-    const header = `📋 *Detail pengeluaran ${timeRange}*\n\nTotal: ${formatExactRupiah(total)} (${details.length} transaksi)\n`;
+    const header = `📋 *Detail pengeluaran ${timeRange}*\n\n💰 Total: ${formatExactRupiah(total)} (${details.length} transaksi)\n`;
 
     const items = details.map((item, index) => {
         const emoji = CATEGORY_EMOJI[item.category] || '📦';
-        const dateStr = new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-        return `\n${index + 1}. ${emoji} *${item.category}*\n   💰 ${formatExactRupiah(item.amount)}\n   📝 ${item.description}\n   📅 ${dateStr}`;
+        return `\n${index + 1}. ${item.description} : 💵 ${formatExactRupiah(item.amount)}\n    ${emoji} ${item.category}`;
     }).join('');
 
     return header + items;
