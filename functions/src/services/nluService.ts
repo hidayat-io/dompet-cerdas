@@ -70,7 +70,7 @@ Rules:
 1. Intent "query_expenses" = tanya total pengeluaran (berapa/total)
 2. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian)
 3. Intent "add_transaction" = tambah/catat transaksi manual
-4. Intent "category_breakdown" = tanya breakdown per kategori
+4. Intent "category_breakdown" = tanya breakdown/rincian per kategori, atau tanya kategori paling boros/paling banyak
 5. Time range mapping - BACA DENGAN TELITI:
    - "hari ini" / "today" → "today"
    - "kemarin" / "yesterday" → "yesterday"
@@ -88,6 +88,8 @@ Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
 "pengeluaran 7 hari terakhir" → intent: query_expenses, time_range: last_week, confidence: high
 "detailkan transaksi 7 hari terakhir" → intent: query_details, time_range: last_week, confidence: high
+"kategori paling boros bulan ini" → intent: category_breakdown, time_range: this_month, confidence: high
+"bulan ini transaksi paling boros apa" → intent: category_breakdown, time_range: this_month, confidence: high
 "apa aja pengeluaran hari ini?" → intent: query_details, time_range: today, confidence: high
 "detailkan" → intent: query_details, time_range: this_week, confidence: high
 "tolong detailkan" → intent: query_details, time_range: this_week, confidence: high
