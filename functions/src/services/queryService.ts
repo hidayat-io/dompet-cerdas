@@ -30,6 +30,13 @@ function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
             end.setHours(23, 59, 59, 999);
             break;
 
+        case 'yesterday':
+            start.setDate(now.getDate() - 1);
+            start.setHours(0, 0, 0, 0);
+            end.setDate(now.getDate() - 1);
+            end.setHours(23, 59, 59, 999);
+            break;
+
         case 'this_week':
             // Monday to today
             const dayOfWeek = now.getDay();
@@ -367,6 +374,8 @@ export function formatTimeRange(timeRange: TimeRange): string {
     switch (timeRange) {
         case 'today':
             return 'hari ini';
+        case 'yesterday':
+            return 'kemarin';
         case 'this_week':
             return 'minggu ini';
         case 'this_month':

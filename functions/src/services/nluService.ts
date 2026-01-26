@@ -23,7 +23,7 @@ export type IntentType =
 /**
  * Time range options
  */
-export type TimeRange = 'today' | 'this_week' | 'this_month' | 'last_month';
+export type TimeRange = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'last_month';
 
 /**
  * Parsed intent structure
@@ -72,8 +72,7 @@ Rules:
 3. Intent "add_transaction" = tambah/catat transaksi manual
 4. Intent "category_breakdown" = tanya breakdown per kategori
 5. Time range mapping:
-   - "hari ini" / "today" → "today"
-   - "minggu ini" / "this week" → "this_week"
+   - "hari ini" / "today" → "today"   - "kemarin" / "yesterday" → "yesterday"   - "minggu ini" / "this week" → "this_week"
    - "bulan ini" / "this month" → "this_month"
    - "bulan lalu" / "last month" → "last_month"
 6. Untuk add_transaction, extract angka sebagai amount
