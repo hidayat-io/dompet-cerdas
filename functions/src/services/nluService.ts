@@ -77,16 +77,18 @@ Rules:
    - "bulan lalu" / "last month" → "last_month"
 6. Untuk add_transaction, extract angka sebagai amount
 7. Category hint dari kata kunci: makan/food → "Food", transport/grab/gojek → "Transportation", belanja/shopping → "Shopping"
-8. Confidence "low" jika pesan ambiguous atau tidak lengkap
+8. **PENTING**: Jika tidak ada time range disebutkan, gunakan default "this_week" untuk query
+9. Kata seperti "detailkan", "list", "rincian" tanpa time range → intent: query_details, time_range: this_week, confidence: high
+10. Jangan terlalu strict - pahami maksud user, jangan sering minta klarifikasi
 
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
 "pengeluaran selama 1 minggu" → intent: query_expenses, time_range: last_week, confidence: high
 "pengeluaran 7 hari terakhir" → intent: query_expenses, time_range: last_week, confidence: high
 "apa aja pengeluaran hari ini?" → intent: query_details, time_range: today, confidence: high
-"tolong detailkan" → intent: query_details, time_range: today, confidence: medium
+"detailkan" → intent: query_details, time_range: this_week, confidence: high
+"tolong detailkan" → intent: query_details, time_range: this_week, confidence: high
 "tambah 50000 makan siang" → intent: add_transaction, amount: 50000, description: "makan siang", category_hint: "Food", confidence: high
-"pengeluaran" → intent: query_expenses, confidence: low, clarification_needed: "Periode mana? (hari ini/minggu ini/bulan ini)"
 `.trim();
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
