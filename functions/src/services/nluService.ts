@@ -17,6 +17,7 @@ export type IntentType =
     | 'query_balance'
     | 'add_transaction'
     | 'category_breakdown'
+    | 'query_details'
     | 'unknown';
 
 /**
@@ -54,7 +55,7 @@ Pesan user: "${message}"
 
 Return ONLY valid JSON (no markdown, no code blocks):
 {
-  "intent": "query_expenses | query_income | query_balance | add_transaction | category_breakdown | unknown",
+  "intent": "query_expenses | query_income | query_balance | add_transaction | category_breakdown | query_details | unknown",
   "confidence": "high | medium | low",
   "parameters": {
     "time_range": "today | this_week | this_month | last_month",
@@ -66,20 +67,23 @@ Return ONLY valid JSON (no markdown, no code blocks):
 }
 
 Rules:
-1. Intent "query_expenses" = tanya total pengeluaran
-2. Intent "add_transaction" = tambah/catat transaksi manual
-3. Intent "category_breakdown" = tanya breakdown per kategori
-4. Time range mapping:
+1. Intent "query_expenses" = tanya total pengeluaran (berapa/total)
+2. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian)
+3. Intent "add_transaction" = tambah/catat transaksi manual
+4. Intent "category_breakdown" = tanya breakdown per kategori
+5. Time range mapping:
    - "hari ini" / "today" → "today"
    - "minggu ini" / "this week" → "this_week"
    - "bulan ini" / "this month" → "this_month"
    - "bulan lalu" / "last month" → "last_month"
-5. Untuk add_transaction, extract angka sebagai amount
-6. Category hint dari kata kunci: makan/food → "Food", transport/grab/gojek → "Transportation", belanja/shopping → "Shopping"
-7. Confidence "low" jika pesan ambiguous atau tidak lengkap
+6. Untuk add_transaction, extract angka sebagai amount
+7. Category hint dari kata kunci: makan/food → "Food", transport/grab/gojek → "Transportation", belanja/shopping → "Shopping"
+8. Confidence "low" jika pesan ambiguous atau tidak lengkap
 
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
+"apa aja pengeluaran hari ini?" → intent: query_details, time_range: today, confidence: high
+"tolong detailkan" → intent: query_details, time_range: today, confidence: medium
 "tambah 50000 makan siang" → intent: add_transaction, amount: 50000, description: "makan siang", category_hint: "Food", confidence: high
 "pengeluaran" → intent: query_expenses, confidence: low, clarification_needed: "Periode mana? (hari ini/minggu ini/bulan ini)"
 `.trim();

@@ -9,7 +9,7 @@ import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from 
 import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
 import { createTransactionFromReceipt, createManualTransaction } from '../services/transactionService';
 import { parseIntent, isActionable } from '../services/nluService';
-import { getTotalExpenses, getCategoryBreakdown, formatTimeRange } from '../services/queryService';
+import { getTotalExpenses, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
 import * as responseFormatter from '../services/responseFormatter';
 import { getDb } from '../index';
 
@@ -332,6 +332,15 @@ async function handleTextMessage(
                 const { total, count } = await getTotalExpenses(userId, timeRange);
                 const timeRangeText = formatTimeRange(timeRange);
                 const response = responseFormatter.formatExpenseResponse(total, count, timeRangeText);
+                await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                break;
+            }
+
+            case 'query_details': {
+                const timeRange = parsedIntent.parameters.time_range || 'today';
+                const details = await getTransactionDetails(userId, timeRange);
+                const timeRangeText = formatTimeRange(timeRange);
+                const response = responseFormatter.formatTransactionDetails(details, timeRangeText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }

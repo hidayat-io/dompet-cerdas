@@ -3,7 +3,7 @@
  * Formats query results into user-friendly messages
  */
 
-import { CategoryData } from './queryService';
+import { CategoryData, TransactionDetail } from './queryService';
 
 /**
  * Emoji mapping for categories
@@ -103,6 +103,29 @@ export function formatCategoryBreakdown(
 ${lines.join('\n')}
 
 💰 Total: ${formatExactRupiah(totalAmount)}`;
+}
+
+/**
+ * Format transaction details list
+ */
+export function formatTransactionDetails(
+    details: TransactionDetail[],
+    timeRange: string
+): string {
+    if (details.length === 0) {
+        return `📋 Belum ada pengeluaran ${timeRange}.`;
+    }
+
+    const total = details.reduce((sum, item) => sum + item.amount, 0);
+    const header = `📋 *Detail pengeluaran ${timeRange}*\n\nTotal: ${formatExactRupiah(total)} (${details.length} transaksi)\n`;
+
+    const items = details.map((item, index) => {
+        const emoji = CATEGORY_EMOJI[item.category] || '📦';
+        const dateStr = new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        return `\n${index + 1}. ${emoji} *${item.category}*\n   💰 ${formatExactRupiah(item.amount)}\n   📝 ${item.description}\n   📅 ${dateStr}`;
+    }).join('');
+
+    return header + items;
 }
 
 /**

@@ -282,6 +282,85 @@ export async function getCategoryBreakdown(
 }
 
 /**
+ * Transaction detail item
+ */
+export interface TransactionDetail {
+    description: string;
+    amount: number;
+    category: string;
+    date: string;
+}
+
+/**
+ * Get transaction details with category names
+ */
+export async function getTransactionDetails(
+    userId: string,
+    timeRange: TimeRange = 'today'
+): Promise<TransactionDetail[]> {
+    const db = admin.firestore();
+    const { start, end } = getDateRange(timeRange);
+
+    // Format dates as YYYY-MM-DD string
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+
+    // Get categories first
+    const categoriesSnapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .get();
+
+    const categories = new Map<string, { name: string; type: string }>();
+    const expenseCategoryIds = new Set<string>();
+    
+    categoriesSnapshot.forEach(doc => {
+        const cat = doc.data();
+        categories.set(doc.id, { name: cat.name, type: cat.type });
+        if (cat.type === 'EXPENSE') {
+            expenseCategoryIds.add(doc.id);
+        }
+    });
+
+    // Query transactions by date
+    const snapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('transactions')
+        .where('date', '>=', startStr)
+        .where('date', '<=', endStr)
+        .orderBy('date', 'desc')
+        .orderBy('createdAt', 'desc')
+        .get();
+
+    // Build transaction details (only expenses)
+    const details: TransactionDetail[] = [];
+
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const categoryId = data.categoryId;
+        
+        // Only process expense categories
+        if (!expenseCategoryIds.has(categoryId)) {
+            return;
+        }
+
+        const categoryInfo = categories.get(categoryId);
+        const categoryName = categoryInfo?.name || 'Other';
+
+        details.push({
+            description: data.description || '-',
+            amount: data.amount || 0,
+            category: categoryName,
+            date: data.date
+        });
+    });
+
+    return details;
+}
+
+/**
  * Format time range for display
  */
 export function formatTimeRange(timeRange: TimeRange): string {
