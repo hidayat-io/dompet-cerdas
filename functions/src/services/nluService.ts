@@ -23,7 +23,7 @@ export type IntentType =
 /**
  * Time range options
  */
-export type TimeRange = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'last_month';
+export type TimeRange = 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_month';
 
 /**
  * Parsed intent structure
@@ -81,6 +81,8 @@ Rules:
 
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
+"pengeluaran selama 1 minggu" → intent: query_expenses, time_range: last_week, confidence: high
+"pengeluaran 7 hari terakhir" → intent: query_expenses, time_range: last_week, confidence: high
 "apa aja pengeluaran hari ini?" → intent: query_details, time_range: today, confidence: high
 "tolong detailkan" → intent: query_details, time_range: today, confidence: medium
 "tambah 50000 makan siang" → intent: add_transaction, amount: 50000, description: "makan siang", category_hint: "Food", confidence: high

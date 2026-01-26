@@ -45,6 +45,13 @@ function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
             start.setHours(0, 0, 0, 0);
             break;
 
+        case 'last_week':
+            // Last 7 days (including today)
+            start.setDate(now.getDate() - 6);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            break;
+
         case 'this_month':
             start.setDate(1);
             start.setHours(0, 0, 0, 0);
@@ -385,6 +392,8 @@ export function formatTimeRange(timeRange: TimeRange): string {
             return 'kemarin';
         case 'this_week':
             return 'minggu ini';
+        case 'last_week':
+            return '7 hari terakhir';
         case 'this_month':
             return 'bulan ini';
         case 'last_month':
