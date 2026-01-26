@@ -71,20 +71,23 @@ Rules:
 2. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian)
 3. Intent "add_transaction" = tambah/catat transaksi manual
 4. Intent "category_breakdown" = tanya breakdown per kategori
-5. Time range mapping:
-   - "hari ini" / "today" → "today"   - "kemarin" / "yesterday" → "yesterday"   - "minggu ini" / "this week" → "this_week"
+5. Time range mapping - BACA DENGAN TELITI:
+   - "hari ini" / "today" → "today"
+   - "kemarin" / "yesterday" → "yesterday"
+   - "minggu ini" / "this week" / "seminggu ini" (tanpa kata "terakhir") → "this_week"
+   - **"7 hari terakhir" / "seminggu terakhir" / "1 minggu terakhir" / "selama 1 minggu" / "selama seminggu" → "last_week"**
    - "bulan ini" / "this month" → "this_month"
    - "bulan lalu" / "last month" → "last_month"
 6. Untuk add_transaction, extract angka sebagai amount
 7. Category hint dari kata kunci: makan/food → "Food", transport/grab/gojek → "Transportation", belanja/shopping → "Shopping"
 8. **PENTING**: Jika tidak ada time range disebutkan, gunakan default "this_week" untuk query
-9. Kata seperti "detailkan", "list", "rincian" tanpa time range → intent: query_details, time_range: this_week, confidence: high
+9. **PENTING**: Kata "terakhir" / "lalu" setelah angka hari = last_week (7 hari terakhir = last_week)
 10. Jangan terlalu strict - pahami maksud user, jangan sering minta klarifikasi
 
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
-"pengeluaran selama 1 minggu" → intent: query_expenses, time_range: last_week, confidence: high
 "pengeluaran 7 hari terakhir" → intent: query_expenses, time_range: last_week, confidence: high
+"detailkan transaksi 7 hari terakhir" → intent: query_details, time_range: last_week, confidence: high
 "apa aja pengeluaran hari ini?" → intent: query_details, time_range: today, confidence: high
 "detailkan" → intent: query_details, time_range: this_week, confidence: high
 "tolong detailkan" → intent: query_details, time_range: this_week, confidence: high
