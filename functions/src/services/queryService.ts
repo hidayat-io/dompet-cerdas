@@ -66,25 +66,46 @@ export async function getTotalExpenses(
     const db = admin.firestore();
     const { start, end } = getDateRange(timeRange);
 
+    // Format dates as YYYY-MM-DD string to match web app schema
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+
+    // Query by date string (web app uses string format, not Timestamp)
     const snapshot = await db
         .collection('users')
         .doc(userId)
         .collection('transactions')
-        .where('type', '==', 'expense')
-        .where('date', '>=', admin.firestore.Timestamp.fromDate(start))
-        .where('date', '<=', admin.firestore.Timestamp.fromDate(end))
+        .where('date', '>=', startStr)
+        .where('date', '<=', endStr)
         .get();
 
-    let total = 0;
-    snapshot.forEach(doc => {
-        const data = doc.data();
-        total += data.amount || 0;
+    // Get categories to determine which are expenses
+    const categoriesSnapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .get();
+
+    const expenseCategoryIds = new Set<string>();
+    categoriesSnapshot.forEach(doc => {
+        const cat = doc.data();
+        if (cat.type === 'EXPENSE') {
+            expenseCategoryIds.add(doc.id);
+        }
     });
 
-    return {
-        total,
-        count: snapshot.size
-    };
+    // Filter and sum only expense transactions
+    let total = 0;
+    let count = 0;
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        if (expenseCategoryIds.has(data.categoryId)) {
+            total += data.amount || 0;
+            count++;
+        }
+    });
+
+    return { total, count };
 }
 
 /**
@@ -97,25 +118,46 @@ export async function getTotalIncome(
     const db = admin.firestore();
     const { start, end } = getDateRange(timeRange);
 
+    // Format dates as YYYY-MM-DD string to match web app schema
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+
+    // Query by date string (web app uses string format, not Timestamp)
     const snapshot = await db
         .collection('users')
         .doc(userId)
         .collection('transactions')
-        .where('type', '==', 'income')
-        .where('date', '>=', admin.firestore.Timestamp.fromDate(start))
-        .where('date', '<=', admin.firestore.Timestamp.fromDate(end))
+        .where('date', '>=', startStr)
+        .where('date', '<=', endStr)
         .get();
 
-    let total = 0;
-    snapshot.forEach(doc => {
-        const data = doc.data();
-        total += data.amount || 0;
+    // Get categories to determine which are income
+    const categoriesSnapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .get();
+
+    const incomeCategoryIds = new Set<string>();
+    categoriesSnapshot.forEach(doc => {
+        const cat = doc.data();
+        if (cat.type === 'INCOME') {
+            incomeCategoryIds.add(doc.id);
+        }
     });
 
-    return {
-        total,
-        count: snapshot.size
-    };
+    // Filter and sum only income transactions
+    let total = 0;
+    let count = 0;
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        if (incomeCategoryIds.has(data.categoryId)) {
+            total += data.amount || 0;
+            count++;
+        }
+    });
+
+    return { total, count };
 }
 
 /**
@@ -123,6 +165,19 @@ export async function getTotalIncome(
  */
 export async function getBalance(userId: string): Promise<number> {
     const db = admin.firestore();
+
+    // Get categories to determine income vs expense
+    const categoriesSnapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .get();
+
+    const categoryTypes = new Map<string, string>();
+    categoriesSnapshot.forEach(doc => {
+        const cat = doc.data();
+        categoryTypes.set(doc.id, cat.type);
+    });
 
     // Get all transactions
     const snapshot = await db
@@ -134,9 +189,10 @@ export async function getBalance(userId: string): Promise<number> {
     let balance = 0;
     snapshot.forEach(doc => {
         const data = doc.data();
-        if (data.type === 'income') {
+        const categoryType = categoryTypes.get(data.categoryId);
+        if (categoryType === 'INCOME') {
             balance += data.amount || 0;
-        } else if (data.type === 'expense') {
+        } else if (categoryType === 'EXPENSE') {
             balance -= data.amount || 0;
         }
     });
@@ -154,30 +210,60 @@ export async function getCategoryBreakdown(
     const db = admin.firestore();
     const { start, end } = getDateRange(timeRange);
 
+    // Format dates as YYYY-MM-DD string to match web app schema
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+
+    // Get categories first
+    const categoriesSnapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .get();
+
+    const categories = new Map<string, { name: string; type: string }>();
+    const expenseCategoryIds = new Set<string>();
+    
+    categoriesSnapshot.forEach(doc => {
+        const cat = doc.data();
+        categories.set(doc.id, { name: cat.name, type: cat.type });
+        if (cat.type === 'EXPENSE') {
+            expenseCategoryIds.add(doc.id);
+        }
+    });
+
+    // Query transactions by date
     const snapshot = await db
         .collection('users')
         .doc(userId)
         .collection('transactions')
-        .where('type', '==', 'expense')
-        .where('date', '>=', admin.firestore.Timestamp.fromDate(start))
-        .where('date', '<=', admin.firestore.Timestamp.fromDate(end))
+        .where('date', '>=', startStr)
+        .where('date', '<=', endStr)
         .get();
 
-    // Aggregate by category
+    // Aggregate by category (only expenses)
     const categoryMap: { [key: string]: { amount: number; count: number } } = {};
     let totalAmount = 0;
 
     snapshot.forEach(doc => {
         const data = doc.data();
-        const category = data.category || 'Other';
-        const amount = data.amount || 0;
-
-        if (!categoryMap[category]) {
-            categoryMap[category] = { amount: 0, count: 0 };
+        const categoryId = data.categoryId;
+        
+        // Only process expense categories
+        if (!expenseCategoryIds.has(categoryId)) {
+            return;
         }
 
-        categoryMap[category].amount += amount;
-        categoryMap[category].count += 1;
+        const categoryInfo = categories.get(categoryId);
+        const categoryName = categoryInfo?.name || 'Other';
+        const amount = data.amount || 0;
+
+        if (!categoryMap[categoryName]) {
+            categoryMap[categoryName] = { amount: 0, count: 0 };
+        }
+
+        categoryMap[categoryName].amount += amount;
+        categoryMap[categoryName].count += 1;
         totalAmount += amount;
     });
 
