@@ -370,23 +370,29 @@ async function handleTextMessage(
 
             case 'query_balance': {
                 const timeRange = parsedIntent.parameters.time_range;
-                const daysAgo = parsedIntent.parameters.days_ago;
+                const daysAgoRaw = parsedIntent.parameters.days_ago;
                 const customMonth = parsedIntent.parameters.custom_month;
-                const balance = await getBalance(userId, timeRange, daysAgo, customMonth);
+
+                const hasDaysAgo = typeof daysAgoRaw === 'number' && !Number.isNaN(daysAgoRaw);
+                const hasCustomMonth = typeof customMonth === 'string' && customMonth.length > 0;
+                const hasTimeRange = typeof timeRange === 'string' && timeRange.length > 0;
+
+                const daysAgo = hasDaysAgo ? daysAgoRaw : undefined;
+                const balance = await getBalance(userId, hasTimeRange ? timeRange : undefined, daysAgo, hasCustomMonth ? customMonth : undefined);
                 
                 let timeRangeText = '';
-                if (customMonth) {
+                if (hasCustomMonth && customMonth) {
                     const [year, month] = customMonth.split('-');
                     const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
                                       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
                     timeRangeText = ` (${monthNames[parseInt(month)]} ${year})`;
-                } else if (daysAgo !== undefined) {
+                } else if (hasDaysAgo && daysAgo !== undefined) {
                     timeRangeText = ` (${daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`})`;
-                } else if (timeRange) {
+                } else if (hasTimeRange && timeRange) {
                     timeRangeText = ` (${formatTimeRange(timeRange)})`;
                 }
                 
-                const response = responseFormatter.formatBalanceResponse(balance, timeRangeText);
+                const response = responseFormatter.formatBalanceResponse(balance, timeRangeText || undefined);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }

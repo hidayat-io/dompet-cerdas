@@ -14,6 +14,7 @@ export interface CategoryData {
     amount: number;
     percentage: number;
     count: number;
+    icon?: string;
 }
 
 /**
@@ -312,12 +313,12 @@ export async function getCategoryBreakdown(
         .collection('categories')
         .get();
 
-    const categories = new Map<string, { name: string; type: string }>();
+    const categories = new Map<string, { name: string; type: string; icon: string }>();
     const expenseCategoryIds = new Set<string>();
     
     categoriesSnapshot.forEach(doc => {
         const cat = doc.data();
-        categories.set(doc.id, { name: cat.name, type: cat.type });
+        categories.set(doc.id, { name: cat.name, type: cat.type, icon: cat.icon || 'Package' });
         if (cat.type === 'EXPENSE') {
             expenseCategoryIds.add(doc.id);
         }
@@ -333,7 +334,7 @@ export async function getCategoryBreakdown(
         .get();
 
     // Aggregate by category (only expenses)
-    const categoryMap: { [key: string]: { amount: number; count: number } } = {};
+    const categoryMap: { [key: string]: { amount: number; count: number; icon: string } } = {};
     let totalAmount = 0;
 
     snapshot.forEach(doc => {
@@ -347,10 +348,11 @@ export async function getCategoryBreakdown(
 
         const categoryInfo = categories.get(categoryId);
         const categoryName = categoryInfo?.name || 'Other';
+        const categoryIcon = categoryInfo?.icon || 'Package';
         const amount = data.amount || 0;
 
         if (!categoryMap[categoryName]) {
-            categoryMap[categoryName] = { amount: 0, count: 0 };
+            categoryMap[categoryName] = { amount: 0, count: 0, icon: categoryIcon };
         }
 
         categoryMap[categoryName].amount += amount;
@@ -363,7 +365,8 @@ export async function getCategoryBreakdown(
         category,
         amount: data.amount,
         count: data.count,
-        percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0
+        percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0,
+        icon: data.icon
     }));
 
     // Sort by amount descending
@@ -381,6 +384,7 @@ export interface TransactionDetail {
     category: string;
     date: string;
     createdAt: string;
+    icon?: string;
 }
 
 /**
@@ -416,12 +420,12 @@ export async function getTransactionDetails(
         .collection('categories')
         .get();
 
-    const categories = new Map<string, { name: string; type: string }>();
+    const categories = new Map<string, { name: string; type: string; icon: string }>();
     const expenseCategoryIds = new Set<string>();
     
     categoriesSnapshot.forEach(doc => {
         const cat = doc.data();
-        categories.set(doc.id, { name: cat.name, type: cat.type });
+        categories.set(doc.id, { name: cat.name, type: cat.type, icon: cat.icon || 'Package' });
         if (cat.type === 'EXPENSE') {
             expenseCategoryIds.add(doc.id);
         }
@@ -450,6 +454,7 @@ export async function getTransactionDetails(
 
         const categoryInfo = categories.get(categoryId);
         const categoryName = categoryInfo?.name || 'Other';
+        const categoryIcon = categoryInfo?.icon || 'Package';
 
         // Apply category filter if specified
         if (categoryFilter && categoryName.toLowerCase() !== categoryFilter.toLowerCase()) {
@@ -461,7 +466,8 @@ export async function getTransactionDetails(
             amount: data.amount || 0,
             category: categoryName,
             date: data.date,
-            createdAt: data.createdAt || data.date
+            createdAt: data.createdAt || data.date,
+            icon: categoryIcon
         });
     });
 

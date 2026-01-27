@@ -79,9 +79,9 @@ Return ONLY valid JSON (no markdown, no code blocks):
 }
 
 Rules:
-1. Intent "query_expenses" = tanya total pengeluaran (berapa/total)
-2. Intent "query_income" = tanya total pemasukan (berapa/total)
-3. Intent "query_balance" = tanya saldo/balance sekarang (berapa saldo/sisa uang)
+1. Intent "query_expenses" = tanya total pengeluaran (berapa/total/pengeluaran)
+2. Intent "query_income" = tanya total pemasukan (berapa/total/pemasukan)
+3. Intent "query_balance" = tanya saldo/balance sekarang (berapa saldo/sisa uang/balance)
 4. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian)
    - Jika menyebut kategori spesifik ("detailkan kategori Bill"), isi category_filter
 5. Intent "add_transaction" = tambah/catat transaksi manual
@@ -109,12 +109,20 @@ Rules:
 
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
+"pengeluaran hari ini" → intent: query_expenses, time_range: today, confidence: high
+"pengeluaran minggu ini" → intent: query_expenses, time_range: this_week, confidence: high
+"pengeluaran bulan ini" → intent: query_expenses, time_range: this_month, confidence: high
 "berapa pengeluaran bulan desember 2025?" → intent: query_expenses, custom_month: "2025-12", confidence: high
 "pengeluaran januari 2026" → intent: query_expenses, custom_month: "2026-01", confidence: high
 "berapa pemasukan bulan ini?" → intent: query_income, time_range: this_month, confidence: high
+"pemasukan hari ini" → intent: query_income, time_range: today, confidence: high
 "saldo ada berapa sekarang?" → intent: query_balance, confidence: high
 "berapa saldo saya?" → intent: query_balance, confidence: high
 "sisa uang berapa?" → intent: query_balance, confidence: high
+"saldo" → intent: query_balance, confidence: high
+"saldo bulan ini" → intent: query_balance, time_range: this_month, confidence: high
+"saldo kemarin" → intent: query_balance, time_range: yesterday, confidence: high
+"saldo minggu ini" → intent: query_balance, time_range: this_week, confidence: high
 "pengeluaran 7 hari terakhir" → intent: query_expenses, time_range: last_week, confidence: high
 "transaksi 2 hari lalu" → intent: query_details, days_ago: 2, confidence: high
 "pengeluaran 3 hari lalu berapa" → intent: query_expenses, days_ago: 3, confidence: high
@@ -142,6 +150,22 @@ Contoh:
 
         // Parse JSON
         const parsedIntent: ParsedIntent = JSON.parse(cleanText);
+
+        // Sanitize numeric fields that might be null/undefined/string
+        const params = parsedIntent.parameters || {} as any;
+        if (typeof params.days_ago !== 'number' || Number.isNaN(params.days_ago)) {
+            delete params.days_ago;
+        }
+        // Remove invalid time_range values
+        const validRanges = new Set(['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month']);
+        if (params.time_range && !validRanges.has(params.time_range)) {
+            delete params.time_range;
+        }
+        // Normalize custom_month format YYYY-MM
+        if (params.custom_month && !/^\d{4}-\d{2}$/.test(params.custom_month)) {
+            delete params.custom_month;
+        }
+        parsedIntent.parameters = params;
 
         // Validate intent
         if (!parsedIntent.intent || !parsedIntent.confidence) {
