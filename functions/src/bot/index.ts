@@ -9,7 +9,7 @@ import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from 
 import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
 import { createTransactionFromReceipt, createManualTransaction, getUserCategories } from '../services/transactionService';
 import { parseIntent, isActionable, classifyCategory } from '../services/nluService';
-import { getTotalExpenses, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
+import { getTotalExpenses, getTotalIncome, getBalance, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
 import * as responseFormatter from '../services/responseFormatter';
 import { getDb } from '../index';
 
@@ -338,16 +338,55 @@ async function handleTextMessage(
             case 'query_expenses': {
                 const timeRange = parsedIntent.parameters.time_range;
                 const daysAgo = parsedIntent.parameters.days_ago;
-                const { total, count } = await getTotalExpenses(userId, timeRange || 'this_month', daysAgo);
+                const customMonth = parsedIntent.parameters.custom_month;
+                const { total, count } = await getTotalExpenses(userId, timeRange || 'this_month', daysAgo, customMonth);
                 
                 let timeRangeText: string;
-                if (daysAgo !== undefined) {
+                if (customMonth) {
+                    const [year, month] = customMonth.split('-');
+                    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                    timeRangeText = `${monthNames[parseInt(month)]} ${year}`;
+                } else if (daysAgo !== undefined) {
                     timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
                 } else {
                     timeRangeText = formatTimeRange(timeRange || 'this_month');
                 }
                 
                 const response = responseFormatter.formatExpenseResponse(total, count, timeRangeText);
+                await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                break;
+            }
+
+            case 'query_income': {
+                const timeRange = parsedIntent.parameters.time_range;
+                // For now, ignore daysAgo for income queries - use timeRange only
+                const { total, count } = await getTotalIncome(userId, timeRange || 'this_month');
+                const timeRangeText = formatTimeRange(timeRange || 'this_month');
+                const response = responseFormatter.formatIncomeResponse(total, count, timeRangeText);
+                await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                break;
+            }
+
+            case 'query_balance': {
+                const timeRange = parsedIntent.parameters.time_range;
+                const daysAgo = parsedIntent.parameters.days_ago;
+                const customMonth = parsedIntent.parameters.custom_month;
+                const balance = await getBalance(userId, timeRange, daysAgo, customMonth);
+                
+                let timeRangeText = '';
+                if (customMonth) {
+                    const [year, month] = customMonth.split('-');
+                    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                    timeRangeText = ` (${monthNames[parseInt(month)]} ${year})`;
+                } else if (daysAgo !== undefined) {
+                    timeRangeText = ` (${daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`})`;
+                } else if (timeRange) {
+                    timeRangeText = ` (${formatTimeRange(timeRange)})`;
+                }
+                
+                const response = responseFormatter.formatBalanceResponse(balance, timeRangeText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }

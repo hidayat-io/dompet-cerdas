@@ -80,12 +80,28 @@ function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
 }
 
 /**
+ * Get date range for custom month (YYYY-MM format)
+ */
+function getCustomMonthRange(customMonth: string): { start: Date; end: Date } {
+    const [year, month] = customMonth.split('-').map(Number);
+    
+    const start = new Date(year, month - 1, 1); // month-1 because Date months are 0-indexed
+    start.setHours(0, 0, 0, 0);
+    
+    const end = new Date(year, month, 0); // Last day of the month
+    end.setHours(23, 59, 59, 999);
+    
+    return { start, end };
+}
+
+/**
  * Get total expenses for a time range or specific days ago
  */
 export async function getTotalExpenses(
     userId: string,
     timeRange?: TimeRange,
-    daysAgo?: number
+    daysAgo?: number,
+    customMonth?: string
 ): Promise<{ total: number; count: number }> {
     const db = admin.firestore();
 
@@ -93,7 +109,12 @@ export async function getTotalExpenses(
     let startStr: string;
     let endStr: string;
     
-    if (daysAgo !== undefined) {
+    if (customMonth) {
+        // Custom month (YYYY-MM)
+        const { start, end } = getCustomMonthRange(customMonth);
+        startStr = start.toISOString().split('T')[0];
+        endStr = end.toISOString().split('T')[0];
+    } else if (daysAgo !== undefined) {
         // Specific day N days ago
         startStr = getDateForDaysAgo(daysAgo);
         endStr = startStr;
@@ -197,7 +218,12 @@ export async function getTotalIncome(
 /**
  * Get current balance (income - expenses)
  */
-export async function getBalance(userId: string): Promise<number> {
+export async function getBalance(
+    userId: string,
+    timeRange?: TimeRange,
+    daysAgo?: number,
+    customMonth?: string
+): Promise<number> {
     const db = admin.firestore();
 
     // Get categories to determine income vs expense
@@ -213,12 +239,32 @@ export async function getBalance(userId: string): Promise<number> {
         categoryTypes.set(doc.id, cat.type);
     });
 
-    // Get all transactions
-    const snapshot = await db
+    // Get date range if specified
+    let transactionQuery = db
         .collection('users')
         .doc(userId)
-        .collection('transactions')
-        .get();
+        .collection('transactions');
+
+    if (customMonth) {
+        const { start, end } = getCustomMonthRange(customMonth);
+        const startStr = start.toISOString().split('T')[0];
+        const endStr = end.toISOString().split('T')[0];
+        transactionQuery = transactionQuery
+            .where('date', '>=', startStr)
+            .where('date', '<=', endStr) as any;
+    } else if (daysAgo !== undefined) {
+        const dateStr = getDateForDaysAgo(daysAgo);
+        transactionQuery = transactionQuery.where('date', '==', dateStr) as any;
+    } else if (timeRange) {
+        const { start, end } = getDateRange(timeRange);
+        const startStr = start.toISOString().split('T')[0];
+        const endStr = end.toISOString().split('T')[0];
+        transactionQuery = transactionQuery
+            .where('date', '>=', startStr)
+            .where('date', '<=', endStr) as any;
+    }
+
+    const snapshot = await transactionQuery.get();
 
     let balance = 0;
     snapshot.forEach(doc => {

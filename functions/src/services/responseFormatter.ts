@@ -72,11 +72,12 @@ export function formatIncomeResponse(
 /**
  * Format balance response
  */
-export function formatBalanceResponse(balance: number): string {
+export function formatBalanceResponse(balance: number, timeRangeText?: string): string {
     const emoji = balance >= 0 ? '💰' : '⚠️';
     const status = balance >= 0 ? 'Saldo positif' : 'Saldo negatif';
+    const periodText = timeRangeText || '';
 
-    return `${emoji} *Saldo kamu*: ${formatExactRupiah(balance)}
+    return `${emoji} *Saldo kamu${periodText}*: ${formatExactRupiah(balance)}
 
 ${status}`;
 }

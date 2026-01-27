@@ -34,6 +34,7 @@ export interface ParsedIntent {
     parameters: {
         time_range?: TimeRange;
         days_ago?: number;
+        custom_month?: string; // YYYY-MM format
         amount?: number;
         description?: string;
         category_hint?: string;
@@ -68,6 +69,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
   "parameters": {
     "time_range": "today | yesterday | this_week | last_week | this_month | last_month",
     "days_ago": number (jika user tanya "N hari lalu" contoh: "2 hari lalu" = 2, "3 hari lalu" = 3),
+    "custom_month": "YYYY-MM" (jika user sebut bulan+tahun spesifik, contoh: "desember 2025" = "2025-12"),
     "amount": number (hanya untuk add_transaction),
     "description": "string" (hanya untuk add_transaction),
     "category_hint": "string" (optional, tebak kategori dari deskripsi),
@@ -78,10 +80,12 @@ Return ONLY valid JSON (no markdown, no code blocks):
 
 Rules:
 1. Intent "query_expenses" = tanya total pengeluaran (berapa/total)
-2. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian)
+2. Intent "query_income" = tanya total pemasukan (berapa/total)
+3. Intent "query_balance" = tanya saldo/balance sekarang (berapa saldo/sisa uang)
+4. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian)
    - Jika menyebut kategori spesifik ("detailkan kategori Bill"), isi category_filter
-3. Intent "add_transaction" = tambah/catat transaksi manual
-4. Intent "category_breakdown" = tanya breakdown/rincian per kategori, atau tanya kategori paling boros/paling banyak
+5. Intent "add_transaction" = tambah/catat transaksi manual
+6. Intent "category_breakdown" = tanya breakdown/rincian per kategori, atau tanya kategori paling boros/paling banyak
 5. Time range mapping - BACA DENGAN TELITI:
    - "hari ini" / "today" → "today"
    - "kemarin" / "yesterday" → "yesterday"
@@ -89,6 +93,8 @@ Rules:
    - **"7 hari terakhir" / "seminggu terakhir" / "1 minggu terakhir" / "selama 1 minggu" / "selama seminggu" → "last_week"**
    - "bulan ini" / "this month" → "this_month"
    - "bulan lalu" / "last month" → "last_month"
+   - **Bulan+tahun spesifik**: "desember 2025" = "2025-12", "januari 2026" = "2026-01", "februari 2025" = "2025-02", dll.
+6. **PENTING**: Jika user menyebut bulan+tahun spesifik, isi "custom_month" dengan format "YYYY-MM"
 6. Untuk add_transaction, extract angka sebagai amount. Pahami format informal:
     - "35jt" = 35000000, "2,5jt" = 2500000
     - "150rb" = 150000, "1.2rb" = 1200
@@ -103,6 +109,12 @@ Rules:
 
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
+"berapa pengeluaran bulan desember 2025?" → intent: query_expenses, custom_month: "2025-12", confidence: high
+"pengeluaran januari 2026" → intent: query_expenses, custom_month: "2026-01", confidence: high
+"berapa pemasukan bulan ini?" → intent: query_income, time_range: this_month, confidence: high
+"saldo ada berapa sekarang?" → intent: query_balance, confidence: high
+"berapa saldo saya?" → intent: query_balance, confidence: high
+"sisa uang berapa?" → intent: query_balance, confidence: high
 "pengeluaran 7 hari terakhir" → intent: query_expenses, time_range: last_week, confidence: high
 "transaksi 2 hari lalu" → intent: query_details, days_ago: 2, confidence: high
 "pengeluaran 3 hari lalu berapa" → intent: query_expenses, days_ago: 3, confidence: high
