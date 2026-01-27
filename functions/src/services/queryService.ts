@@ -5,6 +5,10 @@
 
 import * as admin from 'firebase-admin';
 import { TimeRange } from './nluService';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 /**
  * Category breakdown data
@@ -85,13 +89,13 @@ function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
  */
 function getCustomMonthRange(customMonth: string): { start: Date; end: Date } {
     const [year, month] = customMonth.split('-').map(Number);
-    
+
     const start = new Date(year, month - 1, 1); // month-1 because Date months are 0-indexed
     start.setHours(0, 0, 0, 0);
-    
+
     const end = new Date(year, month, 0); // Last day of the month
     end.setHours(23, 59, 59, 999);
-    
+
     return { start, end };
 }
 
@@ -109,7 +113,7 @@ export async function getTotalExpenses(
     // Get date range
     let startStr: string;
     let endStr: string;
-    
+
     if (customMonth) {
         // Custom month (YYYY-MM)
         const { start, end } = getCustomMonthRange(customMonth);
@@ -294,7 +298,7 @@ export async function getCategoryBreakdown(
     // Get date range
     let startStr: string;
     let endStr: string;
-    
+
     if (daysAgo !== undefined) {
         // Specific day N days ago
         startStr = getDateForDaysAgo(daysAgo);
@@ -315,7 +319,7 @@ export async function getCategoryBreakdown(
 
     const categories = new Map<string, { name: string; type: string; icon: string }>();
     const expenseCategoryIds = new Set<string>();
-    
+
     categoriesSnapshot.forEach(doc => {
         const cat = doc.data();
         categories.set(doc.id, { name: cat.name, type: cat.type, icon: cat.icon || 'Package' });
@@ -340,7 +344,7 @@ export async function getCategoryBreakdown(
     snapshot.forEach(doc => {
         const data = doc.data();
         const categoryId = data.categoryId;
-        
+
         // Only process expense categories
         if (!expenseCategoryIds.has(categoryId)) {
             return;
@@ -388,6 +392,107 @@ export interface TransactionDetail {
 }
 
 /**
+ * Use Gemini AI to match category filter intelligently
+ * For example: "food" should match "FnB" or "Food and Beverage"
+ * Returns the matched category name or null if no match found
+ */
+async function matchCategoryFilter(
+    userQuery: string,
+    availableCategories: string[]
+): Promise<string | null> {
+    if (!userQuery || availableCategories.length === 0) {
+        return null;
+    }
+
+    console.log(`[CategoryMatch] User query: "${userQuery}"`);
+    console.log(`[CategoryMatch] Available categories:`, availableCategories);
+
+    // First check for exact match (case-insensitive)
+    const exactMatch = availableCategories.find(
+        cat => cat.toLowerCase() === userQuery.toLowerCase()
+    );
+    if (exactMatch) {
+        console.log(`[CategoryMatch] Exact match found: "${exactMatch}"`);
+        return exactMatch;
+    }
+
+    // Check for partial match (e.g., "Other" matches "Others" or "Lainnya")
+    const partialMatch = availableCategories.find(cat => {
+        const catLower = cat.toLowerCase();
+        const queryLower = userQuery.toLowerCase();
+        return catLower.includes(queryLower) || queryLower.includes(catLower);
+    });
+    if (partialMatch) {
+        console.log(`[CategoryMatch] Partial match found: "${partialMatch}"`);
+        return partialMatch;
+    }
+
+    // Use Gemini AI to find semantic match
+    try {
+        const prompt = `
+Kamu adalah AI untuk mencocokkan kategori transaksi.
+
+User mencari kategori: "${userQuery}"
+
+Daftar kategori yang tersedia:
+${availableCategories.map((cat, idx) => `${idx + 1}. ${cat}`).join('\n')}
+
+Tugas kamu:
+1. Cari kategori yang paling sesuai dengan pencarian user
+2. Pertimbangkan sinonim bahasa Indonesia dan Inggris
+   - Contoh: "food" = "FnB" = "Food and Beverage" = "Makanan"
+   - Contoh: "fnb" = "Food" = "Food and Beverage"
+   - Contoh: "bill" = "tagihan"
+   - Contoh: "transport" = "transportasi"
+   - Contoh: "others" = "lainnya" = "other"
+3. Jika ada yang sedikit mendekati, pilih yang paling cocok
+4. HANYA return null jika BENAR-BENAR tidak ada yang berhubungan sama sekali
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{
+  "matchedCategory": "string atau null",
+  "confidence": "high | medium | low"
+}
+
+Contoh:
+- User: "food", Available: ["FnB", "Transport"] → {"matchedCategory": "FnB", "confidence": "high"}
+- User: "fnb", Available: ["Food and Beverage"] → {"matchedCategory": "Food and Beverage", "confidence": "high"}
+- User: "bill", Available: ["Tagihan", "Transport"] → {"matchedCategory": "Tagihan", "confidence": "high"}
+- User: "others", Available: ["Lainnya", "Transport"] → {"matchedCategory": "Lainnya", "confidence": "high"}
+- User: "xyz123", Available: ["Food", "Transport"] → {"matchedCategory": null, "confidence": "low"}
+`.trim();
+
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+
+        const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const parsed = JSON.parse(cleanText) as {
+            matchedCategory: string | null;
+            confidence: 'high' | 'medium' | 'low';
+        };
+
+        console.log(`[CategoryMatch] AI result:`, parsed);
+
+        // Accept any confidence level if a match is found (including low)
+        // Only return null if AI explicitly returns null
+        if (parsed.matchedCategory) {
+            console.log(`[CategoryMatch] AI matched: "${parsed.matchedCategory}" (confidence: ${parsed.confidence})`);
+            return parsed.matchedCategory;
+        }
+
+        console.log(`[CategoryMatch] No match found`);
+        return null;
+
+    } catch (error) {
+        console.error('[CategoryMatch] Error matching category with Gemini:', error);
+        // Fallback to null if AI fails
+        return null;
+    }
+}
+
+/**
  * Get transaction details with category names
  */
 export async function getTransactionDetails(
@@ -401,7 +506,7 @@ export async function getTransactionDetails(
     // Get date range
     let startStr: string;
     let endStr: string;
-    
+
     if (daysAgo !== undefined) {
         // Specific day N days ago
         startStr = getDateForDaysAgo(daysAgo);
@@ -422,7 +527,7 @@ export async function getTransactionDetails(
 
     const categories = new Map<string, { name: string; type: string; icon: string }>();
     const expenseCategoryIds = new Set<string>();
-    
+
     categoriesSnapshot.forEach(doc => {
         const cat = doc.data();
         categories.set(doc.id, { name: cat.name, type: cat.type, icon: cat.icon || 'Package' });
@@ -430,6 +535,49 @@ export async function getTransactionDetails(
             expenseCategoryIds.add(doc.id);
         }
     });
+
+    // Use AI to match category filter if provided
+    let matchedCategoryName: string | null = null;
+    if (categoryFilter) {
+        // Get ALL category names for matching (not just expense)
+        const allCategoryNames: string[] = [];
+        categories.forEach((catInfo) => {
+            allCategoryNames.push(catInfo.name);
+        });
+
+        // Use AI to find matching category
+        matchedCategoryName = await matchCategoryFilter(categoryFilter, allCategoryNames);
+
+        if (!matchedCategoryName) {
+            // No matching category found at all - return empty array
+            console.log(`[CategoryMatch] No category found matching "${categoryFilter}"`);
+            return [];
+        }
+
+        // Check if matched category is EXPENSE type
+        let isExpenseCategory = false;
+        console.log(`[CategoryMatch] Checking if "${matchedCategoryName}" is EXPENSE type...`);
+        console.log(`[CategoryMatch] Expense category IDs:`, Array.from(expenseCategoryIds));
+
+        categories.forEach((catInfo, catId) => {
+            if (catInfo.name === matchedCategoryName) {
+                console.log(`[CategoryMatch] Found category "${catInfo.name}" with id=${catId}, type=${catInfo.type}, isInExpenseSet=${expenseCategoryIds.has(catId)}`);
+                if (expenseCategoryIds.has(catId)) {
+                    isExpenseCategory = true;
+                }
+            }
+        });
+
+        console.log(`[CategoryMatch] isExpenseCategory result: ${isExpenseCategory}`);
+
+        if (!isExpenseCategory) {
+            // Category found but it's INCOME, not EXPENSE
+            console.log(`[CategoryMatch] Category "${matchedCategoryName}" found but it's INCOME type, bot only shows EXPENSE details`);
+            return [];
+        }
+
+        console.log(`[CategoryMatch] Successfully matched EXPENSE category: "${matchedCategoryName}"`);
+    }
 
     // Query transactions by date (no orderBy to avoid index requirement)
     const snapshot = await db
@@ -446,7 +594,7 @@ export async function getTransactionDetails(
     snapshot.forEach(doc => {
         const data = doc.data();
         const categoryId = data.categoryId;
-        
+
         // Only process expense categories
         if (!expenseCategoryIds.has(categoryId)) {
             return;
@@ -456,8 +604,8 @@ export async function getTransactionDetails(
         const categoryName = categoryInfo?.name || 'Other';
         const categoryIcon = categoryInfo?.icon || 'Package';
 
-        // Apply category filter if specified
-        if (categoryFilter && categoryName.toLowerCase() !== categoryFilter.toLowerCase()) {
+        // Apply AI-matched category filter if specified
+        if (matchedCategoryName && categoryName !== matchedCategoryName) {
             return;
         }
 

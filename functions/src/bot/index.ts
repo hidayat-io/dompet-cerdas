@@ -340,19 +340,19 @@ async function handleTextMessage(
                 const daysAgo = parsedIntent.parameters.days_ago;
                 const customMonth = parsedIntent.parameters.custom_month;
                 const { total, count } = await getTotalExpenses(userId, timeRange || 'this_month', daysAgo, customMonth);
-                
+
                 let timeRangeText: string;
                 if (customMonth) {
                     const [year, month] = customMonth.split('-');
-                    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
                     timeRangeText = `${monthNames[parseInt(month)]} ${year}`;
                 } else if (daysAgo !== undefined) {
                     timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
                 } else {
                     timeRangeText = formatTimeRange(timeRange || 'this_month');
                 }
-                
+
                 const response = responseFormatter.formatExpenseResponse(total, count, timeRangeText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -379,19 +379,19 @@ async function handleTextMessage(
 
                 const daysAgo = hasDaysAgo ? daysAgoRaw : undefined;
                 const balance = await getBalance(userId, hasTimeRange ? timeRange : undefined, daysAgo, hasCustomMonth ? customMonth : undefined);
-                
+
                 let timeRangeText = '';
                 if (hasCustomMonth && customMonth) {
                     const [year, month] = customMonth.split('-');
-                    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
                     timeRangeText = ` (${monthNames[parseInt(month)]} ${year})`;
                 } else if (hasDaysAgo && daysAgo !== undefined) {
                     timeRangeText = ` (${daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`})`;
                 } else if (hasTimeRange && timeRange) {
                     timeRangeText = ` (${formatTimeRange(timeRange)})`;
                 }
-                
+
                 const response = responseFormatter.formatBalanceResponse(balance, timeRangeText || undefined);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -401,15 +401,17 @@ async function handleTextMessage(
                 const timeRange = parsedIntent.parameters.time_range;
                 const categoryFilter = parsedIntent.parameters.category_filter;
                 const daysAgo = parsedIntent.parameters.days_ago;
-                const details = await getTransactionDetails(userId, timeRange || 'today', categoryFilter, daysAgo);
-                
+                // Default to 'this_month' for better UX when no time range specified
+                const effectiveTimeRange = timeRange || 'this_month';
+                const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo);
+
                 let timeRangeText: string;
                 if (daysAgo !== undefined) {
                     timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
                 } else {
-                    timeRangeText = formatTimeRange(timeRange || 'today');
+                    timeRangeText = formatTimeRange(effectiveTimeRange);
                 }
-                
+
                 const categoryText = categoryFilter ? ` kategori ${categoryFilter}` : '';
                 const response = responseFormatter.formatTransactionDetails(details, timeRangeText + categoryText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
@@ -420,14 +422,14 @@ async function handleTextMessage(
                 const timeRange = parsedIntent.parameters.time_range;
                 const daysAgo = parsedIntent.parameters.days_ago;
                 const categories = await getCategoryBreakdown(userId, timeRange || 'this_month', daysAgo);
-                
+
                 let timeRangeText: string;
                 if (daysAgo !== undefined) {
                     timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
                 } else {
                     timeRangeText = formatTimeRange(timeRange || 'this_month');
                 }
-                
+
                 const response = responseFormatter.formatCategoryBreakdown(categories, timeRangeText);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
