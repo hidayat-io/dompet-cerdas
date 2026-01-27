@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
-> **Last Updated**: January 24, 2026  
-> **Version**: 1.6.0  
+> **Last Updated**: January 27, 2026  
+> **Version**: 1.6.1  
 > **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -631,6 +631,13 @@ Integrasi dengan Telegram untuk input dan monitoring transaksi via chat dengan *
 ---
 
 ## 📝 Changelog
+
+### Version 1.6.1 (January 27, 2026)
+
+**🤖 Telegram Bot & NLU:**
+- Kategori transaksi bot dipilih dari daftar kategori Firestore via Gemini
+- Cache kategori diperpanjang + refresh on-demand saat kategori berubah
+- NLU lebih fleksibel untuk format input seperti "Salary Feb : 35jt"
 
 ### Version 1.6.0 (January 24, 2026)
 

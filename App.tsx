@@ -4,7 +4,8 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth, db, storage } from './firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth, db, storage, firebaseApp } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
 import { Category, Transaction, Simulation, SimulationItem } from './types';
@@ -24,6 +25,8 @@ import NotificationModal, { NotificationType } from './components/NotificationMo
 // ... (skip content)
 
 type View = 'DASHBOARD' | 'TRANSACTIONS' | 'CATEGORIES' | 'SIMULATION' | 'AI_ADVISOR' | 'SETTINGS';
+
+const functions = getFunctions(firebaseApp, 'asia-southeast1');
 
 function App() {
   const { theme } = useTheme();
@@ -340,15 +343,26 @@ function App() {
     await deleteDoc(doc(db, 'users', user.uid, 'transactions', id));
   };
 
+  const refreshCategoryCache = async () => {
+    try {
+      const callable = httpsCallable(functions, 'refreshCategoryCache');
+      await callable();
+    } catch (error) {
+      console.error('Failed to refresh category cache:', error);
+    }
+  };
+
   const addCategory = async (cat: Omit<Category, 'id'>) => {
     if (!user) return;
     await addDoc(collection(db, 'users', user.uid, 'categories'), cat);
+    await refreshCategoryCache();
   };
 
   const updateCategory = async (id: string, cat: Omit<Category, 'id'>) => {
     if (!user) return;
     const catRef = doc(db, 'users', user.uid, 'categories', id);
     await updateDoc(catRef, cat);
+    await refreshCategoryCache();
   };
 
   const deleteCategory = async (id: string) => {
@@ -359,6 +373,7 @@ function App() {
       return;
     }
     await deleteDoc(doc(db, 'users', user.uid, 'categories', id));
+    await refreshCategoryCache();
   };
 
   // --- Simulation Handlers (Firestore) ---

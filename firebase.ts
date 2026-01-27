@@ -45,3 +45,4 @@ export const auth = authInstance!;
 export const db = dbInstance!;
 export const storage = storageInstance!;
 export const googleProvider = googleProviderInstance!;
+export const firebaseApp = app!;

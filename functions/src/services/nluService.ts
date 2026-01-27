@@ -42,6 +42,12 @@ export interface ParsedIntent {
     clarification_needed?: string;
 }
 
+export interface CategoryCandidate {
+    id: string;
+    name: string;
+    type?: string;
+}
+
 /**
  * Parse user message to extract intent and parameters
  * @param message - User's natural language message in Indonesian
@@ -83,7 +89,13 @@ Rules:
    - **"7 hari terakhir" / "seminggu terakhir" / "1 minggu terakhir" / "selama 1 minggu" / "selama seminggu" → "last_week"**
    - "bulan ini" / "this month" → "this_month"
    - "bulan lalu" / "last month" → "last_month"
-6. Untuk add_transaction, extract angka sebagai amount
+6. Untuk add_transaction, extract angka sebagai amount. Pahami format informal:
+    - "35jt" = 35000000, "2,5jt" = 2500000
+    - "150rb" = 150000, "1.2rb" = 1200
+    - "35 juta" = 35000000, "1,5 juta" = 1500000
+7. Anggap format "Label : amount" sebagai add_transaction, contoh:
+    - "Salary Feb : 35jt" → intent: add_transaction, amount: 35000000, description: "Salary Feb"
+    - "Gaji Feb: 35 juta" → intent: add_transaction, amount: 35000000, description: "Gaji Feb"
 7. Category hint dari kata kunci: makan/food → "Food", transport/grab/gojek → "Transportation", belanja/shopping → "Shopping"
 8. **PENTING**: Jika tidak ada time range disebutkan, gunakan default "this_week" untuk query
 9. **PENTING**: Kata "terakhir" / "lalu" setelah angka hari = last_week (7 hari terakhir = last_week)
@@ -104,6 +116,8 @@ Contoh:
 "detailkan" → intent: query_details, time_range: this_week, confidence: high
 "tolong detailkan" → intent: query_details, time_range: this_week, confidence: high
 "tambah 50000 makan siang" → intent: add_transaction, amount: 50000, description: "makan siang", category_hint: "Food", confidence: high
+"Salary Feb : 35jt" → intent: add_transaction, amount: 35000000, description: "Salary Feb", confidence: high
+"Gaji Feb: 35 juta" → intent: add_transaction, amount: 35000000, description: "Gaji Feb", confidence: high
 `.trim();
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
@@ -142,4 +156,56 @@ Contoh:
  */
 export function isActionable(parsedIntent: ParsedIntent): boolean {
     return parsedIntent.confidence === 'high' && parsedIntent.intent !== 'unknown';
+}
+
+/**
+ * Classify category using Gemini based on description and available categories.
+ */
+export async function classifyCategory(
+    description: string,
+    categories: CategoryCandidate[]
+): Promise<{ categoryId: string; categoryName: string; confidence: 'high' | 'medium' | 'low' }> {
+    if (categories.length === 0) {
+        throw new Error('No categories available for classification');
+    }
+
+    const prompt = `
+Kamu adalah AI untuk memilih kategori transaksi.
+
+Deskripsi transaksi: "${description}"
+
+Daftar kategori (id, name, type):
+${categories.map((c) => `- ${c.id} | ${c.name} | ${c.type || 'UNKNOWN'}`).join('\n')}
+
+Pilih satu kategori yang paling cocok.
+Jika tidak ada yang cocok, pilih kategori bernama "Lainnya" atau "Other" jika tersedia.
+Return ONLY valid JSON (no markdown, no code blocks):
+{
+  "categoryId": "string",
+  "categoryName": "string",
+  "confidence": "high | medium | low"
+}
+`.trim();
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+
+    const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(cleanText) as {
+        categoryId?: string;
+        categoryName?: string;
+        confidence?: 'high' | 'medium' | 'low';
+    };
+
+    if (!parsed.categoryId || !parsed.categoryName) {
+        throw new Error('Invalid category classification response');
+    }
+
+    return {
+        categoryId: parsed.categoryId,
+        categoryName: parsed.categoryName,
+        confidence: parsed.confidence || 'medium'
+    };
 }

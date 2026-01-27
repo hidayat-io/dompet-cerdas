@@ -7,8 +7,8 @@ import { handleStartCommand } from './commands/start';
 import { handleHelpCommand } from './commands/help';
 import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from '../services/linkService';
 import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
-import { createTransactionFromReceipt, createManualTransaction } from '../services/transactionService';
-import { parseIntent, isActionable } from '../services/nluService';
+import { createTransactionFromReceipt, createManualTransaction, getUserCategories } from '../services/transactionService';
+import { parseIntent, isActionable, classifyCategory } from '../services/nluService';
 import { getTotalExpenses, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
 import * as responseFormatter from '../services/responseFormatter';
 import { getDb } from '../index';
@@ -397,29 +397,47 @@ async function handleTextMessage(
                     return;
                 }
 
-                // Map category hint to actual category
-                const categoryMap: { [key: string]: string } = {
-                    'Food': 'Food',
-                    'Transportation': 'Transportation',
-                    'Shopping': 'Shopping',
-                    'Health': 'Health',
-                    'Entertainment': 'Entertainment',
-                    'Bills': 'Bills'
-                };
-                const category = categoryMap[category_hint || 'Other'] || 'Other';
+                const categories = await getUserCategories(userId);
+                let categoryChoice: { categoryId: string; categoryName: string; confidence: 'high' | 'medium' | 'low' };
+                const directMatch = category_hint
+                    ? categories.find((category) => category.name.toLowerCase() === category_hint.toLowerCase())
+                    : undefined;
+
+                if (directMatch) {
+                    categoryChoice = {
+                        categoryId: directMatch.id,
+                        categoryName: directMatch.name,
+                        confidence: 'high'
+                    };
+                } else {
+                    try {
+                        categoryChoice = await classifyCategory(description, categories);
+                    } catch (classificationError) {
+                        console.error('Category classification failed:', classificationError);
+                        const fallbackNames = new Set(['lainnya', 'other', 'others']);
+                        const otherCategory = categories.find((category) => fallbackNames.has(category.name.toLowerCase()));
+                        const fallbackCategory = otherCategory || categories[0];
+                        categoryChoice = {
+                            categoryId: fallbackCategory.id,
+                            categoryName: fallbackCategory.name,
+                            confidence: 'low' as const
+                        };
+                    }
+                }
 
                 // Create transaction
                 const transactionId = await createManualTransaction(
                     userId,
                     amount,
                     description,
-                    category,
-                    msg.from?.id
+                    categoryChoice.categoryName,
+                    msg.from?.id,
+                    categoryChoice.categoryId
                 );
 
                 console.log(`Created manual transaction ${transactionId} for user ${userId}`);
 
-                const response = responseFormatter.formatTransactionAdded(amount, category, description);
+                const response = responseFormatter.formatTransactionAdded(amount, categoryChoice.categoryName, description);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }

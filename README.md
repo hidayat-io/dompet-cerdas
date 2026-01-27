@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.0
+# DompetCerdas - Smart Expense Tracker v2.0.1
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -72,6 +72,7 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ## Version History
 
+- **v2.0.1** - Bot category selection via Firestore categories + cache refresh, improved NLU for shorthand amounts
 - **v2.0.0** - Telegram Bot Integration (Receipt OCR, Natural Language, Account Linking)
 - **v1.6.0** - AI Financial Advisor
 - **v1.5.0** - Financial Simulations

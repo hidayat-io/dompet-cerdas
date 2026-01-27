@@ -5,6 +5,52 @@
 
 import * as admin from 'firebase-admin';
 import { ReceiptData } from './geminiService';
+import { classifyCategory } from './nluService';
+
+const CATEGORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const categoryCache = new Map<string, { expiresAt: number; categories: UserCategory[] }>();
+
+export interface UserCategory {
+    id: string;
+    name: string;
+    type?: string;
+}
+
+export async function getUserCategories(userId: string, forceRefresh = false): Promise<UserCategory[]> {
+    const cached = categoryCache.get(userId);
+    if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+        return cached.categories;
+    }
+
+    const db = admin.firestore();
+    const snapshot = await db
+        .collection('users')
+        .doc(userId)
+        .collection('categories')
+        .get();
+
+    const categories = snapshot.docs.map((doc) => {
+        const data = doc.data() as { name?: string; type?: string };
+        return {
+            id: doc.id,
+            name: data.name || 'Lainnya',
+            type: data.type
+        };
+    });
+
+    categoryCache.set(userId, {
+        expiresAt: Date.now() + CATEGORY_CACHE_TTL_MS,
+        categories
+    });
+
+    return categories;
+}
+
+function getFallbackCategory(categories: UserCategory[]): UserCategory {
+    const fallbackNames = new Set(['lainnya', 'other', 'others']);
+    const otherCategory = categories.find((category) => fallbackNames.has(category.name.toLowerCase()));
+    return otherCategory || categories[0];
+}
 
 /**
  * Transaction type structure for Firestore
@@ -53,57 +99,44 @@ export async function createTransactionFromReceipt(
 
     console.log('[TRANSACTION] Using today\'s date:', transactionDate.toISOString());
 
-    // Map category suggestion to category name
-    const categoryMapping: { [key: string]: string } = {
-        'Makanan': 'Food',
-        'Belanja Harian': 'Shopping',
-        'Transport': 'Transportation',
-        'Kesehatan': 'Health',
-        'Hiburan': 'Entertainment',
-        'Tagihan': 'Bills',
-        'Lainnya': 'Other'
-    };
-
-    const mappedCategoryName = categoryMapping[receiptData.categorySuggestion] || 'Other';
-    console.log('[TRANSACTION] Mapped category:', mappedCategoryName);
-
-    // Get categoryId from categories collection
-    console.log('[TRANSACTION] Looking up categoryId for:', mappedCategoryName);
-    const categoriesSnapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .where('name', '==', mappedCategoryName)
-        .where('type', '==', 'EXPENSE')
-        .limit(1)
-        .get();
-
-    console.log('[TRANSACTION] Categories found:', categoriesSnapshot.size);
-
-    let categoryId: string;
-    if (categoriesSnapshot.empty) {
-        console.log('[TRANSACTION] No exact match, trying fallback...');
-        // Fallback: get any expense category
-        const fallbackSnapshot = await db
-            .collection('users')
-            .doc(userId)
-            .collection('categories')
-            .where('type', '==', 'EXPENSE')
-            .limit(1)
-            .get();
-
-        console.log('[TRANSACTION] Fallback categories found:', fallbackSnapshot.size);
-
-        if (fallbackSnapshot.empty) {
-            console.error('[TRANSACTION] ERROR: No expense categories found for user');
-            throw new Error('No expense categories found for user');
-        }
-        categoryId = fallbackSnapshot.docs[0].id;
-    } else {
-        categoryId = categoriesSnapshot.docs[0].id;
+    const categories = await getUserCategories(userId);
+    if (categories.length === 0) {
+        console.error('[TRANSACTION] ERROR: No categories found for user');
+        throw new Error('No categories found for user');
     }
 
-    console.log('[TRANSACTION] Using categoryId:', categoryId);
+    let categoryId: string;
+    let categoryName: string;
+    const suggestion = (receiptData.categorySuggestion || '').trim();
+    const directMatch = suggestion
+        ? categories.find((category) => category.name.toLowerCase() === suggestion.toLowerCase())
+        : undefined;
+
+    if (directMatch) {
+        categoryId = directMatch.id;
+        categoryName = directMatch.name;
+    } else {
+        try {
+            const description = [receiptData.merchant, ...(receiptData.items || [])]
+                .filter(Boolean)
+                .join(' ')
+                .trim();
+            const classification = await classifyCategory(description || 'Receipt purchase', categories);
+            const matched = categories.find((category) => category.id === classification.categoryId);
+            if (!matched) {
+                throw new Error('Classification returned unknown categoryId');
+            }
+            categoryId = matched.id;
+            categoryName = matched.name;
+        } catch (classificationError) {
+            console.error('Receipt category classification failed:', classificationError);
+            const fallbackCategory = getFallbackCategory(categories);
+            categoryId = fallbackCategory.id;
+            categoryName = fallbackCategory.name;
+        }
+    }
+
+    console.log('[TRANSACTION] Using categoryId:', categoryId, 'name:', categoryName);
 
     // Format date as YYYY-MM-DD
     const dateString = transactionDate.toISOString().split('T')[0];
@@ -166,36 +199,26 @@ export async function createManualTransaction(
     amount: number,
     description: string,
     categoryName: string,
-    telegramId?: number
+    telegramId?: number,
+    categoryIdOverride?: string
 ): Promise<string> {
     const db = admin.firestore();
 
-    // Get categoryId from categories collection
-    const categoriesSnapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .where('name', '==', categoryName)
-        .limit(1)
-        .get();
-
     let categoryId: string;
-    if (categoriesSnapshot.empty) {
-        // Fallback: get first category of type EXPENSE
-        const fallbackSnapshot = await db
-            .collection('users')
-            .doc(userId)
-            .collection('categories')
-            .where('type', '==', 'EXPENSE')
-            .limit(1)
-            .get();
-
-        if (fallbackSnapshot.empty) {
+    if (categoryIdOverride) {
+        categoryId = categoryIdOverride;
+    } else {
+        const categories = await getUserCategories(userId);
+        if (categories.length === 0) {
             throw new Error('No categories found for user');
         }
-        categoryId = fallbackSnapshot.docs[0].id;
-    } else {
-        categoryId = categoriesSnapshot.docs[0].id;
+
+        const normalizedCategoryName = categoryName.toLowerCase();
+        const directMatch = categories.find(
+            (category) => category.name.toLowerCase() === normalizedCategoryName
+        );
+
+        categoryId = (directMatch || getFallbackCategory(categories)).id;
     }
 
     // Format date as YYYY-MM-DD

@@ -5,6 +5,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { initBot, processUpdate } from './bot';
+import { getUserCategories } from './services/transactionService';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -111,4 +112,19 @@ export const healthCheck = functions
             timestamp: new Date().toISOString(),
             service: 'dompetcerdas-telegram-bot',
         });
+    });
+
+/**
+ * Refresh category cache for the authenticated user
+ */
+export const refreshCategoryCache = functions
+    .region('asia-southeast1')
+    .https.onCall(async (_, context) => {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+        }
+
+        const userId = context.auth.uid;
+        await getUserCategories(userId, true);
+        return { success: true };
     });
