@@ -499,7 +499,10 @@ export async function getTransactionDetails(
     userId: string,
     timeRange?: TimeRange,
     categoryFilter?: string,
-    daysAgo?: number
+    daysAgo?: number,
+    limit?: number,
+    specificDate?: string,
+    sortBy?: 'date' | 'amount' // 'date' = recent first, 'amount' = highest first
 ): Promise<TransactionDetail[]> {
     const db = admin.firestore();
 
@@ -507,7 +510,11 @@ export async function getTransactionDetails(
     let startStr: string;
     let endStr: string;
 
-    if (daysAgo !== undefined) {
+    if (specificDate) {
+        // Specific date (YYYY-MM-DD)
+        startStr = specificDate;
+        endStr = specificDate;
+    } else if (daysAgo !== undefined) {
         // Specific day N days ago
         startStr = getDateForDaysAgo(daysAgo);
         endStr = startStr;
@@ -619,12 +626,22 @@ export async function getTransactionDetails(
         });
     });
 
-    // Sort in memory: by date desc, then by createdAt desc
-    details.sort((a, b) => {
-        const dateCompare = b.date.localeCompare(a.date);
-        if (dateCompare !== 0) return dateCompare;
-        return b.createdAt.localeCompare(a.createdAt);
-    });
+    // Sort based on sortBy parameter
+    if (sortBy === 'amount') {
+        // Sort by amount descending (highest first)
+        details.sort((a, b) => b.amount - a.amount);
+    } else {
+        // Default: sort by date desc, then by createdAt desc (most recent first)
+        details.sort((a, b) => {
+            const dateCompare = b.date.localeCompare(a.date);
+            if (dateCompare !== 0) return dateCompare;
+            return b.createdAt.localeCompare(a.createdAt);
+        });
+    }
+
+    if (limit && limit > 0) {
+        return details.slice(0, limit);
+    }
 
     return details;
 }

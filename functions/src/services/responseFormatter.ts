@@ -292,7 +292,7 @@ function formatExactRupiah(amount: number): string {
 /**
  * Format date to Indonesian format (e.g., "27 Jan")
  */
-function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
     return `${date.getDate()} ${months[date.getMonth()]}`;
@@ -384,13 +384,34 @@ export function formatTransactionDetails(
     // Show date if range is more than 1 day
     const showDate = !['hari ini', 'kemarin'].includes(timeRange.toLowerCase());
 
-    const items = details.map((item, index) => {
-        const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
-        const dateStr = showDate ? ` - ${formatDate(item.date)}` : '';
-        return `\n${index + 1}. ${item.description}${dateStr}\n    💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
-    }).join('');
+    if (showDate) {
+        // Group by date
+        const grouped: { [key: string]: TransactionDetail[] } = {};
 
-    return header + items;
+        details.forEach(item => {
+            const dateKey = formatDate(item.date);
+            if (!grouped[dateKey]) grouped[dateKey] = [];
+            grouped[dateKey].push(item);
+        });
+
+        // Create sections from grouped data
+        const sections = Object.keys(grouped).map(date => {
+            const items = grouped[date].map((item) => {
+                const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
+                return `• ${item.description}\n  💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
+            }).join('\n');
+            return `\n📅 *${date}*\n${items}`;
+        }).join('\n');
+
+        return header + sections;
+    } else {
+        // Simple list for single day
+        const items = details.map((item, index) => {
+            const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
+            return `\n${index + 1}. *${item.description}*\n   💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
+        }).join('');
+        return header + items;
+    }
 }
 
 /**

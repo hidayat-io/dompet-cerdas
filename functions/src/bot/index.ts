@@ -17,6 +17,40 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 let bot: TelegramBot | null = null;
 
+const RATE_LIMIT_WINDOW_MS = 10_000;
+const RATE_LIMIT_MAX_REQUESTS = 5;
+const DUPLICATE_SUPPRESS_MS = 5_000;
+const userRateLimit = new Map<number, { windowStart: number; count: number; lastText?: string; lastTextAt?: number }>();
+
+function shouldThrottleUser(telegramId: number, text?: string): { blocked: boolean; reason?: string } {
+    const now = Date.now();
+    const state = userRateLimit.get(telegramId) || { windowStart: now, count: 0 };
+
+    if (now - state.windowStart > RATE_LIMIT_WINDOW_MS) {
+        state.windowStart = now;
+        state.count = 0;
+    }
+
+    if (text && state.lastText && state.lastTextAt && now - state.lastTextAt < DUPLICATE_SUPPRESS_MS) {
+        if (state.lastText === text) {
+            state.lastTextAt = now;
+            userRateLimit.set(telegramId, state);
+            return { blocked: true, reason: 'duplicate' };
+        }
+    }
+
+    state.count += 1;
+    state.lastText = text;
+    state.lastTextAt = now;
+    userRateLimit.set(telegramId, state);
+
+    if (state.count > RATE_LIMIT_MAX_REQUESTS) {
+        return { blocked: true, reason: 'rate_limit' };
+    }
+
+    return { blocked: false };
+}
+
 /**
  * Initialize Telegram Bot (lazy)
  */
@@ -73,6 +107,17 @@ async function handleMessage(msg: TelegramBot.Message): Promise<void> {
     const chatId = msg.chat.id;
     const telegramId = msg.from.id;
     const text = msg.text || '';
+
+    const throttle = shouldThrottleUser(telegramId, text);
+    if (throttle.blocked) {
+        if (throttle.reason === 'rate_limit') {
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Terlalu banyak permintaan dalam waktu singkat. Coba lagi sebentar ya.'
+            );
+        }
+        return;
+    }
 
     // Update last interaction
     await updateLastInteraction(telegramId);
@@ -401,12 +446,26 @@ async function handleTextMessage(
                 const timeRange = parsedIntent.parameters.time_range;
                 const categoryFilter = parsedIntent.parameters.category_filter;
                 const daysAgo = parsedIntent.parameters.days_ago;
+                const limit = parsedIntent.parameters.limit;
+                const specificDate = parsedIntent.parameters.specific_date;
+                const sortBy = parsedIntent.parameters.sort_by;
+
+                console.log('[query_details] Parameters:', { timeRange, categoryFilter, daysAgo, limit, specificDate, sortBy });
+
                 // Default to 'this_month' for better UX when no time range specified
                 const effectiveTimeRange = timeRange || 'this_month';
-                const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo);
+                const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo, limit, specificDate, sortBy);
 
                 let timeRangeText: string;
-                if (daysAgo !== undefined) {
+                if (limit && sortBy === 'amount') {
+                    // "3 transaksi tertinggi bulan ini"
+                    timeRangeText = `${limit} transaksi tertinggi`;
+                } else if (limit) {
+                    // "5 transaksi terakhir"
+                    timeRangeText = `${limit} transaksi terakhir`;
+                } else if (specificDate) {
+                    timeRangeText = `tanggal ${responseFormatter.formatDate(specificDate)}`;
+                } else if (daysAgo !== undefined) {
                     timeRangeText = daysAgo === 0 ? 'hari ini' : `${daysAgo} hari lalu`;
                 } else {
                     timeRangeText = formatTimeRange(effectiveTimeRange);
@@ -446,14 +505,39 @@ async function handleTextMessage(
 
                 const categories = await getUserCategories(userId);
                 let categoryChoice: { categoryId: string; categoryName: string; confidence: 'high' | 'medium' | 'low' };
-                const directMatch = category_hint
-                    ? categories.find((category) => category.name.toLowerCase() === category_hint.toLowerCase())
+                const normalizedHint = category_hint?.toLowerCase().trim();
+                const directMatch = normalizedHint
+                    ? categories.find((category) => category.name.toLowerCase() === normalizedHint)
+                    : undefined;
+
+                const hintAliasMap: Record<string, string[]> = {
+                    food: ['makan', 'makanan', 'kuliner', 'food', 'minum', 'snack', 'camil', 'camilan', 'warteg', 'warung', 'resto', 'restaurant', 'cafe', 'kopi'],
+                    transportation: ['transport', 'transportasi', 'travel', 'perjalanan', 'bensin', 'bbm', 'parkir', 'taksi', 'ojek', 'gojek', 'grab', 'pertamina'],
+                    shopping: ['belanja', 'shopping', 'market', 'minimarket', 'indomaret', 'alfamart', 'supermarket', 'mall']
+                };
+
+                const fuzzyMatch = normalizedHint
+                    ? categories.find((category) => {
+                        const name = category.name.toLowerCase();
+                        if (normalizedHint && (name.includes(normalizedHint) || normalizedHint.includes(name))) {
+                            return true;
+                        }
+
+                        const aliases = hintAliasMap[normalizedHint] || [];
+                        return aliases.some((alias) => name.includes(alias));
+                    })
                     : undefined;
 
                 if (directMatch) {
                     categoryChoice = {
                         categoryId: directMatch.id,
                         categoryName: directMatch.name,
+                        confidence: 'high'
+                    };
+                } else if (fuzzyMatch) {
+                    categoryChoice = {
+                        categoryId: fuzzyMatch.id,
+                        categoryName: fuzzyMatch.name,
                         confidence: 'high'
                     };
                 } else {
@@ -498,6 +582,8 @@ async function handleTextMessage(
 
     } catch (error) {
         console.error('Error handling text message:', error);
+        console.error('Error details - message:', text);
+        console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
         await getBot().sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
         // Try to delete processing message even on error
         try {
