@@ -142,7 +142,7 @@ function detectSimpleIntent(message) {
             intent: 'query_details',
             confidence: 'high',
             parameters: {
-                time_range: specific_date ? undefined : (time_range || 'this_week'),
+                time_range: specific_date ? undefined : (limit ? time_range : (time_range || 'this_week')),
                 category_filter,
                 limit,
                 specific_date,
@@ -298,6 +298,11 @@ const testCases = [
         name: "5 transaksi terakhir",
         input: "5 transaksi terakhir",
         expected: { intent: "query_details", limit: 5, sort_by: "date" }
+    },
+    {
+        name: "20 transaksi terakhir",
+        input: "20 transaksi terakhir",
+        expected: { intent: "query_details", limit: 20, sort_by: "date" }
     },
     {
         name: "Last 10 trans",

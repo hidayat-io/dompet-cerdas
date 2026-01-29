@@ -79,6 +79,12 @@ function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
             end.setDate(0); // Last day of previous month
             end.setHours(23, 59, 59, 999);
             break;
+
+        case 'all_time':
+            start.setTime(0);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            break;
     }
 
     return { start, end };
@@ -663,6 +669,8 @@ export function formatTimeRange(timeRange: TimeRange): string {
             return 'bulan ini';
         case 'last_month':
             return 'bulan lalu';
+        case 'all_time':
+            return 'semua waktu';
         default:
             return timeRange;
     }

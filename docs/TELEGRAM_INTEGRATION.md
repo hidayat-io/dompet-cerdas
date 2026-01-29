@@ -6,6 +6,15 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 
 ## Changelog
 
+### v2.2 (January 2026) - AI Financial Advisor
+- 🤖 **AI Financial Advisor**: Intelligent financial health analysis with personalized insights
+- 💡 **Savings Strategy**: AI-powered recommendations for reducing expenses
+- 🔍 **Expense Analysis**: Identify spending areas that can be reduced without suffering
+- ⚡ **Token Optimized**: Smart data aggregation (50 transactions max) for cost efficiency
+- 🔒 **Scope Limited**: AI strictly limited to user's transaction data only
+- 🛡️ **Rate Limited**: 30s cooldown, 10 analyses/hour, 50/day per user
+- 📊 **Smart Sampling**: Mix of largest amounts + recent + diverse categories
+
 ### v2.1 (January 2026)
 - ✨ **Category Filtering**: Query specific categories (e.g., "detailkan kategori Bill bulan ini")
 - ⏳ **Immediate Feedback**: "Mohon tunggu..." message while processing requests
@@ -77,7 +86,10 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 
 #### NLU Service (`services/nluService.ts`)
 - Parses natural language queries using Gemini 2.0 Flash
-- Detects intents: `query_expenses`, `query_details`, `category_breakdown`, `add_transaction`
+- Detects intents: 
+  - **Query intents**: `query_expenses`, `query_details`, `category_breakdown`, `add_transaction`
+  - **AI Advisor intents**: `financial_advice`, `savings_strategy`, `expense_analysis`
+- Fast keyword detection for advice queries (gimana, analisa, tips, hemat, kurangi)
 - Extracts parameters: 
   - `time_range`: today, yesterday, this_week, last_week, this_month, last_month
   - `days_ago`: N (for queries like "2 hari lalu")
@@ -92,11 +104,37 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
   - Specific days ago (N days back)
   - Category filtering for detail queries
 
+#### Advisor Service (`services/advisorService.ts`) 🆕
+- **AI-powered financial analysis** using Gemini 2.0 Flash
+- **Token-efficient**: Smart data aggregation (max 50-100 transactions)
+- **Three analysis types**:
+  1. `analyzeFinancialHealth()`: Overall financial insights & recommendations
+  2. `generateSavingsStrategy()`: Forward-looking savings plan
+  3. `analyzeExpenseReduction()`: Identify reducible expenses
+- **Rate limiting**: 30s cooldown, 10/hour, 50/day per user
+- **Smart sampling**: Top by amount + recent + diverse categories
+- **Scope limiting**: System instructions prevent off-topic responses
+- **Usage analytics**: Logs to `advisor_analytics` collection
+
+#### Gemini Service (`services/geminiService.ts`)
+- Receipt image analysis using Gemini Vision API
+- Extracts: merchant, amount, date, items, category
+- Returns `is_receipt` flag for validation
+- **Financial insights generation** 🆕:
+  - Strict system instructions for scope limiting
+  - Temperature 0.7 for balanced creativity
+  - Max 1000 output tokens
+  - Hallucination detection for off-topic responses
+
 #### Response Formatter (`services/responseFormatter.ts`)
 - Formats responses with emojis and Markdown
 - Indonesian Rupiah formatting (Rp 1.000.000)
 - Category emoji mapping (🍔 Food, 📄 Bills, 🚗 Transportation, etc.)
 - Clean transaction detail format with category icons
+- **AI response formatters** 🆕:
+  - `formatFinancialAdvice()`: Wraps advice with header & follow-up hints
+  - `formatSavingsStrategy()`: Formats savings recommendations
+  - `formatExpenseAnalysis()`: Formats expense reduction analysis
 
 ## Data Flow
 
@@ -127,14 +165,49 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 ```
 1. User sends text message
 2. Bot sends "⏳ Mohon tunggu..." immediately
-3. NLU Service parses intent and parameters using Gemini AI
+3. NLU Service parses intent and parameters:
+   - Fast keyword check for advice queries
+   - Gemini AI for complex intent classification
 4. Route to handler based on intent:
    - query_expenses → Query Service → formatExpenseResponse
    - query_details → Query Service → formatTransactionDetails
    - category_breakdown → Query Service → formatCategoryBreakdown
    - add_transaction → Transaction Service → formatTransactionAdded
+   - financial_advice → Advisor Service → formatFinancialAdvice 🆕
+   - savings_strategy → Advisor Service → formatSavingsStrategy 🆕
+   - expense_analysis → Advisor Service → formatExpenseAnalysis 🆕
 5. Send formatted response
 6. Auto-delete "Mohon tunggu..." message
+```
+
+### AI Advisor Flow 🆕
+
+```
+1. User sends advice query (e.g., "gimana keuanganku?")
+2. NLU detects advice intent via keyword matching
+3. Advisor Service checks rate limit:
+   - 30 seconds cooldown
+   - Max 10 analyses per hour
+   - Max 50 analyses per day
+4. Gather data in parallel:
+   - Current month expenses & breakdown
+   - Last month for comparison
+   - Top 100 transactions (will be sampled)
+   - 3-month historical aggregates
+5. Smart sampling (50 transactions max):
+   - Top 30 by amount (outliers)
+   - Top 20 most recent (trends)
+   - 1 per category (diversity)
+6. Compose compact prompt (~2-3K tokens):
+   - Current period detail
+   - Historical context (aggregated)
+   - Spending patterns detected
+7. Call Gemini with strict system instructions:
+   - Scope limited to user's data
+   - Temperature 0.7, max 1000 tokens output
+   - Hallucination detection
+8. Format & send response with follow-up hints
+9. Log usage to advisor_analytics
 ```
 
 ### Query Examples
@@ -157,6 +230,14 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 **Category Breakdown:**
 - "kategori paling boros bulan ini" → Categories sorted by spending
 - "bulan ini pengeluaran per kategori" → Category breakdown
+
+**AI Advisor Queries:** 🆕
+- "gimana keuanganku bulan ini?" → Financial health analysis
+- "analisa pengeluaran aku" → General financial insights
+- "tips hemat bulan depan" → Savings strategy recommendations
+- "saran biar lebih hemat" → Forward-looking savings plan
+- "kategori mana yang bisa dikurangi?" → Expense reduction analysis
+- "pengeluaran apa yang bisa dipotong tanpa suffering?" → Identify reducible expenses
 
 ### Account Linking Flow
 
@@ -218,6 +299,30 @@ GEMINI_API_KEY=your_gemini_api_key
 }
 ```
 
+### Advisor Rate Limit Document 🆕
+```javascript
+// Collection: advisor_limits/{userId}
+{
+  hourlyCount: number,      // Analyses in current hour
+  dailyCount: number,       // Analyses today
+  lastRequest: number,      // Timestamp of last request (ms)
+  hourStart: number,        // Hour window start timestamp (ms)
+  dayStart: number          // Day window start timestamp (ms)
+}
+```
+
+### Advisor Analytics Document 🆕
+```javascript
+// Collection: advisor_analytics/{autoId}
+{
+  userId: string,
+  intentType: string,       // 'financial_advice', 'savings_strategy', 'expense_analysis'
+  transactionCount: number, // Number of transactions analyzed
+  timestamp: string,        // ISO timestamp
+  createdAt: Timestamp
+}
+```
+
 ## Validation Rules
 
 | Validation | Error Message |
@@ -227,6 +332,9 @@ GEMINI_API_KEY=your_gemini_api_key
 | PDF/Document | "Format file tidak didukung. JPG/PNG saja" |
 | File > 5MB | "Ukuran foto terlalu besar" |
 | Not a receipt | "Foto ini bukan struk belanja" |
+| Rate limit (30s) | "Mohon tunggu X detik lagi" 🆕 |
+| Rate limit (hourly) | "Limit analisis per jam tercapai (10)" 🆕 |
+| Rate limit (daily) | "Limit analisis harian tercapai (50)" 🆕 |
 | No amount found | "Nominal total tidak ditemukan" |
 
 ## Deployment

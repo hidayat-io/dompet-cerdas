@@ -372,7 +372,8 @@ ${lines.join('\n')}
  */
 export function formatTransactionDetails(
     details: TransactionDetail[],
-    timeRange: string
+    timeRange: string,
+    notice?: string
 ): string {
     if (details.length === 0) {
         return `📋 Belum ada pengeluaran ${timeRange}.`;
@@ -380,6 +381,7 @@ export function formatTransactionDetails(
 
     const total = details.reduce((sum, item) => sum + item.amount, 0);
     const header = `📋 *Detail pengeluaran ${timeRange}*\n\n💰 Total: ${formatExactRupiah(total)} (${details.length} transaksi)\n`;
+    const noticeText = notice ? `\n${notice}\n` : '';
 
     // Show date if range is more than 1 day
     const showDate = !['hari ini', 'kemarin'].includes(timeRange.toLowerCase());
@@ -403,14 +405,14 @@ export function formatTransactionDetails(
             return `\n📅 *${date}*\n${items}`;
         }).join('\n');
 
-        return header + sections;
+        return header + noticeText + sections;
     } else {
         // Simple list for single day
         const items = details.map((item, index) => {
             const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
             return `\n${index + 1}. *${item.description}*\n   💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
         }).join('');
-        return header + items;
+        return header + noticeText + items;
     }
 }
 
@@ -455,4 +457,25 @@ Atau ketik /help untuk panduan lengkap.`;
  */
 export function formatClarification(clarification: string): string {
     return `❓ ${clarification}`;
+}
+
+/**
+ * Format financial advice response
+ */
+export function formatFinancialAdvice(advice: string): string {
+    return `🤖 *AI Financial Advisor - DompetCerdas*\n\n${advice}\n\n---\n💬 *Mau tanya lebih lanjut?*\nContoh: "tips hemat kategori Food", "kategori mana yang bisa dikurangi?"`;
+}
+
+/**
+ * Format savings strategy response
+ */
+export function formatSavingsStrategy(strategy: string): string {
+    return `💰 *Strategi Hemat - DompetCerdas*\n\n${strategy}\n\n---\n💬 *Perlu analisa lebih detail?*\nKetik: "analisa pengeluaranku" atau "gimana keuanganku?"`;
+}
+
+/**
+ * Format expense analysis response
+ */
+export function formatExpenseAnalysis(analysis: string): string {
+    return `🔍 *Analisa Pengeluaran - DompetCerdas*\n\n${analysis}\n\n---\n💬 *Butuh strategi hemat?*\nKetik: "tips hemat bulan depan" atau "saran biar hemat"`;
 }

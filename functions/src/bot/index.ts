@@ -10,6 +10,7 @@ import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
 import { createTransactionFromReceipt, createManualTransaction, getUserCategories } from '../services/transactionService';
 import { parseIntent, isActionable, classifyCategory } from '../services/nluService';
 import { getTotalExpenses, getTotalIncome, getBalance, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
+import { analyzeFinancialHealth, generateSavingsStrategy, analyzeExpenseReduction } from '../services/advisorService';
 import * as responseFormatter from '../services/responseFormatter';
 import { getDb } from '../index';
 
@@ -446,14 +447,25 @@ async function handleTextMessage(
                 const timeRange = parsedIntent.parameters.time_range;
                 const categoryFilter = parsedIntent.parameters.category_filter;
                 const daysAgo = parsedIntent.parameters.days_ago;
-                const limit = parsedIntent.parameters.limit;
+                const requestedLimit = parsedIntent.parameters.limit;
                 const specificDate = parsedIntent.parameters.specific_date;
                 const sortBy = parsedIntent.parameters.sort_by;
+
+                let limit = requestedLimit;
+                let limitNotice: string | undefined;
+
+                if (requestedLimit && requestedLimit > 30) {
+                    limit = 30;
+                    limitNotice = '⚠️ Maksimal 30 transaksi. Menampilkan 30 transaksi terakhir.';
+                }
 
                 console.log('[query_details] Parameters:', { timeRange, categoryFilter, daysAgo, limit, specificDate, sortBy });
 
                 // Default to 'this_month' for better UX when no time range specified
-                const effectiveTimeRange = timeRange || 'this_month';
+                // For limit-based queries without explicit time range, use all_time
+                const effectiveTimeRange = (limit && !timeRange && !specificDate && daysAgo === undefined)
+                    ? 'all_time'
+                    : (timeRange || 'this_month');
                 const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo, limit, specificDate, sortBy);
 
                 let timeRangeText: string;
@@ -472,7 +484,7 @@ async function handleTextMessage(
                 }
 
                 const categoryText = categoryFilter ? ` kategori ${categoryFilter}` : '';
-                const response = responseFormatter.formatTransactionDetails(details, timeRangeText + categoryText);
+                const response = responseFormatter.formatTransactionDetails(details, timeRangeText + categoryText, limitNotice);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
@@ -570,6 +582,52 @@ async function handleTextMessage(
 
                 const response = responseFormatter.formatTransactionAdded(amount, categoryChoice.categoryName, description);
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                break;
+            }
+
+            case 'financial_advice': {
+                try {
+                    const timeRange = parsedIntent.parameters.time_range || 'this_month';
+                    const advice = await analyzeFinancialHealth(userId, timeRange);
+                    
+                    // Format with metadata
+                    const formattedAdvice = responseFormatter.formatFinancialAdvice(advice);
+                    await getBot().sendMessage(chatId, formattedAdvice, { parse_mode: 'Markdown' });
+                } catch (error) {
+                    console.error('Error in financial advice:', error);
+                    const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat menganalisis data keuangan.';
+                    await getBot().sendMessage(chatId, `❌ ${errorMsg}`);
+                }
+                break;
+            }
+
+            case 'savings_strategy': {
+                try {
+                    const timeRange = parsedIntent.parameters.time_range || 'this_month';
+                    const strategy = await generateSavingsStrategy(userId, timeRange);
+                    
+                    const formattedStrategy = responseFormatter.formatSavingsStrategy(strategy);
+                    await getBot().sendMessage(chatId, formattedStrategy, { parse_mode: 'Markdown' });
+                } catch (error) {
+                    console.error('Error in savings strategy:', error);
+                    const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat membuat strategi hemat.';
+                    await getBot().sendMessage(chatId, `❌ ${errorMsg}`);
+                }
+                break;
+            }
+
+            case 'expense_analysis': {
+                try {
+                    const timeRange = parsedIntent.parameters.time_range || 'this_month';
+                    const analysis = await analyzeExpenseReduction(userId, timeRange);
+                    
+                    const formattedAnalysis = responseFormatter.formatExpenseAnalysis(analysis);
+                    await getBot().sendMessage(chatId, formattedAnalysis, { parse_mode: 'Markdown' });
+                } catch (error) {
+                    console.error('Error in expense analysis:', error);
+                    const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat menganalisis pengeluaran.';
+                    await getBot().sendMessage(chatId, `❌ ${errorMsg}`);
+                }
                 break;
             }
 

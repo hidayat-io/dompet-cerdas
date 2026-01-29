@@ -18,12 +18,15 @@ export type IntentType =
     | 'add_transaction'
     | 'category_breakdown'
     | 'query_details'
+    | 'financial_advice'      // AI-powered financial health analysis
+    | 'savings_strategy'      // AI-powered savings recommendations
+    | 'expense_analysis'      // AI-powered expense reduction suggestions
     | 'unknown';
 
 /**
  * Time range options
  */
-export type TimeRange = 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_month';
+export type TimeRange = 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'all_time';
 
 /**
  * Parsed intent structure
@@ -67,9 +70,41 @@ const QUERY_KEYWORDS = [
     'boros'
 ];
 
+const ADVICE_KEYWORDS = [
+    'gimana',
+    'bagaimana',
+    'analisa',
+    'analisis',
+    'analyze',
+    'saran',
+    'tips',
+    'strategi',
+    'strategy',
+    'rekomendasi',
+    'recommend',
+    'hemat',
+    'menghemat',
+    'saving',
+    'bisa dikurangi',
+    'kurangi',
+    'potong',
+    'cut',
+    'sebaiknya',
+    'insight',
+    'advice',
+    'advisor',
+    'suffering',
+    'tanpa suffering'
+];
+
 function containsQueryKeywords(message: string): boolean {
     const lower = message.toLowerCase();
     return QUERY_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
+function containsAdviceKeywords(message: string): boolean {
+    const lower = message.toLowerCase();
+    return ADVICE_KEYWORDS.some((keyword) => lower.includes(keyword));
 }
 
 function detectSimpleIntent(message: string): ParsedIntent | null {
@@ -223,11 +258,11 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         return {
             intent: 'query_details',
             confidence: 'high',
-            parameters: { 
-                time_range: specific_date ? undefined : (time_range || 'this_week'), 
-                category_filter, 
-                limit, 
-                sort_by, 
+            parameters: {
+                time_range: specific_date ? undefined : (limit ? time_range : (time_range || 'this_week')),
+                category_filter,
+                limit,
+                sort_by,
                 specific_date
             }
         };
@@ -458,7 +493,36 @@ function extractManualTransaction(message: string): { amount: number; descriptio
  */
 export async function parseIntent(message: string): Promise<ParsedIntent> {
     try {
-        // Try simple rule-based intent detection first
+        // Fast path: Check for advice keywords first
+        if (containsAdviceKeywords(message)) {
+            const lower = message.toLowerCase();
+            
+            // Sub-categorize advice type based on keywords
+            if (/tips|strategi|saran.*hemat|cara.*hemat|biar.*hemat|agar.*hemat/.test(lower)) {
+                return {
+                    intent: 'savings_strategy',
+                    confidence: 'high',
+                    parameters: { time_range: 'this_month' }
+                };
+            }
+            
+            if (/kurangi|potong|cut|bisa.*turun|bisa.*hemat|tanpa suffering|suffering/.test(lower)) {
+                return {
+                    intent: 'expense_analysis',
+                    confidence: 'high',
+                    parameters: { time_range: 'this_month' }
+                };
+            }
+            
+            // General financial advice
+            return {
+                intent: 'financial_advice',
+                confidence: 'high',
+                parameters: { time_range: 'this_month' }
+            };
+        }
+        
+        // Try simple rule-based intent detection for standard queries
         const simpleIntent = detectSimpleIntent(message);
         if (simpleIntent) {
             return simpleIntent;
@@ -486,7 +550,7 @@ User message: "${message}"
 
 Return ONLY valid JSON (no markdown, no code blocks):
 {
-  "intent": "query_expenses | query_income | query_balance | add_transaction | category_breakdown | query_details | unknown",
+  "intent": "query_expenses | query_income | query_balance | add_transaction | category_breakdown | query_details | financial_advice | savings_strategy | expense_analysis | unknown",
   "confidence": "high | medium | low",
   "parameters": {
     "time_range": "today | yesterday | this_week | last_week | this_month | last_month",
@@ -570,6 +634,12 @@ Contoh:
 "Gaji Feb: 35 juta" → intent: add_transaction, amount: 35000000, description: "Gaji Feb", confidence: high
 "last 5 trans" → intent: query_details, limit: 5, confidence: high
 "5 transaksi terakhir" → intent: query_details, limit: 5, confidence: high
+"gimana keuanganku bulan ini?" → intent: financial_advice, time_range: this_month, confidence: high
+"analisa pengeluaran aku" → intent: financial_advice, time_range: this_month, confidence: high
+"tips hemat bulan depan?" → intent: savings_strategy, time_range: this_month, confidence: high
+"saran biar lebih hemat?" → intent: savings_strategy, time_range: this_month, confidence: high
+"kategori mana yang bisa dikurangi?" → intent: expense_analysis, time_range: this_month, confidence: high
+"pengeluaran apa yang bisa aku potong tanpa suffering?" → intent: expense_analysis, time_range: this_month, confidence: high
 `.trim();
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });

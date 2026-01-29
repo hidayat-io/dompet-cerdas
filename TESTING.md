@@ -42,6 +42,8 @@ Test langsung di Telegram dengan 7 query "kramat" ini. Jika salah satu salah, ma
 | 4 | `pengeluaran hari ini` | Total pengeluaran HARI INI (test tanpa kata tanya) |
 | 4a | `pengeluaran 7 hari terakhir` | Total pengeluaran 7 HARI TERAKHIR (dynamic range) |
 | 4b | `berapa pengeluaran total 7 hari terakhir` | Total pengeluaran 7 HARI TERAKHIR (with keywords) |
+| 4c | `20 transaksi terakhir` | Menampilkan 20 transaksi terakhir (all-time, bukan minggu/bulan ini) |
+| 4d | `40 transaksi terakhir` | Menampilkan 30 transaksi terakhir + pesan batas maksimum (cap 30) |
 | 5 | `5 transaksi terakhir` | 5 transaksi **TERMUDA** (Most recent by Date) |
 | 6 | `3 transaksi tertinggi bulan ini` | ⚠️ **CRITICAL CHECK**: 3 transaksi dengan **NOMINAL TERBESAR** (Highest Amount). <br> *Bukan yang terbaru!* |
 | 7 | `transaksi 27 jan` | Hanya transaksi tanggal 27 Jan (Specific Date) |

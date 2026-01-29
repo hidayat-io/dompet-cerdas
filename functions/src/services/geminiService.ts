@@ -129,3 +129,107 @@ function formatDate(dateStr: string): string {
     };
     return date.toLocaleDateString('id-ID', options);
 }
+
+/**
+ * Generate financial insights using Gemini AI
+ * Optimized for financial advisor with strict scope limiting
+ */
+export async function generateFinancialInsights(dataPrompt: string): Promise<string> {
+    try {
+        const model = genAI.getGenerativeModel({ 
+            model: 'gemini-2.0-flash-exp',
+            systemInstruction: {
+                role: 'system',
+                parts: [{
+                    text: `Kamu adalah AI Financial Advisor untuk DompetCerdas, aplikasi manajemen keuangan personal.
+
+ATURAN KETAT (WAJIB DIIKUTI):
+1. Kamu HANYA boleh menganalisis data transaksi yang diberikan user
+2. JANGAN jawab pertanyaan tentang:
+   - Investasi saham/crypto/reksadana/trading
+   - Berita ekonomi/politik/sosial
+   - Topik di luar manajemen keuangan personal user
+   - Hal-hal tidak berhubungan dengan data transaksi yang diberikan
+   - Pertanyaan umum tentang finansial yang tidak spesifik ke data user
+
+3. Jika user tanya off-topic atau data tidak cukup, jawab:
+   "Maaf, saya hanya bisa menganalisis data transaksi keuangan yang tersedia. Ketik /help untuk panduan."
+
+4. Format output:
+   - Bahasa Indonesia casual tapi profesional
+   - Gunakan emoji untuk readability (📊 💡 💰 🎯 ✅ ⚠️)
+   - Max 500 kata per response
+   - Fokus pada actionable insights, bukan general advice
+   - Berikan estimasi penghematan konkret dalam Rupiah
+   - Sebutkan kategori & nominal spesifik dari DATA
+
+5. Struktur jawaban standar:
+   📊 Summary (ringkas 1-2 kalimat)
+   💡 Key Insights (2-4 poin berdasarkan data)
+   💰 Rekomendasi (3-5 action items konkret)
+   🎯 Quick Wins (1-2 tips termudah)
+
+6. JANGAN:
+   - Membuat asumsi di luar data yang diberikan
+   - Memberikan saran investasi
+   - Membahas topik politik/agama/sosial
+   - Menggunakan bahasa formal kaku
+   - Memberikan saran umum seperti "sebaiknya menabung" tanpa data spesifik
+
+7. DO:
+   - Analisa pola spending dari data
+   - Identifikasi outlier & anomali
+   - Berikan rekomendasi spesifik dengan estimasi saving
+   - Referensi kategori & transaksi konkret
+   - Gunakan bahasa yang encouraging tapi honest`
+                }]
+            },
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 1000,
+                topP: 0.9,
+                topK: 40
+            }
+        });
+        
+        const result = await model.generateContent(dataPrompt);
+        const response = result.response.text();
+        
+        // Validate response is not off-topic
+        if (isOffTopicResponse(response)) {
+            return "Maaf, terjadi kesalahan dalam analisis. Pastikan pertanyaan kamu terkait data transaksi keuangan. Ketik /help untuk panduan.";
+        }
+        
+        return response;
+        
+    } catch (error) {
+        console.error('Error generating financial insights:', error);
+        throw new Error('Gagal menghasilkan insight keuangan. Coba lagi atau hubungi support.');
+    }
+}
+
+/**
+ * Check if response is off-topic (hallucination detection)
+ */
+function isOffTopicResponse(response: string): boolean {
+    const offTopicKeywords = [
+        'investasi saham',
+        'beli saham',
+        'cryptocurrency',
+        'bitcoin',
+        'crypto',
+        'trading forex',
+        'politik',
+        'pemerintah',
+        'pemilu',
+        'pilpres',
+        'i don\'t have access',
+        'i cannot access',
+        'i am unable to',
+        'as an ai',
+        'i\'m sorry, but'
+    ];
+    
+    const lower = response.toLowerCase();
+    return offTopicKeywords.some(kw => lower.includes(kw));
+}
