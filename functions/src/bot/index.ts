@@ -631,6 +631,18 @@ async function handleTextMessage(
                 break;
             }
 
+            case 'list_categories': {
+                try {
+                    const categories = await getUserCategories(userId);
+                    const response = responseFormatter.formatCategoryList(categories);
+                    await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                } catch (error) {
+                    console.error('Error listing categories:', error);
+                    await getBot().sendMessage(chatId, '❌ Gagal mengambil daftar kategori.');
+                }
+                break;
+            }
+
             default:
                 await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
         }

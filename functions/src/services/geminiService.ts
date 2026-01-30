@@ -68,7 +68,7 @@ Examples:
 - Cat photo → is_receipt: false
 `.trim();
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const result = await model.generateContent([
             prompt,
@@ -133,11 +133,12 @@ function formatDate(dateStr: string): string {
 /**
  * Generate financial insights using Gemini AI
  * Optimized for financial advisor with strict scope limiting
+ * Updated: Using stable gemini-2.0-flash model (Jan 2026)
  */
 export async function generateFinancialInsights(dataPrompt: string): Promise<string> {
     try {
         const model = genAI.getGenerativeModel({ 
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.0-flash',
             systemInstruction: {
                 role: 'system',
                 parts: [{

@@ -468,7 +468,7 @@ Contoh:
 - User: "xyz123", Available: ["Food", "Transport"] → {"matchedCategory": null, "confidence": "low"}
 `.trim();
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const result = await model.generateContent(prompt);
         const response = result.response;
         const text = response.text();

@@ -18,6 +18,7 @@ export type IntentType =
     | 'add_transaction'
     | 'category_breakdown'
     | 'query_details'
+    | 'list_categories'       // Show available categories (master data)
     | 'financial_advice'      // AI-powered financial health analysis
     | 'savings_strategy'      // AI-powered savings recommendations
     | 'expense_analysis'      // AI-powered expense reduction suggestions
@@ -178,6 +179,41 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
                 parameters: { time_range }
             };
         }
+    }
+
+    // List categories (master data) - CHECK FIRST
+    // Handles: "kategori apa aja", "ada kategori apa", "apa aja kategorinya", "list kategori", "daftar kategori"
+    // This shows the AVAILABLE categories, not breakdown of spending
+    if (/kategori\s+apa\s*(aja|saja)?/i.test(lower) ||
+        /apa\s+(aja|saja)\s+kategori/i.test(lower) ||
+        /ada\s+kategori\s+apa/i.test(lower) ||
+        /list\s+kategori|daftar\s+kategori/i.test(lower) ||
+        /kategori\s+yang\s+ada/i.test(lower) ||
+        /kategori\s+tersedia/i.test(lower)) {
+        return {
+            intent: 'list_categories',
+            confidence: 'high',
+            parameters: {}
+        };
+    }
+
+    // Category breakdown queries - spending per category
+    // Handles: "breakdown", "boros", "paling banyak", "pengeluaran per kategori"
+    if (/breakdown|boros|paling\s+banyak/i.test(lower) ||
+        /pengeluaran\s+(per|tiap)\s+kategori/i.test(lower) ||
+        /spending\s+(per|by)\s+category/i.test(lower)) {
+        let time_range: TimeRange | undefined;
+        if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
+        else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
+        else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
+        else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+        else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
+
+        return {
+            intent: 'category_breakdown',
+            confidence: 'high',
+            parameters: { time_range: time_range || 'this_month' }
+        };
     }
 
     // Transaction details / list queries (check BEFORE expense/income queries for "detail pengeluaran")
@@ -370,22 +406,6 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
                 parameters: { time_range: time_range || 'this_month' }
             };
         }
-    }
-
-    // Category breakdown queries (only if no detail/list keywords)
-    if (/breakdown|boros|paling\s+banyak/i.test(lower)) {
-        let time_range: TimeRange | undefined;
-        if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
-        else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
-        else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-        else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
-        else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
-
-        return {
-            intent: 'category_breakdown',
-            confidence: 'high',
-            parameters: { time_range: time_range || 'this_month' }
-        };
     }
 
     return null;
@@ -642,7 +662,7 @@ Contoh:
 "pengeluaran apa yang bisa aku potong tanpa suffering?" → intent: expense_analysis, time_range: this_month, confidence: high
 `.trim();
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const result = await model.generateContent(prompt);
         const response = result.response;
         const text = response.text();
@@ -750,7 +770,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
 }
 `.trim();
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const result = await model.generateContent(prompt);
     const response = result.response;
     const text = response.text();

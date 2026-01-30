@@ -6,6 +6,12 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 
 ## Changelog
 
+### v2.2.1 (January 30, 2026) - Bug Fixes & Improvements
+- 🔧 **Gemini Model Fix**: Migrated from deprecated `gemini-2.0-flash-exp` to stable `gemini-2.0-flash`
+- 📋 **List Categories**: New `list_categories` intent to show available categories (master data)
+- 🧠 **Smarter NLU**: "kategori apa aja" now correctly shows category list, not breakdown
+- ⚡ **Better Intent Detection**: Category queries properly distinguished from breakdown queries
+
 ### v2.2 (January 2026) - AI Financial Advisor
 - 🤖 **AI Financial Advisor**: Intelligent financial health analysis with personalized insights
 - 💡 **Savings Strategy**: AI-powered recommendations for reducing expenses
@@ -87,7 +93,7 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 #### NLU Service (`services/nluService.ts`)
 - Parses natural language queries using Gemini 2.0 Flash
 - Detects intents: 
-  - **Query intents**: `query_expenses`, `query_details`, `category_breakdown`, `add_transaction`
+  - **Query intents**: `query_expenses`, `query_details`, `category_breakdown`, `list_categories`, `add_transaction`
   - **AI Advisor intents**: `financial_advice`, `savings_strategy`, `expense_analysis`
 - Fast keyword detection for advice queries (gimana, analisa, tips, hemat, kurangi)
 - Extracts parameters: 

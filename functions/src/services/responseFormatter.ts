@@ -460,6 +460,44 @@ export function formatClarification(clarification: string): string {
 }
 
 /**
+ * Format category list (master data)
+ */
+export function formatCategoryList(categories: Array<{ id: string; name: string; type?: string }>): string {
+    if (!categories || categories.length === 0) {
+        return `📋 Belum ada kategori yang dibuat.
+
+💡 Buat kategori baru di aplikasi web DompetCerdas.`;
+    }
+
+    const expenseCategories = categories.filter(c => c.type === 'EXPENSE' || !c.type);
+    const incomeCategories = categories.filter(c => c.type === 'INCOME');
+
+    let response = `📋 *Daftar Kategori Tersedia*\n\n`;
+
+    if (expenseCategories.length > 0) {
+        response += `💸 *Pengeluaran* (${expenseCategories.length} kategori)\n`;
+        expenseCategories.forEach((cat, index) => {
+            response += `   ${index + 1}. ${cat.name}\n`;
+        });
+        response += '\n';
+    }
+
+    if (incomeCategories.length > 0) {
+        response += `💰 *Pemasukan* (${incomeCategories.length} kategori)\n`;
+        incomeCategories.forEach((cat, index) => {
+            response += `   ${index + 1}. ${cat.name}\n`;
+        });
+        response += '\n';
+    }
+
+    response += `---\n💡 *Tips:*\n`;
+    response += `• Ketik "breakdown bulan ini" untuk lihat pengeluaran per kategori\n`;
+    response += `• Ketik "detail kategori Food" untuk lihat transaksi kategori tertentu`;
+
+    return response;
+}
+
+/**
  * Format financial advice response
  */
 export function formatFinancialAdvice(advice: string): string {
