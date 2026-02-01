@@ -11,7 +11,7 @@ interface CategoryFormModalProps {
     categories: Category[]; // List of existing categories for validation
     defaultType?: TransactionType; // Default type when adding new
     onClose: () => void;
-    onSave: (category: Omit<Category, 'id'>) => void;
+    onSave: (category: Omit<Category, 'id'>) => void | Promise<void>;
     onUpdate?: (id: string, category: Omit<Category, 'id'>) => void;
 }
 
@@ -35,6 +35,9 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     // Validation Warning State
     const [warning, setWarning] = useState<SimilarityResult | null>(null);
 
+    // Loading state for save operation
+    const [isSaving, setIsSaving] = useState(false);
+
     // Initialize form when editing
     useEffect(() => {
         if (editingCategory) {
@@ -57,11 +60,12 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         setNewCatIcon('Utensils');
         setNewCatColor(COLORS[0]);
         setWarning(null);
+        setIsSaving(false);
     };
 
-    const handleSubmit = (e: React.FormEvent, forceSave = false) => {
+    const handleSubmit = async (e: React.FormEvent, forceSave = false) => {
         e.preventDefault();
-        if (!newCatName.trim()) {
+        if (!newCatName.trim() || isSaving) {
             return;
         }
 
@@ -81,6 +85,9 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             }
         }
 
+        // Start loading state
+        setIsSaving(true);
+
         const categoryData = {
             name: newCatName,
             type: newCatType,
@@ -88,14 +95,20 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             color: newCatColor
         };
 
-        if (editingCategory && onUpdate) {
-            onUpdate(editingCategory.id, categoryData);
-        } else {
-            onSave(categoryData);
-        }
+        try {
+            if (editingCategory && onUpdate) {
+                onUpdate(editingCategory.id, categoryData);
+            } else {
+                // Await onSave in case it's async (e.g., from TransactionForm)
+                await Promise.resolve(onSave(categoryData));
+            }
 
-        resetForm();
-        onClose();
+            resetForm();
+            onClose();
+        } catch (error) {
+            console.error('Error saving category:', error);
+            setIsSaving(false);
+        }
     };
 
     const handleClose = () => {
@@ -226,7 +239,8 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                                     required
                                     value={newCatName}
                                     onChange={(e) => setNewCatName(e.target.value)}
-                                    className="w-full px-4 py-2 border rounded-lg outline-none"
+                                    disabled={isSaving}
+                                    className="w-full px-4 py-2 border rounded-lg outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     placeholder="Contoh: Investasi"
                                     autoFocus
                                     style={{
@@ -241,7 +255,8 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                                 <select
                                     value={newCatType}
                                     onChange={(e) => setNewCatType(e.target.value as TransactionType)}
-                                    className="w-full px-4 py-2 border rounded-lg outline-none"
+                                    disabled={isSaving}
+                                    className="w-full px-4 py-2 border rounded-lg outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={{
                                         backgroundColor: theme.colors.bgHover,
                                         borderColor: theme.colors.border,
@@ -339,20 +354,30 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         <button
                             type="submit"
                             form="category-form"
-                            className="px-6 py-3 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-2 shadow-md hover:shadow-lg"
+                            disabled={isSaving}
+                            className="px-6 py-3 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
-                                backgroundColor: theme.colors.accent,
+                                backgroundColor: isSaving ? theme.colors.bgMuted : theme.colors.accent,
                                 color: 'white'
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                if (!isSaving) e.currentTarget.style.transform = 'translateY(-2px)';
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.transform = 'translateY(0)';
                             }}
                         >
-                            <IconDisplay name={editingCategory ? "Check" : "Save"} size={18} />
-                            <span>{editingCategory ? 'Update' : 'Simpan'}</span>
+                            {isSaving ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-current border-t-transparent" />
+                                    <span>Menyimpan...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <IconDisplay name={editingCategory ? "Check" : "Save"} size={18} />
+                                    <span>{editingCategory ? 'Update' : 'Simpan'}</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -361,19 +386,29 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 <button
                     type="submit"
                     form="category-form"
-                    className="md:hidden fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 z-50"
+                    disabled={isSaving}
+                    className="md:hidden fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 z-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        boxShadow: '0 10px 30px rgba(102, 126, 234, 0.5)'
+                        background: isSaving
+                            ? theme.colors.bgMuted
+                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        boxShadow: isSaving
+                            ? '0 4px 12px rgba(0,0,0,0.15)'
+                            : '0 10px 30px rgba(102, 126, 234, 0.5)',
+                        transform: isSaving ? 'scale(0.95)' : 'scale(1)'
                     }}
                     onTouchStart={(e) => {
-                        e.currentTarget.style.transform = 'scale(0.9)';
+                        if (!isSaving) e.currentTarget.style.transform = 'scale(0.9)';
                     }}
                     onTouchEnd={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)';
+                        if (!isSaving) e.currentTarget.style.transform = 'scale(1)';
                     }}
                 >
-                    <IconDisplay name={editingCategory ? "Check" : "Save"} size={28} style={{ color: 'white' }} />
+                    {isSaving ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent" />
+                    ) : (
+                        <IconDisplay name={editingCategory ? "Check" : "Save"} size={28} style={{ color: 'white' }} />
+                    )}
                 </button>
             </div>
         </div>

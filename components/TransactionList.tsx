@@ -17,7 +17,7 @@ interface TransactionListProps {
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' } | null
   ) => Promise<void>;
-  onAddCategory?: (category: Omit<Category, 'id'>) => void;
+  onAddCategory?: (category: Omit<Category, 'id'>) => Promise<string | undefined>;
   onShowNotification?: (type: NotificationType, title: string, message: string, autoClose?: boolean) => void;
 }
 

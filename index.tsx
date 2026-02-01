@@ -1,3 +1,4 @@
+// Build version: 2026-02-01T14:20:00 - Cache bust
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

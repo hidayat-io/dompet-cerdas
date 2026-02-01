@@ -1,7 +1,7 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
 > **Last Updated**: February 1, 2026  
-> **Version**: 2.0.2  
+> **Version**: 2.1.1  
 > **Live URL**: https://dompas.indoomega.my.id (Firebase Hosting via Cloudflare Worker)
 
 ---
@@ -637,6 +637,32 @@ Integrasi dengan Telegram untuk input dan monitoring transaksi via chat dengan *
 ---
 
 ## 📝 Changelog
+
+### Version 2.1.1 (February 1, 2026)
+
+**🎨 UI/UX Improvements:**
+- ⏳ **Category Form Loading State** - Loading indicator saat menyimpan kategori baru
+  - Spinner animation pada tombol "Simpan" saat proses berlangsung
+  - Tombol dan form disabled saat saving untuk mencegah double-submit
+  - Text berubah menjadi "Menyimpan..." dengan spinner
+  - Berlaku untuk desktop button dan mobile FAB
+
+**🔧 Technical Improvements:**
+- 🔄 **Enhanced Cache Busting** - Build otomatis generate nama file JS unik
+  - Format: `index-[hash]-[timestamp].js`
+  - Setiap build menghasilkan nama file berbeda
+  - User tidak perlu clear cache manual untuk dapat versi terbaru
+- ☁️ **Cloudflare Worker Optimization**
+  - Host header fix untuk proper proxy ke Firebase
+  - No-cache header untuk HTML files
+  - Mencegah masalah blank page akibat cache lama
+
+**Files Changed:** 3 files (+50 lines, -20 lines)
+- `components/CategoryFormModal.tsx` - Added isSaving state, loading spinner, disabled states
+- `vite.config.ts` - Added timestamp to output filenames for cache busting
+- `index.tsx` - Build version comment
+
+---
 
 ### Version 1.6.1 (January 27, 2026)
 

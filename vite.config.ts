@@ -23,10 +23,10 @@ export default defineConfig(({ mode }) => {
       // Cache busting: Add content hash to filenames
       rollupOptions: {
         output: {
-          // Hash all JS files
-          entryFileNames: 'assets/[name]-[hash].js',
-          chunkFileNames: 'assets/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash].[ext]'
+          // Hash all JS files - add version suffix for cache busting
+          entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+          chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+          assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`
         }
       },
       // Generate source maps for debugging

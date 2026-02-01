@@ -7,7 +7,7 @@ import CategoryFormModal from './CategoryFormModal';
 
 interface CategoryManagerProps {
   categories: Category[];
-  onAddCategory: (category: Omit<Category, 'id'>) => void;
+  onAddCategory: (category: Omit<Category, 'id'>) => Promise<string | undefined>;
   onUpdateCategory: (id: string, category: Omit<Category, 'id'>) => void;
   onDeleteCategory: (id: string) => void;
 }

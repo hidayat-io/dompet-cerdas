@@ -27,7 +27,7 @@ interface TransactionFormProps {
     attachment?: { file: File; type: 'image' | 'pdf' } | null
   ) => Promise<void>;
   onDelete?: (id: string) => void;
-  onAddCategory?: (category: Omit<Category, 'id'>) => void;
+  onAddCategory?: (category: Omit<Category, 'id'>) => Promise<string | undefined>;
   onClose: () => void;
   onShowNotification?: (type: NotificationType, title: string, message: string, autoClose?: boolean) => void;
 }
@@ -813,9 +813,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           defaultType={type}
           categories={categories}
           onClose={() => setShowCategoryModal(false)}
-          onSave={(categoryData) => {
-            onAddCategory(categoryData);
-            setShowCategoryModal(false);
+          onSave={async (categoryData) => {
+            const newCategoryId = await onAddCategory(categoryData);
+            if (newCategoryId) {
+              setCategoryId(newCategoryId);
+            }
+            // Modal will close itself via onClose after this returns
           }}
         />
       )}

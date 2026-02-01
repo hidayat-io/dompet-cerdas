@@ -352,10 +352,11 @@ function App() {
     }
   };
 
-  const addCategory = async (cat: Omit<Category, 'id'>) => {
+  const addCategory = async (cat: Omit<Category, 'id'>): Promise<string | undefined> => {
     if (!user) return;
-    await addDoc(collection(db, 'users', user.uid, 'categories'), cat);
+    const docRef = await addDoc(collection(db, 'users', user.uid, 'categories'), cat);
     await refreshCategoryCache();
+    return docRef.id;
   };
 
   const updateCategory = async (id: string, cat: Omit<Category, 'id'>) => {
