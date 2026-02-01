@@ -1,8 +1,8 @@
 # 📱 Dompet Cerdas - Technical Documentation
 
-> **Last Updated**: January 27, 2026  
-> **Version**: 1.6.1  
-> **Live URL**: https://dompas.indoomega.my.id
+> **Last Updated**: February 1, 2026  
+> **Version**: 2.0.2  
+> **Live URL**: https://dompas.indoomega.my.id (Firebase Hosting via Cloudflare Worker)
 
 ---
 
@@ -301,31 +301,37 @@ const { theme, isDark, toggleTheme } = useTheme();
 ## 🚀 Deployment
 
 ### Infrastructure
-- **Server**: Google Cloud VM (Debian)
-- **Web Server**: Nginx
-- **SSL**: Let's Encrypt (Certbot)
-- **CDN/Proxy**: Cloudflare (SSL Mode: Full)
+- **Frontend Hosting**: Firebase Hosting (CDN Global)
+- **Backend**: Firebase Cloud Functions (Node.js 20)
+- **Database**: Firebase Firestore
+- **Storage**: Firebase Storage
+- **CDN/Proxy**: Cloudflare Worker (reverse proxy ke Firebase)
 - **Domain**: dompas.indoomega.my.id
 
 ### Deployment Flow
-```
-Local: npm run build → git push
-   ↓
-Server: git pull → Files updated via symlink
+```bash
+# 1. Build frontend
+npm run build
+
+# 2. Deploy semua (hosting + functions + rules)
+firebase deploy
+
+# Atau deploy terpisah:
+firebase deploy --only hosting      # Frontend only
+firebase deploy --only functions    # Backend only
+firebase deploy --only firestore    # Database rules only
 ```
 
-### Server Paths
+### Firebase URLs
 ```
-~/dompet-cerdas/              # Git repository
-~/dompet-cerdas/dist/         # Production build
-   ↓ (symlink)
-/var/www/dompas.indoomega.my.id/  # Nginx root
+https://expensetracker-test-1.web.app     # Firebase default URL
+https://dompas.indoomega.my.id            # Custom domain (via Cloudflare Worker)
 ```
 
-### Nginx Config Location
-```
-/etc/nginx/sites-available/dompas.indoomega.my.id
-```
+### Cloudflare Worker Setup
+Domain `dompas.indoomega.my.id` menggunakan Cloudflare Worker untuk reverse proxy ke Firebase Hosting.
+- Worker Name: `dompas-proxy`
+- Route: `dompas.indoomega.my.id/*`
 
 ---
 

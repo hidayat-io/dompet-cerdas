@@ -12,10 +12,9 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
-    // Link tokens - allow read/write for validation
+    // Link tokens - Cloud Functions only (Admin SDK bypasses rules)
     match /link_tokens/{token} {
-      allow read, write: if true; // Temporary for development
-      // TODO: Restrict to Cloud Functions only in production
+      allow read, write: if false;
     }
     
     // User data

@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.0.1
+# DompetCerdas - Smart Expense Tracker v2.0.2
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -14,6 +14,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - Category management
 - Financial simulations
 - AI financial advisor
+- Excel export with date range selection
 
 ### 🤖 Telegram Bot (@dompas_bot)
 - **Receipt Scanning**: Upload photos, AI extracts data automatically
@@ -26,6 +27,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 | Component | Technology |
 |-----------|------------|
 | Frontend | React 19, TypeScript, Vite |
+| Hosting | **Firebase Hosting** (CDN Global) |
 | Backend | Firebase Functions (Node.js 20) |
 | Database | Firestore |
 | Storage | Firebase Storage |
@@ -52,10 +54,26 @@ npm run build
 firebase deploy --only functions
 ```
 
+## 🚀 Deployment
+
+```bash
+# Build frontend
+npm run build
+
+# Deploy semua (Hosting + Functions + Rules)
+firebase deploy
+
+# Atau deploy terpisah:
+firebase deploy --only hosting      # Frontend only
+firebase deploy --only functions    # Backend only
+firebase deploy --only firestore    # Firestore rules only
+```
+
 ## Documentation
 
+- [Deploy Guide](deploy/DEPLOY_GUIDE.md) - Firebase Hosting deployment
 - [Telegram Integration](docs/TELEGRAM_INTEGRATION.md) - Technical docs for bot implementation
-- [Firebase Setup](firebase.json) - Firebase configuration
+- [Technical Documentation](DOCUMENTATION.md) - Full technical reference
 
 ## Environment Variables
 
@@ -72,6 +90,7 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ## Version History
 
+- **v2.0.2** - Migrated to Firebase Hosting, Timezone fixes, Security hardening
 - **v2.0.1** - Bot category selection via Firestore categories + cache refresh, improved NLU for shorthand amounts
 - **v2.0.0** - Telegram Bot Integration (Receipt OCR, Natural Language, Account Linking)
 - **v1.6.0** - AI Financial Advisor
