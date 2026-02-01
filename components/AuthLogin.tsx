@@ -1,11 +1,63 @@
-import React, { useState } from 'react';
-import { signInWithPopup, Auth } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, Auth } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 import IconDisplay from './IconDisplay';
+
+// Detect if running in iOS Safari or in-app browser (like Telegram, Instagram, etc.)
+const isIOS = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const ua = window.navigator.userAgent;
+    return /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
+const isInAppBrowser = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const ua = window.navigator.userAgent;
+    // Detect common in-app browsers
+    return /FBAN|FBAV|Instagram|Twitter|Line|Telegram|TelegramBot|WebView|wv\)/i.test(ua);
+};
+
+const isSafari = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const ua = window.navigator.userAgent;
+    return /^((?!chrome|android).)*safari/i.test(ua);
+};
+
+// Should use redirect instead of popup?
+const shouldUseRedirect = (): boolean => {
+    return isIOS() || isInAppBrowser() || (isIOS() && isSafari());
+};
 
 const AuthLogin: React.FC = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
+
+    // Check for redirect result on page load
+    useEffect(() => {
+        const checkRedirectResult = async () => {
+            try {
+                const result = await getRedirectResult(auth as Auth);
+                if (result) {
+                    // User successfully signed in via redirect
+                    console.log('Redirect sign-in successful:', result.user.email);
+                }
+            } catch (err: any) {
+                console.error('Redirect result error:', err);
+                const errorCode = err.code;
+                if (errorCode === 'auth/unauthorized-domain') {
+                    setError('Domain ini belum diizinkan di Firebase Console.');
+                } else if (errorCode !== 'auth/popup-closed-by-user') {
+                    setError(`Gagal login: ${err.message || 'Terjadi kesalahan'}`);
+                }
+            } finally {
+                setIsCheckingRedirect(false);
+            }
+        };
+
+        checkRedirectResult();
+    }, []);
 
     const handleLogin = async () => {
         setIsLoading(true);
@@ -19,6 +71,16 @@ const AuthLogin: React.FC = () => {
         }
 
         try {
+            // Use redirect for iOS and in-app browsers
+            if (shouldUseRedirect()) {
+                console.log('Using signInWithRedirect for iOS/in-app browser');
+                await signInWithRedirect(auth as Auth, googleProvider as any);
+                // Note: This will redirect away from the page, so no code after this will run
+                return;
+            }
+
+            // Use popup for desktop and other browsers
+            console.log('Using signInWithPopup');
             await signInWithPopup(auth as Auth, googleProvider as any);
         } catch (err: any) {
             console.error("Login Error:", err);
@@ -28,7 +90,23 @@ const AuthLogin: React.FC = () => {
             if (errorCode === 'auth/cancelled-popup-request') {
                 setError('Login dibatalkan.');
             } else if (errorCode === 'auth/popup-closed-by-user') {
-                setError('Popup login ditutup sebelum selesai.');
+                setError('Popup login ditutup. Mencoba metode alternatif...');
+                // Fallback to redirect if popup fails
+                try {
+                    await signInWithRedirect(auth as Auth, googleProvider as any);
+                    return;
+                } catch (redirectErr: any) {
+                    setError(`Gagal login: ${redirectErr.message || 'Terjadi kesalahan'}`);
+                }
+            } else if (errorCode === 'auth/popup-blocked') {
+                setError('Popup diblokir browser. Mencoba metode alternatif...');
+                // Fallback to redirect if popup is blocked
+                try {
+                    await signInWithRedirect(auth as Auth, googleProvider as any);
+                    return;
+                } catch (redirectErr: any) {
+                    setError(`Gagal login: ${redirectErr.message || 'Terjadi kesalahan'}`);
+                }
             } else if (errorCode === 'auth/unauthorized-domain') {
                 setError('Domain ini belum diizinkan di Firebase Console. Silakan tambahkan domain di Firebase Authentication → Settings → Authorized domains.');
             } else {
@@ -38,6 +116,18 @@ const AuthLogin: React.FC = () => {
             setIsLoading(false);
         }
     };
+
+    // Show loading while checking redirect result
+    if (isCheckingRedirect) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+                <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8 text-center animate-fade-in-up transition-all border border-gray-100">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto mb-4"></div>
+                    <p className="text-gray-500">Memeriksa status login...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -75,6 +165,13 @@ const AuthLogin: React.FC = () => {
                         </>
                     )}
                 </button>
+
+                {/* Hint for iOS users */}
+                {(isIOS() || isInAppBrowser()) && (
+                    <p className="text-xs text-amber-600 mt-4 bg-amber-50 p-2 rounded-lg">
+                        💡 Tip: Jika login bermasalah, buka di Safari atau Chrome
+                    </p>
+                )}
 
                 <p className="text-xs text-gray-400 mt-6">
                     Dengan masuk, kamu menyetujui bahwa data akan tersimpan di cloud Firebase.

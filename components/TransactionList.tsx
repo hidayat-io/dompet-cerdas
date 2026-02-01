@@ -194,6 +194,11 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
   });
   const [showFilters, setShowFilters] = useState(false);
 
+  // Search and Category Filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
+
   const yearOptions = useMemo(() => generateYearOptions(), []);
 
   const formatRp = (val: number) => {
@@ -205,16 +210,41 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     return transactions.filter(t => {
       const txDate = new Date(t.date);
 
+      // Date filter
+      let dateMatch = false;
       if (filterMode === 'month') {
-        return txDate.getFullYear() === selectedYear && txDate.getMonth() === selectedMonthIndex;
+        dateMatch = txDate.getFullYear() === selectedYear && txDate.getMonth() === selectedMonthIndex;
       } else {
         const start = new Date(startDate);
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        return txDate >= start && txDate <= end;
+        dateMatch = txDate >= start && txDate <= end;
       }
+      if (!dateMatch) return false;
+
+      // Category filter
+      if (selectedCategoryId !== 'all' && t.categoryId !== selectedCategoryId) {
+        return false;
+      }
+
+      // Type filter (Income/Expense)
+      if (selectedType !== 'all') {
+        const cat = categories.find(c => c.id === t.categoryId);
+        if (cat?.type !== selectedType) return false;
+      }
+
+      // Search filter (check description and category name)
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const descMatch = t.description?.toLowerCase().includes(query);
+        const cat = categories.find(c => c.id === t.categoryId);
+        const catMatch = cat?.name?.toLowerCase().includes(query);
+        if (!descMatch && !catMatch) return false;
+      }
+
+      return true;
     });
-  }, [transactions, filterMode, selectedYear, selectedMonthIndex, startDate, endDate]);
+  }, [transactions, filterMode, selectedYear, selectedMonthIndex, startDate, endDate, selectedCategoryId, selectedType, searchQuery, categories]);
 
   // Group transactions by Date
   const groupedTransactions = useMemo(() => {
@@ -521,6 +551,191 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           </div>
         )}
 
+        {/* Search & Category Filter Bar */}
+        <div className="flex flex-col md:flex-row gap-3">
+          {/* Search Input */}
+          <div className="flex-1 relative">
+            <IconDisplay
+              name="Search"
+              size={18}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: theme.colors.textMuted
+              }}
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari transaksi..."
+              className="w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm outline-none transition-colors"
+              style={{
+                backgroundColor: theme.colors.bgCard,
+                borderColor: searchQuery ? theme.colors.accent : theme.colors.border,
+                color: theme.colors.textPrimary
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.colors.accent;
+                e.currentTarget.style.boxShadow = `0 0 0 3px ${theme.colors.accentLight}`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = searchQuery ? theme.colors.accent : theme.colors.border;
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition-colors"
+                style={{ color: theme.colors.textMuted }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.bgHover;
+                  e.currentTarget.style.color = theme.colors.textPrimary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = theme.colors.textMuted;
+                }}
+              >
+                <IconDisplay name="X" size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Type Filter Buttons */}
+          <div
+            className="flex p-1 rounded-xl border"
+            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+          >
+            {[
+              { value: 'all' as const, label: 'Semua' },
+              { value: 'EXPENSE' as const, label: 'Keluar', icon: 'TrendingDown' },
+              { value: 'INCOME' as const, label: 'Masuk', icon: 'TrendingUp' }
+            ].map((typeOption) => (
+              <button
+                key={typeOption.value}
+                onClick={() => setSelectedType(typeOption.value)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                style={{
+                  backgroundColor: selectedType === typeOption.value
+                    ? (typeOption.value === 'EXPENSE' ? theme.colors.expenseBg : typeOption.value === 'INCOME' ? theme.colors.incomeBg : theme.colors.bgHover)
+                    : 'transparent',
+                  color: selectedType === typeOption.value
+                    ? (typeOption.value === 'EXPENSE' ? theme.colors.expense : typeOption.value === 'INCOME' ? theme.colors.income : theme.colors.accent)
+                    : theme.colors.textMuted
+                }}
+              >
+                {typeOption.icon && <IconDisplay name={typeOption.icon} size={14} />}
+                {typeOption.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Category Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedCategoryId}
+              onChange={(e) => setSelectedCategoryId(e.target.value)}
+              className="appearance-none pl-4 pr-10 py-2.5 border rounded-xl text-sm font-medium outline-none transition-colors cursor-pointer min-w-[160px]"
+              style={{
+                backgroundColor: theme.colors.bgCard,
+                borderColor: selectedCategoryId !== 'all' ? theme.colors.accent : theme.colors.border,
+                color: theme.colors.textPrimary
+              }}
+            >
+              <option value="all">Semua Kategori</option>
+              <optgroup label="📤 Pengeluaran">
+                {categories.filter(c => c.type === 'EXPENSE').map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="📥 Pemasukan">
+                {categories.filter(c => c.type === 'INCOME').map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </optgroup>
+            </select>
+            <IconDisplay
+              name="ArrowDown"
+              size={16}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: theme.colors.textMuted,
+                pointerEvents: 'none'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Active Filters Indicator */}
+        {(searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all') && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium" style={{ color: theme.colors.textMuted }}>Filter aktif:</span>
+            {searchQuery && (
+              <span
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+                style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
+              >
+                <IconDisplay name="Search" size={12} />
+                "{searchQuery}"
+                <button onClick={() => setSearchQuery('')} className="ml-1 hover:opacity-70">
+                  <IconDisplay name="X" size={10} />
+                </button>
+              </span>
+            )}
+            {selectedType !== 'all' && (
+              <span
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+                style={{
+                  backgroundColor: selectedType === 'EXPENSE' ? theme.colors.expenseBg : theme.colors.incomeBg,
+                  color: selectedType === 'EXPENSE' ? theme.colors.expense : theme.colors.income
+                }}
+              >
+                <IconDisplay name={selectedType === 'EXPENSE' ? 'TrendingDown' : 'TrendingUp'} size={12} />
+                {selectedType === 'EXPENSE' ? 'Pengeluaran' : 'Pemasukan'}
+                <button onClick={() => setSelectedType('all')} className="ml-1 hover:opacity-70">
+                  <IconDisplay name="X" size={10} />
+                </button>
+              </span>
+            )}
+            {selectedCategoryId !== 'all' && (
+              <span
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
+              >
+                <IconDisplay name="Tag" size={12} />
+                {categories.find(c => c.id === selectedCategoryId)?.name || 'Kategori'}
+                <button onClick={() => setSelectedCategoryId('all')} className="ml-1 hover:opacity-70">
+                  <IconDisplay name="X" size={10} />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedType('all');
+                setSelectedCategoryId('all');
+              }}
+              className="text-xs font-medium px-2 py-1 rounded-lg transition-colors"
+              style={{ color: theme.colors.expense }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              Hapus Semua
+            </button>
+          </div>
+        )}
+
         {/* Summary Cards */}
         <div className="grid grid-cols-3 gap-3">
           <div
@@ -565,8 +780,12 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             <div className="p-4 rounded-full mb-4" style={{ backgroundColor: theme.colors.bgHover }}>
               <IconDisplay name="Search" size={32} style={{ color: theme.colors.textMuted }} />
             </div>
-            <p className="font-medium" style={{ color: theme.colors.textSecondary }}>Tidak ada transaksi</p>
-            <p className="text-sm mt-1" style={{ color: theme.colors.textMuted }}>Coba ubah filter tanggal</p>
+            <p className="font-medium" style={{ color: theme.colors.textSecondary }}>Tidak ada transaksi ditemukan</p>
+            <p className="text-sm mt-1 text-center px-4" style={{ color: theme.colors.textMuted }}>
+              {searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all'
+                ? 'Coba ubah filter atau kata kunci pencarian'
+                : 'Coba ubah filter tanggal'}
+            </p>
           </div>
         )}
 
