@@ -6,6 +6,7 @@
 import * as admin from 'firebase-admin';
 import { ReceiptData } from './geminiService';
 import { classifyCategory } from './nluService';
+import { getJakartaDateString } from '../utils/date';
 
 const CATEGORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const categoryCache = new Map<string, { expiresAt: number; categories: UserCategory[] }>();
@@ -138,8 +139,8 @@ export async function createTransactionFromReceipt(
 
     console.log('[TRANSACTION] Using categoryId:', categoryId, 'name:', categoryName);
 
-    // Format date as YYYY-MM-DD
-    const dateString = transactionDate.toISOString().split('T')[0];
+    // Format date as YYYY-MM-DD (Jakarta Time)
+    const dateString = getJakartaDateString(transactionDate);
 
     // Create transaction object matching web app schema
     const transaction: Record<string, unknown> = {
@@ -221,8 +222,8 @@ export async function createManualTransaction(
         categoryId = (directMatch || getFallbackCategory(categories)).id;
     }
 
-    // Format date as YYYY-MM-DD
-    const dateString = new Date().toISOString().split('T')[0];
+    // Format date as YYYY-MM-DD (Jakarta Time)
+    const dateString = getJakartaDateString();
 
     const transaction = {
         amount,

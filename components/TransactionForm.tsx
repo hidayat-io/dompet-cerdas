@@ -39,7 +39,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [displayAmount, setDisplayAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
 
@@ -805,6 +811,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         <CategoryFormModal
           isOpen={showCategoryModal}
           defaultType={type}
+          categories={categories}
           onClose={() => setShowCategoryModal(false)}
           onSave={(categoryData) => {
             onAddCategory(categoryData);

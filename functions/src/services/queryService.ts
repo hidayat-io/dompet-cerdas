@@ -6,6 +6,7 @@
 import * as admin from 'firebase-admin';
 import { TimeRange } from './nluService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getJakartaDate } from '../utils/date';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -22,87 +23,107 @@ export interface CategoryData {
 }
 
 /**
- * Get specific date string for N days ago
+ * Get specific date string for N days ago (Jakarta Time)
  */
 function getDateForDaysAgo(daysAgo: number): string {
-    const date = new Date();
+    const date = getJakartaDate();
     date.setDate(date.getDate() - daysAgo);
     return date.toISOString().split('T')[0];
 }
 
 /**
- * Calculate date range from time range string
+ * Calculate date range from time range string (Jakarta Time)
  */
-function getDateRange(timeRange: TimeRange): { start: Date; end: Date } {
-    const now = new Date();
-    const start = new Date();
-    const end = new Date();
+function getDateRange(timeRange: TimeRange): { startStr: string; endStr: string } {
+    const now = getJakartaDate();
+    let startStr: string;
+    let endStr: string;
+
+    // Helper to format Date to YYYY-MM-DD
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
 
     switch (timeRange) {
         case 'today':
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
+            startStr = fmt(now);
+            endStr = startStr;
             break;
 
         case 'yesterday':
-            start.setDate(now.getDate() - 1);
-            start.setHours(0, 0, 0, 0);
-            end.setDate(now.getDate() - 1);
-            end.setHours(23, 59, 59, 999);
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            startStr = fmt(yesterday);
+            endStr = startStr;
             break;
 
         case 'this_week':
             // Monday to today
-            const dayOfWeek = now.getDay();
+            const startWeek = new Date(now);
+            const dayOfWeek = startWeek.getDay(); // 0 is Sunday
             const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-            start.setDate(now.getDate() + mondayOffset);
-            start.setHours(0, 0, 0, 0);
+            startWeek.setDate(now.getDate() + mondayOffset);
+            startStr = fmt(startWeek);
+            endStr = fmt(now);
             break;
 
         case 'last_week':
             // Last 7 days (including today)
-            start.setDate(now.getDate() - 6);
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
+            const startLastWeek = new Date(now);
+            startLastWeek.setDate(now.getDate() - 6);
+            startStr = fmt(startLastWeek);
+            endStr = fmt(now);
             break;
 
         case 'this_month':
-            start.setDate(1);
-            start.setHours(0, 0, 0, 0);
+            const startMonth = new Date(now);
+            startMonth.setDate(1);
+            startStr = fmt(startMonth);
+
+            // End of month
+            const endMonth = new Date(now);
+            endMonth.setMonth(endMonth.getMonth() + 1);
+            endMonth.setDate(0);
+            endStr = fmt(endMonth);
             break;
 
         case 'last_month':
-            start.setMonth(now.getMonth() - 1);
-            start.setDate(1);
-            start.setHours(0, 0, 0, 0);
+            const startPrevMonth = new Date(now);
+            startPrevMonth.setMonth(now.getMonth() - 1);
+            startPrevMonth.setDate(1);
+            startStr = fmt(startPrevMonth);
 
-            end.setDate(0); // Last day of previous month
-            end.setHours(23, 59, 59, 999);
+            const endPrevMonth = new Date(now);
+            endPrevMonth.setDate(0); // Last day of previous month relative to now
+            // Wait, if now is March, setDate(0) is Feb 28.
+            // If now is Feb 1st (Jakarta).
+            // now.setDate(0) -> Jan 31. Correct.
+            endStr = fmt(endPrevMonth);
             break;
 
         case 'all_time':
-            start.setTime(0);
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
+            startStr = '2020-01-01'; // Arbitrary start
+            endStr = fmt(now);
             break;
+
+        default:
+            startStr = fmt(now);
+            endStr = fmt(now);
     }
 
-    return { start, end };
+    return { startStr, endStr };
 }
 
 /**
  * Get date range for custom month (YYYY-MM format)
  */
-function getCustomMonthRange(customMonth: string): { start: Date; end: Date } {
+function getCustomMonthRange(customMonth: string): { startStr: string; endStr: string } {
     const [year, month] = customMonth.split('-').map(Number);
+    // Construct date string manually
+    const lastDay = new Date(year, month, 0).getDate();
 
-    const start = new Date(year, month - 1, 1); // month-1 because Date months are 0-indexed
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(year, month, 0); // Last day of the month
-    end.setHours(23, 59, 59, 999);
-
-    return { start, end };
+    return {
+        startStr: `${year}-${String(month).padStart(2, '0')}-01`,
+        endStr: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    };
 }
 
 /**
@@ -122,18 +143,18 @@ export async function getTotalExpenses(
 
     if (customMonth) {
         // Custom month (YYYY-MM)
-        const { start, end } = getCustomMonthRange(customMonth);
-        startStr = start.toISOString().split('T')[0];
-        endStr = end.toISOString().split('T')[0];
+        const range = getCustomMonthRange(customMonth);
+        startStr = range.startStr;
+        endStr = range.endStr;
     } else if (daysAgo !== undefined) {
         // Specific day N days ago
         startStr = getDateForDaysAgo(daysAgo);
         endStr = startStr;
     } else {
         // Use time range
-        const { start, end } = getDateRange(timeRange || 'today');
-        startStr = start.toISOString().split('T')[0];
-        endStr = end.toISOString().split('T')[0];
+        const range = getDateRange(timeRange || 'today');
+        startStr = range.startStr;
+        endStr = range.endStr;
     }
 
     // Query by date string (web app uses string format, not Timestamp)
@@ -182,11 +203,7 @@ export async function getTotalIncome(
     timeRange: TimeRange = 'this_month'
 ): Promise<{ total: number; count: number }> {
     const db = admin.firestore();
-    const { start, end } = getDateRange(timeRange);
-
-    // Format dates as YYYY-MM-DD string to match web app schema
-    const startStr = start.toISOString().split('T')[0];
-    const endStr = end.toISOString().split('T')[0];
+    const { startStr, endStr } = getDateRange(timeRange);
 
     // Query by date string (web app uses string format, not Timestamp)
     const snapshot = await db
@@ -257,9 +274,7 @@ export async function getBalance(
         .collection('transactions');
 
     if (customMonth) {
-        const { start, end } = getCustomMonthRange(customMonth);
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
+        const { startStr, endStr } = getCustomMonthRange(customMonth);
         transactionQuery = transactionQuery
             .where('date', '>=', startStr)
             .where('date', '<=', endStr) as any;
@@ -267,9 +282,7 @@ export async function getBalance(
         const dateStr = getDateForDaysAgo(daysAgo);
         transactionQuery = transactionQuery.where('date', '==', dateStr) as any;
     } else if (timeRange) {
-        const { start, end } = getDateRange(timeRange);
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
+        const { startStr, endStr } = getDateRange(timeRange);
         transactionQuery = transactionQuery
             .where('date', '>=', startStr)
             .where('date', '<=', endStr) as any;
@@ -311,9 +324,9 @@ export async function getCategoryBreakdown(
         endStr = startStr;
     } else {
         // Use time range
-        const { start, end } = getDateRange(timeRange || 'this_month');
-        startStr = start.toISOString().split('T')[0];
-        endStr = end.toISOString().split('T')[0];
+        const range = getDateRange(timeRange || 'this_month');
+        startStr = range.startStr;
+        endStr = range.endStr;
     }
 
     // Get categories first
@@ -526,9 +539,9 @@ export async function getTransactionDetails(
         endStr = startStr;
     } else {
         // Use time range
-        const { start, end } = getDateRange(timeRange || 'today');
-        startStr = start.toISOString().split('T')[0];
-        endStr = end.toISOString().split('T')[0];
+        const range = getDateRange(timeRange || 'today');
+        startStr = range.startStr;
+        endStr = range.endStr;
     }
 
     // Get categories first

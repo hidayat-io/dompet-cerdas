@@ -4,6 +4,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getJakartaDateString, getJakartaDate } from '../utils/date';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -110,7 +111,7 @@ function containsAdviceKeywords(message: string): boolean {
 
 function detectSimpleIntent(message: string): ParsedIntent | null {
     const lower = message.toLowerCase().trim();
-    const currentYear = new Date().getFullYear();
+    const currentYear = getJakartaDate().getFullYear();
 
     // Helper to parse Indonesian months
     const monthMap: { [key: string]: string } = {
@@ -148,7 +149,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         const tglMatch = lower.match(/\b(?:tgl|tanggal)\s+(\d{1,2})\b/i);
         if (tglMatch) {
             const day = tglMatch[1].padStart(2, '0');
-            const now = new Date();
+            const now = getJakartaDate();
             const month = (now.getMonth() + 1).toString().padStart(2, '0');
             specific_date = `${now.getFullYear()}-${month}-${day}`;
         }
@@ -219,7 +220,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
     // Transaction details / list queries (check BEFORE expense/income queries for "detail pengeluaran")
     if (/transaksi|trans\b|detail|rincian|apa\s+aja|apa\s+saja|list|tampilkan|lihat|show|tunjukkan/i.test(lower)) {
         let time_range: TimeRange | undefined;
-        
+
         // Check for "N hari terakhir" pattern first (e.g., "detail pengeluaran 7 hari terakhir") - maps to last_week
         if (/\d+\s+hari\s+ter[a-z]+/i.test(lower)) {
             time_range = 'last_week'; // Last 7 days including today
@@ -311,11 +312,11 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         // Check if it's an expense query (not just mentioning the word)
         const hasQueryIndicator = /(berapa|total|ada|apa|cek|check)/i.test(lower);
         const hasTimeIndicator = /(hari|kemarin|minggu|bulan|today|yesterday|week|month)/i.test(lower);
-        
+
         // If it has "pengeluaran" with either query indicator OR time indicator, treat as query
         if (hasQueryIndicator || hasTimeIndicator) {
             let time_range: TimeRange | undefined;
-            
+
             // Check for "N hari terakhir" pattern (e.g., "7 hari terakhir") - maps to last_week
             if (/\d+\s+hari\s+ter[a-z]+/i.test(lower)) {
                 time_range = 'last_week'; // Last 7 days including today
@@ -340,7 +341,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         // Check if it's an income query (not just mentioning the word)
         const hasQueryIndicator = /(berapa|total|ada|apa|cek|check)/i.test(lower);
         const hasTimeIndicator = /(hari|kemarin|minggu|bulan|today|yesterday|week|month)/i.test(lower);
-        
+
         // If it has "pemasukan" with either query indicator OR time indicator, treat as query
         if (hasQueryIndicator || hasTimeIndicator) {
             let time_range: TimeRange | undefined;
@@ -365,7 +366,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         // Check if it's an expense query (not just mentioning the word)
         const hasQueryIndicator = /(berapa|total|ada|apa|cek|check)/i.test(lower);
         const hasTimeIndicator = /(hari|kemarin|minggu|bulan|today|yesterday|week|month)/i.test(lower);
-        
+
         // If it has "pengeluaran" with either query indicator OR time indicator, treat as query
         if (hasQueryIndicator || hasTimeIndicator) {
             let time_range: TimeRange | undefined;
@@ -390,7 +391,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         // Check if it's an income query (not just mentioning the word)
         const hasQueryIndicator = /(berapa|total|ada|apa|cek|check)/i.test(lower);
         const hasTimeIndicator = /(hari|kemarin|minggu|bulan|today|yesterday|week|month)/i.test(lower);
-        
+
         // If it has "pemasukan" with either query indicator OR time indicator, treat as query
         if (hasQueryIndicator || hasTimeIndicator) {
             let time_range: TimeRange | undefined;
@@ -516,7 +517,7 @@ export async function parseIntent(message: string): Promise<ParsedIntent> {
         // Fast path: Check for advice keywords first
         if (containsAdviceKeywords(message)) {
             const lower = message.toLowerCase();
-            
+
             // Sub-categorize advice type based on keywords
             if (/tips|strategi|saran.*hemat|cara.*hemat|biar.*hemat|agar.*hemat/.test(lower)) {
                 return {
@@ -525,7 +526,7 @@ export async function parseIntent(message: string): Promise<ParsedIntent> {
                     parameters: { time_range: 'this_month' }
                 };
             }
-            
+
             if (/kurangi|potong|cut|bisa.*turun|bisa.*hemat|tanpa suffering|suffering/.test(lower)) {
                 return {
                     intent: 'expense_analysis',
@@ -533,7 +534,7 @@ export async function parseIntent(message: string): Promise<ParsedIntent> {
                     parameters: { time_range: 'this_month' }
                 };
             }
-            
+
             // General financial advice
             return {
                 intent: 'financial_advice',
@@ -541,7 +542,7 @@ export async function parseIntent(message: string): Promise<ParsedIntent> {
                 parameters: { time_range: 'this_month' }
             };
         }
-        
+
         // Try simple rule-based intent detection for standard queries
         const simpleIntent = detectSimpleIntent(message);
         if (simpleIntent) {
@@ -565,7 +566,7 @@ export async function parseIntent(message: string): Promise<ParsedIntent> {
 Kamu adalah AI assistant untuk aplikasi keuangan DompetCerdas.
 Parse pesan bahasa Indonesia ini dan extract intent + parameter.
 
-Current date: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD)
+Current date: ${getJakartaDateString()} (YYYY-MM-DD)
 User message: "${message}"
 
 Return ONLY valid JSON (no markdown, no code blocks):
@@ -576,7 +577,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
     "time_range": "today | yesterday | this_week | last_week | this_month | last_month",
     "days_ago": number (jika user tanya "N hari lalu" contoh: "2 hari lalu" = 2, "3 hari lalu" = 3),
     "custom_month": "YYYY-MM" (jika user sebut bulan+tahun spesifik, contoh: "desember 2025" = "2025-12"),
-    "specific_date": "YYYY-MM-DD" (jika user sebut tanggal spesifik, contoh: "27 jan" = "2026-01-27", "tgl 5" = "2026-01-05" - asumsikan tahun saat ini ${new Date().getFullYear()} jika tidak disebut),
+    "specific_date": "YYYY-MM-DD" (jika user sebut tanggal spesifik, contoh: "27 jan" = "2026-01-27", "tgl 5" = "2026-01-05" - asumsikan tahun saat ini ${getJakartaDate().getFullYear()} jika tidak disebut),
     "amount": number (hanya untuk add_transaction),
     "description": "string" (hanya untuk add_transaction),
     "category_hint": "string" (optional, tebak kategori dari deskripsi),
