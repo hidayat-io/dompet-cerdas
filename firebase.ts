@@ -4,9 +4,11 @@ import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 
 // --- KONFIGURASI FIREBASE (PRODUCTION) ---
+// PENTING: authDomain menggunakan custom domain untuk menghindari
+// masalah third-party cookie di iOS Safari dan in-app browsers
 const firebaseConfig = {
     apiKey: "AIzaSyBCCBireEUYJh9OR-kMCDkTY38eTOXXVZE",
-    authDomain: "expensetracker-test-1.firebaseapp.com",
+    authDomain: "dompas.indoomega.my.id", // Custom domain untuk iOS compatibility
     databaseURL: "https://expensetracker-test-1-default-rtdb.firebaseio.com",
     projectId: "expensetracker-test-1",
     storageBucket: "expensetracker-test-1.firebasestorage.app",
