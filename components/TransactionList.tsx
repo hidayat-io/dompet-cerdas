@@ -198,6 +198,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
+  const categorySelectRef = useRef<HTMLSelectElement | null>(null);
 
   const yearOptions = useMemo(() => generateYearOptions(), []);
 
@@ -391,6 +392,36 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       )}
 
       <div className="space-y-4 pb-20 md:pb-0">
+        {/* Summary Cards (Top) */}
+        <div className="grid grid-cols-3 gap-3">
+          <div
+            className="rounded-xl border p-3 shadow-sm"
+            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+          >
+            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Pemasukan</p>
+            <p className="text-sm md:text-base font-bold" style={{ color: theme.colors.income }}>{formatRp(totalIncome)}</p>
+          </div>
+          <div
+            className="rounded-xl border p-3 shadow-sm"
+            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+          >
+            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Pengeluaran</p>
+            <p className="text-sm md:text-base font-bold" style={{ color: theme.colors.expense }}>{formatRp(totalExpense)}</p>
+          </div>
+          <div
+            className="rounded-xl border p-3 shadow-sm"
+            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+          >
+            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Saldo</p>
+            <p
+              className="text-sm md:text-base font-bold"
+              style={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense }}
+            >
+              {totalBalance >= 0 ? '+' : ''}{formatRp(totalBalance)}
+            </p>
+          </div>
+        </div>
+
         {/* Header with Filter Toggle */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <h2 className="text-2xl font-bold hidden md:block" style={{ color: theme.colors.textPrimary }}>Riwayat Transaksi</h2>
@@ -548,130 +579,131 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                 </button>
               </div>
             )}
+
+            {/* Search & Category Filter Bar */}
+            <div className="flex flex-col md:flex-row gap-3 mt-4">
+              {/* Search Input */}
+              <div className="flex-1 relative">
+                <IconDisplay
+                  name="Search"
+                  size={18}
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: theme.colors.textMuted
+                  }}
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari transaksi..."
+                  className="w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm outline-none transition-colors"
+                  style={{
+                    backgroundColor: theme.colors.bgCard,
+                    borderColor: searchQuery ? theme.colors.accent : theme.colors.border,
+                    color: theme.colors.textPrimary
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = theme.colors.accent;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${theme.colors.accentLight}`;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = searchQuery ? theme.colors.accent : theme.colors.border;
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition-colors"
+                    style={{ color: theme.colors.textMuted }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = theme.colors.bgHover;
+                      e.currentTarget.style.color = theme.colors.textPrimary;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = theme.colors.textMuted;
+                    }}
+                  >
+                    <IconDisplay name="X" size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Type Filter Buttons */}
+              <div
+                className="flex p-1 rounded-xl border"
+                style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+              >
+                {[
+                  { value: 'all' as const, label: 'Semua' },
+                  { value: 'EXPENSE' as const, label: 'Keluar', icon: 'TrendingDown' },
+                  { value: 'INCOME' as const, label: 'Masuk', icon: 'TrendingUp' }
+                ].map((typeOption) => (
+                  <button
+                    key={typeOption.value}
+                    onClick={() => setSelectedType(typeOption.value)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                      backgroundColor: selectedType === typeOption.value
+                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expenseBg : typeOption.value === 'INCOME' ? theme.colors.incomeBg : theme.colors.bgHover)
+                        : 'transparent',
+                      color: selectedType === typeOption.value
+                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expense : typeOption.value === 'INCOME' ? theme.colors.income : theme.colors.accent)
+                        : theme.colors.textMuted
+                    }}
+                  >
+                    {typeOption.icon && <IconDisplay name={typeOption.icon} size={14} />}
+                    {typeOption.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category Filter Dropdown */}
+              <div className="relative">
+                <select
+                  ref={categorySelectRef}
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="appearance-none pl-4 pr-10 py-2.5 border rounded-xl text-sm font-medium outline-none transition-colors cursor-pointer min-w-[160px]"
+                  style={{
+                    backgroundColor: theme.colors.bgCard,
+                    borderColor: selectedCategoryId !== 'all' ? theme.colors.accent : theme.colors.border,
+                    color: theme.colors.textPrimary
+                  }}
+                >
+                  <option value="all">Semua Kategori</option>
+                  <optgroup label="📤 Pengeluaran">
+                    {categories.filter(c => c.type === 'EXPENSE').map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="📥 Pemasukan">
+                    {categories.filter(c => c.type === 'INCOME').map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </optgroup>
+                </select>
+                <button
+                  type="button"
+                  aria-label="Buka filter kategori"
+                  onClick={() => {
+                    categorySelectRef.current?.focus();
+                    categorySelectRef.current?.click();
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg"
+                  style={{ color: theme.colors.textMuted }}
+                >
+                  <IconDisplay name="ArrowDown" size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
-
-        {/* Search & Category Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <IconDisplay
-              name="Search"
-              size={18}
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: theme.colors.textMuted
-              }}
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari transaksi..."
-              className="w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm outline-none transition-colors"
-              style={{
-                backgroundColor: theme.colors.bgCard,
-                borderColor: searchQuery ? theme.colors.accent : theme.colors.border,
-                color: theme.colors.textPrimary
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = theme.colors.accent;
-                e.currentTarget.style.boxShadow = `0 0 0 3px ${theme.colors.accentLight}`;
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = searchQuery ? theme.colors.accent : theme.colors.border;
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition-colors"
-                style={{ color: theme.colors.textMuted }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.bgHover;
-                  e.currentTarget.style.color = theme.colors.textPrimary;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = theme.colors.textMuted;
-                }}
-              >
-                <IconDisplay name="X" size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Type Filter Buttons */}
-          <div
-            className="flex p-1 rounded-xl border"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            {[
-              { value: 'all' as const, label: 'Semua' },
-              { value: 'EXPENSE' as const, label: 'Keluar', icon: 'TrendingDown' },
-              { value: 'INCOME' as const, label: 'Masuk', icon: 'TrendingUp' }
-            ].map((typeOption) => (
-              <button
-                key={typeOption.value}
-                onClick={() => setSelectedType(typeOption.value)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-                style={{
-                  backgroundColor: selectedType === typeOption.value
-                    ? (typeOption.value === 'EXPENSE' ? theme.colors.expenseBg : typeOption.value === 'INCOME' ? theme.colors.incomeBg : theme.colors.bgHover)
-                    : 'transparent',
-                  color: selectedType === typeOption.value
-                    ? (typeOption.value === 'EXPENSE' ? theme.colors.expense : typeOption.value === 'INCOME' ? theme.colors.income : theme.colors.accent)
-                    : theme.colors.textMuted
-                }}
-              >
-                {typeOption.icon && <IconDisplay name={typeOption.icon} size={14} />}
-                {typeOption.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Category Filter Dropdown */}
-          <div className="relative">
-            <select
-              value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
-              className="appearance-none pl-4 pr-10 py-2.5 border rounded-xl text-sm font-medium outline-none transition-colors cursor-pointer min-w-[160px]"
-              style={{
-                backgroundColor: theme.colors.bgCard,
-                borderColor: selectedCategoryId !== 'all' ? theme.colors.accent : theme.colors.border,
-                color: theme.colors.textPrimary
-              }}
-            >
-              <option value="all">Semua Kategori</option>
-              <optgroup label="📤 Pengeluaran">
-                {categories.filter(c => c.type === 'EXPENSE').map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="📥 Pemasukan">
-                {categories.filter(c => c.type === 'INCOME').map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </optgroup>
-            </select>
-            <IconDisplay
-              name="ArrowDown"
-              size={16}
-              style={{
-                position: 'absolute',
-                right: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: theme.colors.textMuted,
-                pointerEvents: 'none'
-              }}
-            />
-          </div>
-        </div>
 
         {/* Active Filters Indicator */}
         {(searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all') && (
@@ -736,35 +768,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           </div>
         )}
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-3">
-          <div
-            className="rounded-xl border p-3 shadow-sm"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Pemasukan</p>
-            <p className="text-sm md:text-base font-bold" style={{ color: theme.colors.income }}>{formatRp(totalIncome)}</p>
-          </div>
-          <div
-            className="rounded-xl border p-3 shadow-sm"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Pengeluaran</p>
-            <p className="text-sm md:text-base font-bold" style={{ color: theme.colors.expense }}>{formatRp(totalExpense)}</p>
-          </div>
-          <div
-            className="rounded-xl border p-3 shadow-sm"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Selisih</p>
-            <p
-              className="text-sm md:text-base font-bold"
-              style={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense }}
-            >
-              {formatRp(totalBalance)}
-            </p>
-          </div>
-        </div>
 
         {/* Transaction Count */}
         <p className="text-sm" style={{ color: theme.colors.textSecondary }}>

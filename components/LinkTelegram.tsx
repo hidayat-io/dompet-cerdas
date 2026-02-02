@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { db, auth } from '../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth, firebaseApp } from '../firebase';
 import { useTheme } from '../contexts/ThemeContext';
 
 type LinkStatus = 'loading' | 'validating' | 'success' | 'invalid' | 'expired' | 'used' | 'not_logged_in' | 'error';
@@ -56,60 +56,20 @@ const LinkTelegram: React.FC = () => {
             setStatus('validating');
             setMessage('Memvalidasi token...');
 
-            // Validate token from Firestore
-            const tokenDoc = await getDoc(doc(db, 'link_tokens', token));
+            setMessage('Menghubungkan akun Telegram...');
 
-            if (!tokenDoc.exists()) {
-                setStatus('invalid');
-                setMessage('Token tidak valid atau sudah kadaluarsa.');
-                return;
-            }
+            const functions = getFunctions(firebaseApp, 'asia-southeast1');
+            const linkTelegram = httpsCallable(functions, 'linkTelegram');
 
-            const tokenData = tokenDoc.data();
-
-            // Check if already used
-            if (tokenData.used) {
-                setStatus('used');
-                setMessage('Token sudah pernah digunakan. Silakan minta link baru dari Telegram Bot.');
-                return;
-            }
-
-            // Check expiry (5 minutes)
-            const createdAt = tokenData.createdAt.toDate();
-            const now = new Date();
-            const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
-
-            if (diffMinutes > 5) {
-                setStatus('expired');
-                setMessage('Token sudah kadaluarsa (max 5 menit). Silakan minta link baru dari Telegram Bot dengan mengirim /start.');
-                return;
-            }
-
-            // Link Telegram ID to current user
-            const telegramId = tokenData.telegramId;
-
-            console.log('Linking telegram account:', { telegramId, userId: user.uid });
-
-            // Create telegram_link document
-            await setDoc(doc(db, `users/${user.uid}/telegram_link/main`), {
-                telegramId,
-                linkedAt: new Date().toISOString(),
-                active: true,
-                lastInteraction: new Date().toISOString(),
-            });
-
-            console.log('Created telegram_link document');
-
-            // Mark token as used
-            await updateDoc(doc(db, 'link_tokens', token), {
-                used: true,
-                usedAt: new Date().toISOString(),
-            });
-
-            console.log('Marked token as used');
+            console.log('Calling linkTelegram function:', { userId: user.uid });
+            const result = await linkTelegram({ token });
+            const telegramId = (result.data as { telegramId?: number })?.telegramId;
+            console.log('linkTelegram response:', result.data);
 
             // Notify bot via Cloud Function
             try {
+                setMessage('Mengirim notifikasi ke Telegram...');
+
                 const functionUrl = 'https://asia-southeast1-expensetracker-test-1.cloudfunctions.net/notifyLinkSuccess';
                 console.log('Calling notifyLinkSuccess:', { telegramId, userId: user.uid });
 
@@ -133,10 +93,22 @@ const LinkTelegram: React.FC = () => {
             setStatus('success');
             setMessage('🎉 Akun berhasil terhubung! Silakan kembali ke Telegram Bot untuk mulai menggunakan fitur.');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error linking account:', error);
-            setStatus('error');
-            setMessage('Terjadi kesalahan. Silakan coba lagi.');
+            const reason = error?.details?.reason;
+            if (reason === 'invalid') {
+                setStatus('invalid');
+                setMessage('Token tidak valid atau sudah kadaluarsa.');
+            } else if (reason === 'used') {
+                setStatus('used');
+                setMessage('Token sudah pernah digunakan. Silakan minta link baru dari Telegram Bot.');
+            } else if (reason === 'expired') {
+                setStatus('expired');
+                setMessage('Token sudah kadaluarsa (max 5 menit). Silakan minta link baru dari Telegram Bot dengan mengirim /start.');
+            } else {
+                setStatus('error');
+                setMessage('Terjadi kesalahan. Silakan coba lagi.');
+            }
         }
     };
 

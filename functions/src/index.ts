@@ -6,6 +6,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { initBot, processUpdate } from './bot';
 import { getUserCategories } from './services/transactionService';
+import { linkTelegramAccount, validateLinkToken } from './services/linkService';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -112,6 +113,46 @@ export const healthCheck = functions
             timestamp: new Date().toISOString(),
             service: 'dompetcerdas-telegram-bot',
         });
+    });
+
+/**
+ * Link Telegram account via secure callable function
+ */
+export const linkTelegram = functions
+    .region('asia-southeast1')
+    .https.onCall(async (data, context) => {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+        }
+
+        const token = data?.token;
+        if (!token || typeof token !== 'string') {
+            throw new functions.https.HttpsError('invalid-argument', 'Token is required.');
+        }
+
+        const validation = await validateLinkToken(token);
+        if (!validation.valid || !validation.telegramId) {
+            const reasonMap: Record<string, string> = {
+                'Token not found': 'invalid',
+                'Token already used': 'used',
+                'Token expired': 'expired',
+            };
+            const reason = validation.error ? (reasonMap[validation.error] || 'invalid') : 'invalid';
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                validation.error || 'Invalid token',
+                { reason }
+            );
+        }
+
+        const telegramUser = validation.telegramUser || {
+            id: validation.telegramId,
+            first_name: 'Telegram',
+        };
+
+        await linkTelegramAccount(token, context.auth.uid, telegramUser);
+
+        return { success: true, telegramId: validation.telegramId };
     });
 
 /**

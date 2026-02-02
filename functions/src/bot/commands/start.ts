@@ -30,7 +30,12 @@ export async function handleStartCommand(
     }
 
     // Generate link token
-    const token = await generateLinkToken(telegramId);
+    const token = await generateLinkToken({
+        id: telegramId,
+        username: msg.from?.username,
+        first_name: msg.from!.first_name,
+        last_name: msg.from?.last_name,
+    });
     const linkUrl = `${WEB_APP_URL}/link-telegram?token=${token}`;
 
     await bot.sendMessage(

@@ -12,6 +12,9 @@ const getDb = () => admin.firestore();
 export interface LinkToken {
     token: string;
     telegramId: number;
+    telegramUsername?: string;
+    telegramFirstName?: string;
+    telegramLastName?: string;
     createdAt: admin.firestore.Timestamp;
     expiresAt: admin.firestore.Timestamp;
     used: boolean;
@@ -33,16 +36,23 @@ export interface TelegramLink {
  * @param telegramId - Telegram user ID
  * @returns Token string
  */
-export async function generateLinkToken(telegramId: number): Promise<string> {
+export async function generateLinkToken(
+    telegramUser: { id: number; username?: string; first_name: string; last_name?: string } | number
+): Promise<string> {
     const token = generateSecureToken(32);
     const now = admin.firestore.Timestamp.now();
     const expiresAt = admin.firestore.Timestamp.fromMillis(
         now.toMillis() + 5 * 60 * 1000 // 5 minutes
     );
 
+    const telegramId = typeof telegramUser === 'number' ? telegramUser : telegramUser.id;
+
     const linkToken: LinkToken = {
         token,
         telegramId,
+        telegramUsername: typeof telegramUser === 'number' ? undefined : telegramUser.username,
+        telegramFirstName: typeof telegramUser === 'number' ? undefined : telegramUser.first_name,
+        telegramLastName: typeof telegramUser === 'number' ? undefined : telegramUser.last_name,
         createdAt: now,
         expiresAt,
         used: false,
@@ -60,7 +70,7 @@ export async function generateLinkToken(telegramId: number): Promise<string> {
  */
 export async function validateLinkToken(
     token: string
-): Promise<{ valid: boolean; telegramId?: number; error?: string }> {
+): Promise<{ valid: boolean; telegramId?: number; telegramUser?: { id: number; username?: string; first_name?: string; last_name?: string }; error?: string }> {
     const tokenDoc = await getDb().collection('link_tokens').doc(token).get();
 
     if (!tokenDoc.exists) {
@@ -78,7 +88,16 @@ export async function validateLinkToken(
         return { valid: false, error: 'Token expired' };
     }
 
-    return { valid: true, telegramId: data.telegramId };
+    return {
+        valid: true,
+        telegramId: data.telegramId,
+        telegramUser: {
+            id: data.telegramId,
+            username: data.telegramUsername,
+            first_name: data.telegramFirstName,
+            last_name: data.telegramLastName,
+        },
+    };
 }
 
 /**
@@ -93,7 +112,7 @@ export async function linkTelegramAccount(
     telegramUser: {
         id: number;
         username?: string;
-        first_name: string;
+        first_name?: string;
         last_name?: string;
     }
 ): Promise<void> {
@@ -109,7 +128,7 @@ export async function linkTelegramAccount(
     const telegramLink: TelegramLink = {
         telegramId: telegramUser.id,
         username: telegramUser.username,
-        firstName: telegramUser.first_name,
+        firstName: telegramUser.first_name || 'Telegram',
         lastName: telegramUser.last_name,
         linkedAt: now,
         active: true,

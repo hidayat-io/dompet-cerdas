@@ -104,6 +104,7 @@ dompet_cerdas/
 ### 2. 📋 Transaksi (Transactions)
 - **CRUD operations**: Add, view, edit, delete transactions
 - **Filters**: By month, by date range
+- **Minimal mobile UI**: Summary cards shown at top; search/type/category filters are hidden inside the filter panel toggle
 - **Grouping**: Transactions grouped by date
 - **Smart sorting**: Within each date group, sorted by creation time (newest first)
 - **Attachments**: Support for image (JPG, PNG, GIF, WEBP) and PDF uploads
@@ -582,7 +583,7 @@ Integrasi dengan Telegram untuk input dan monitoring transaksi via chat dengan *
    - `/start` → Bot generates unique token
    - Click link → Opens web app
    - Auto-validates with existing Google Auth
-   - Links Telegram ID to Firebase UID
+  - Links Telegram ID to Firebase UID via secure Cloud Function (server-side token validation)
    - Token expires in 5 minutes
    - Privacy-friendly (no phone number required)
 
