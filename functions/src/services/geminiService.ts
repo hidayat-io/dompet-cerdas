@@ -101,20 +101,35 @@ Examples:
 /**
  * Format receipt data for display
  */
-export function formatReceiptData(data: ReceiptData): string {
+export function formatReceiptData(data: ReceiptData, caption?: string, categoryOverride?: string): string {
     const formattedAmount = data.totalAmount.toLocaleString('id-ID');
+    const displayCategory = categoryOverride && categoryOverride.trim()
+        ? categoryOverride.trim()
+        : data.categorySuggestion;
 
-    return `📸 *Struk berhasil dianalisis!*
+    let message = `📸 *Struk berhasil dianalisis!*
 
 💰 Total: Rp ${formattedAmount}
 🏪 Merchant: ${data.merchant}
 📅 Tanggal: ${formatDate(data.date)}
-🏷️ Kategori: ${data.categorySuggestion}
-${data.items && data.items.length > 0 ? `\n📝 Items: ${data.items.slice(0, 3).join(', ')}${data.items.length > 3 ? '...' : ''}` : ''}
+🏷️ Kategori: ${displayCategory}`;
 
-${data.confidence === 'high' ? '✅ Confidence: High' : data.confidence === 'medium' ? '⚠️ Confidence: Medium - mohon cek kembali' : '❌ Confidence: Low - harap verifikasi manual'}
+    // Add caption/description if provided
+    if (caption && caption.trim()) {
+        message += `\n📝 Deskripsi: _${caption.trim()}_`;
+    }
 
-Apakah data sudah benar?`;
+    // Add items if available
+    if (data.items && data.items.length > 0) {
+        message += `\n\n📦 Items: ${data.items.slice(0, 3).join(', ')}${data.items.length > 3 ? '...' : ''}`;
+    }
+
+    // Add confidence level
+    message += `\n\n${data.confidence === 'high' ? '✅ Confidence: High' : data.confidence === 'medium' ? '⚠️ Confidence: Medium - mohon cek kembali' : '❌ Confidence: Low - harap verifikasi manual'}`;
+
+    message += `\n\nApakah data sudah benar?`;
+
+    return message;
 }
 
 /**

@@ -471,9 +471,26 @@ function parseAmountToken(token: string): number | null {
     return Math.round(baseValue * multiplier);
 }
 
+function extractCategoryKeyword(message: string): { cleanedMessage: string; categoryHint?: string } {
+    const keywordRegex = /\b(cat|categ|category|kategori|kat|ktg|ktgr|kate)\b\s*[:\-]?\s*([a-zA-ZÀ-ÿ0-9]+(?:\s+[a-zA-ZÀ-ÿ0-9]+){0,2})/i;
+    const match = message.match(keywordRegex);
+    if (!match) {
+        return { cleanedMessage: message };
+    }
+
+    const categoryHint = match[2]?.trim();
+    const cleanedMessage = message
+        .replace(match[0], ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    return { cleanedMessage, categoryHint };
+}
+
 function extractManualTransaction(message: string): { amount: number; description: string; category_hint?: string } | null {
     const normalizedMessage = collapseRepeatedMessage(message);
-    const matchAll = [...normalizedMessage.matchAll(/(?:rp\s*)?\d[\d.,]*\s*(?:k|rb|ribu|jt|juta|m|milyar|miliar)?\b/gi)];
+    const { cleanedMessage, categoryHint } = extractCategoryKeyword(normalizedMessage);
+    const matchAll = [...cleanedMessage.matchAll(/(?:rp\s*)?\d[\d.,]*\s*(?:k|rb|ribu|jt|juta|m|milyar|miliar)?\b/gi)];
     if (matchAll.length === 0) return null;
 
     const lastMatch = matchAll[matchAll.length - 1];
@@ -481,7 +498,7 @@ function extractManualTransaction(message: string): { amount: number; descriptio
     const amount = parseAmountToken(amountToken);
     if (!amount || amount <= 0) return null;
 
-    let description = normalizedMessage;
+    let description = cleanedMessage;
     for (const match of matchAll) {
         const token = match[0];
         const tokenRegex = new RegExp(escapeRegex(token), 'gi');
@@ -495,13 +512,13 @@ function extractManualTransaction(message: string): { amount: number; descriptio
     if (!description) return null;
 
     const lowerDesc = description.toLowerCase();
-    let category_hint: string | undefined;
+    let category_hint: string | undefined = categoryHint;
     if (/makan|sarapan|breakfast|lunch|dinner|warteg|warung|kopi|cafe|resto|restaurant|snack|camil|camilan|keripik|chips|cassava|casava/.test(lowerDesc)) {
-        category_hint = 'Food';
+        category_hint = category_hint || 'Food';
     } else if (/grab|gojek|ojek|bus|kereta|taxi|tol|parkir|bensin|bbm|pertamina/.test(lowerDesc)) {
-        category_hint = 'Transportation';
+        category_hint = category_hint || 'Transportation';
     } else if (/belanja|shopping|market|minimarket|indomaret|alfamart|supermarket|mall/.test(lowerDesc)) {
-        category_hint = 'Shopping';
+        category_hint = category_hint || 'Shopping';
     }
 
     return { amount, description, category_hint };
@@ -610,15 +627,19 @@ Rules:
     - "35jt" = 35000000, "2,5jt" = 2500000
     - "150rb" = 150000, "1.2rb" = 1200
     - "35 juta" = 35000000, "1,5 juta" = 1500000
-7. Anggap format "Label : amount" sebagai add_transaction, contoh:
+7. **PENTING - Category Keyword Detection**: Jika user menyebut "category [nama]" atau "kategori [nama]", extract [nama] sebagai category_hint dan HAPUS "category/kategori [nama]" dari description.
+    - "Pay 2k for Friend category charity" → amount: 2000, description: "Pay 2k for Friend", category_hint: "charity"
+    - "tambah 50rb beli obat category kesehatan" → amount: 50000, description: "beli obat", category_hint: "kesehatan"
+    - "100k makan malam kategori makanan" → amount: 100000, description: "makan malam", category_hint: "makanan"
+8. Anggap format "Label : amount" sebagai add_transaction, contoh:
     - "Salary Feb : 35jt" → intent: add_transaction, amount: 35000000, description: "Salary Feb"
     - "Gaji Feb: 35 juta" → intent: add_transaction, amount: 35000000, description: "Gaji Feb"
-7. Category hint dari kata kunci: makan/food → "Food", transport/grab/gojek → "Transportation", belanja/shopping → "Shopping"
-8. **PENTING**: Jika tidak ada time range disebutkan, gunakan default "this_week" untuk query
-9. **PENTING**: Kata "terakhir" / "lalu" setelah angka hari = last_week (7 hari terakhir = last_week). TAPI jika angka < 7 dan konteksnya "transaksi terakhir", mungkin maksudnya "limit".
+9. Category hint dari kata kunci: makan/food → "Food", transport/grab/gojek → "Transportation", belanja/shopping → "Shopping"
+10. **PENTING**: Jika tidak ada time range disebutkan, gunakan default "this_week" untuk query
+11. **PENTING**: Kata "terakhir" / "lalu" setelah angka hari = last_week (7 hari terakhir = last_week). TAPI jika angka < 7 dan konteksnya "transaksi terakhir", mungkin maksudnya "limit".
     - "3 hari terakhir" = query_details, time_range: last_week (atau custom logic), days_ago: 3
     - "3 transaksi terakhir" = query_details, limit: 3
-10. Jangan terlalu strict - pahami maksud user, jangan sering minta klarifikasi
+12. Jangan terlalu strict - pahami maksud user, jangan sering minta klarifikasi
 
 Contoh:
 "berapa pengeluaran minggu ini?" → intent: query_expenses, time_range: this_week, confidence: high
@@ -651,6 +672,8 @@ Contoh:
 "detailkan" → intent: query_details, time_range: this_week, confidence: high
 "tolong detailkan" → intent: query_details, time_range: this_week, confidence: high
 "tambah 50000 makan siang" → intent: add_transaction, amount: 50000, description: "makan siang", category_hint: "Food", confidence: high
+"Pay 2k for Friend category charity" → intent: add_transaction, amount: 2000, description: "Pay 2k for Friend", category_hint: "charity", confidence: high
+"50rb beli obat category kesehatan" → intent: add_transaction, amount: 50000, description: "beli obat", category_hint: "kesehatan", confidence: high
 "Salary Feb : 35jt" → intent: add_transaction, amount: 35000000, description: "Salary Feb", confidence: high
 "Gaji Feb: 35 juta" → intent: add_transaction, amount: 35000000, description: "Gaji Feb", confidence: high
 "last 5 trans" → intent: query_details, limit: 5, confidence: high

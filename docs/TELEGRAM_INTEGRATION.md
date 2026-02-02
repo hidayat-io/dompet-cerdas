@@ -6,6 +6,15 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 
 ## Changelog
 
+### v2.2.2 (February 2, 2026) - Receipt Upload Enhancements
+- 📎 **Document Upload Support**: Image files sent as documents are now supported (JPG/PNG/WEBP)
+- 🗜️ **Mandatory Compression**: All uploads are compressed before storage
+- 📦 **1MB Post-Compression Limit**: Rejects files larger than 1MB after compression
+- 📝 **Caption as Description**: Photo/document caption is saved as transaction description
+- 🧹 **Caption Cleanup**: Category keywords (kat/ktg/cat/categ/kategori/category) are removed from description
+- 🧠 **Dynamic Category Matching**: Caption category uses AI classification for custom user categories
+- ✅ **Confirmation Preview Update**: Confirmation message shows cleaned description and caption-driven category
+
 ### v2.2.1 (January 30, 2026) - Bug Fixes & Improvements
 - 🔧 **Gemini Model Fix**: Migrated from deprecated `gemini-2.0-flash-exp` to stable `gemini-2.0-flash`
 - 📋 **List Categories**: New `list_categories` intent to show available categories (master data)
@@ -147,23 +156,29 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 ### Receipt Upload Flow
 
 ```
-1. User sends photo to bot
+1. User sends photo or image document to bot
 2. Bot validates:
-   - Single photo (no albums)
-   - JPG/PNG format (no PDF)
-   - Max 5MB size
-3. Gemini Vision analyzes image
+  - Single photo (no albums)
+  - JPG/PNG/WEBP format (no PDF)
+  - Max 5MB size before compression
+3. Image is compressed (resize + JPEG quality 80)
 4. Bot validates:
-   - is_receipt == true
-   - totalAmount > 0
-5. Shows confirmation with inline buttons
-6. On confirm:
-   - Download photo from Telegram
-   - Compress with sharp
-   - Upload to Firebase Storage
-   - Map category to categoryId
-   - Save transaction to Firestore
-7. Send success message
+  - Post-compression size ≤ 1MB
+5. Gemini Vision analyzes image
+6. Bot validates:
+  - is_receipt == true
+  - totalAmount > 0
+7. Caption parsing:
+  - Extract category keyword (kat/ktg/cat/categ/kategori/category)
+  - Clean caption to remove category keyword from description
+  - Resolve category dynamically (direct → fuzzy → AI classification)
+8. Shows confirmation with inline buttons (including cleaned description + resolved category)
+9. On confirm:
+  - Download image from Telegram
+  - Upload to Firebase Storage
+  - Map category to categoryId
+  - Save transaction to Firestore
+10. Send success message
 ```
 
 ### Natural Language Flow

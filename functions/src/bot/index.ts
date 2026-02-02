@@ -7,7 +7,7 @@ import { handleStartCommand } from './commands/start';
 import { handleHelpCommand } from './commands/help';
 import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from '../services/linkService';
 import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
-import { createTransactionFromReceipt, createManualTransaction, getUserCategories } from '../services/transactionService';
+import { createTransactionFromReceipt, createManualTransaction, getUserCategories, UserCategory } from '../services/transactionService';
 import { parseIntent, isActionable, classifyCategory } from '../services/nluService';
 import { getTotalExpenses, getTotalIncome, getBalance, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
 import { analyzeFinancialHealth, generateSavingsStrategy, analyzeExpenseReduction } from '../services/advisorService';
@@ -22,6 +22,60 @@ const RATE_LIMIT_WINDOW_MS = 10_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const DUPLICATE_SUPPRESS_MS = 5_000;
 const userRateLimit = new Map<number, { windowStart: number; count: number; lastText?: string; lastTextAt?: number }>();
+
+function extractCaptionCategoryHint(caption: string): string | undefined {
+    const keywordRegex = /\b(cat|categ|category|kategori|kat|ktg|ktgr|kate)\b\s*[:\-]?\s*([a-zA-ZÀ-ÿ0-9]+(?:\s+[a-zA-ZÀ-ÿ0-9]+){0,2})/i;
+    const match = caption.match(keywordRegex);
+    if (!match) return undefined;
+
+    let hint = match[2]?.trim() || '';
+    const lowerHint = hint.toLowerCase();
+    if (lowerHint === 'shoping') hint = 'shopping';
+
+    return hint;
+}
+
+function cleanCaptionDescription(caption: string): string {
+    const keywordRegex = /\b(cat|categ|category|kategori|kat|ktg|ktgr|kate)\b\s*[:\-]?\s*([a-zA-ZÀ-ÿ0-9]+(?:\s+[a-zA-ZÀ-ÿ0-9]+){0,2})/i;
+    const match = caption.match(keywordRegex);
+    if (!match) return caption.trim();
+
+    // Remove the category keyword and hint from caption
+    const cleanedCaption = caption
+        .replace(match[0], ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    return cleanedCaption;
+}
+
+async function resolveCaptionCategoryName(caption: string, categories: UserCategory[]): Promise<string | undefined> {
+    const hint = extractCaptionCategoryHint(caption);
+    if (!hint) return undefined;
+
+    const normalizedHint = hint.toLowerCase();
+
+    // 1. Try direct match (exact name)
+    const directMatch = categories.find((category) => category.name.toLowerCase() === normalizedHint);
+    if (directMatch) return directMatch.name;
+
+    // 2. Try fuzzy match (contains)
+    const fuzzyMatch = categories.find((category) => {
+        const name = category.name.toLowerCase();
+        return name.includes(normalizedHint) || normalizedHint.includes(name);
+    });
+    if (fuzzyMatch) return fuzzyMatch.name;
+
+    // 3. Use AI classification for dynamic matching (supports any custom category)
+    try {
+        const { classifyCategory } = await import('../services/nluService');
+        const classification = await classifyCategory(hint, categories);
+        return classification.categoryName;
+    } catch (error) {
+        console.error('[CAPTION] AI category classification failed:', error);
+        return undefined;
+    }
+}
 
 function shouldThrottleUser(telegramId: number, text?: string): { blocked: boolean; reason?: string } {
     const now = Date.now();
@@ -145,12 +199,9 @@ async function handleMessage(msg: TelegramBot.Message): Promise<void> {
         return;
     }
 
-    // Reject documents/files (PDF, etc)
+    // Handle documents/files (image files as documents)
     if (msg.document) {
-        await getBot().sendMessage(
-            chatId,
-            '⚠️ Format file tidak didukung.\n\nMohon kirim foto struk langsung sebagai gambar (JPG/PNG).\nJangan kirim sebagai file/dokumen.'
-        );
+        await handleDocumentMessage(msg, userId);
         return;
     }
 
@@ -243,6 +294,7 @@ async function handlePhotoMessage(
 ): Promise<void> {
     const chatId = msg.chat.id;
     const photo = msg.photo![msg.photo!.length - 1]; // Get highest resolution
+    const photoCaption = msg.caption || ''; // Get photo caption/description
 
     try {
         // Reject albums (multiple photos)
@@ -304,6 +356,10 @@ async function handlePhotoMessage(
             return;
         }
 
+        const categories = await getUserCategories(userId);
+        const captionCategoryName = await resolveCaptionCategoryName(photoCaption, categories);
+        const cleanedCaption = cleanCaptionDescription(photoCaption);
+
         // Create session ID for confirmation
         // Create session ID (short random string max 10 chars)
         const sessionId = require('crypto').randomBytes(4).toString('hex');
@@ -314,13 +370,14 @@ async function handlePhotoMessage(
             telegramId: msg.from!.id,
             receiptData,
             photoFileId: photo.file_id,
+            photoCaption: cleanedCaption, // Store cleaned caption without category keyword
             status: 'pending',
             createdAt: new Date(),
             expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
         });
 
-        // Format confirmation message
-        const confirmationText = formatReceiptData(receiptData);
+        // Format confirmation message with caption
+        const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
 
         // Edit analyzing message with confirmation
         await getBot().editMessageText(
@@ -343,6 +400,183 @@ async function handlePhotoMessage(
         await getBot().sendMessage(
             chatId,
             '❌ Terjadi kesalahan saat memproses foto.\n\nSilakan coba lagi atau hubungi developer.'
+        );
+    }
+}
+
+/**
+ * Handle document messages (image files sent as documents)
+ */
+async function handleDocumentMessage(
+    msg: TelegramBot.Message,
+    userId: string
+): Promise<void> {
+    const chatId = msg.chat.id;
+    const document = msg.document!;
+    const documentCaption = msg.caption || ''; // Get document caption/description
+
+    try {
+        // Validate mime type (must be image)
+        const mimeType = document.mime_type || '';
+        const supportedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+        
+        if (!supportedMimes.includes(mimeType)) {
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Format file tidak didukung.\n\n' +
+                'Mohon kirim gambar dalam format: JPG, PNG, atau WEBP.\n\n' +
+                '_Cara upload:_\n' +
+                '1. Buka Telegram\n' +
+                '2. Tekan paperclip (attach)\n' +
+                '3. Pilih foto struk\n' +
+                '4. Telegram akan tanya "Send as photo/file?"\n' +
+                '5. Pilih "Send as photo" (JANGAN "Send as file")',
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        // Validate file size (max 5MB before compression)
+        const fileSizeMB = (document.file_size || 0) / (1024 * 1024);
+        if (fileSizeMB > 5) {
+            await getBot().sendMessage(
+                chatId,
+                `⚠️ Ukuran file terlalu besar!\n\nFile: ${fileSizeMB.toFixed(2)}MB (Max: 5MB)\n\nSilakan kompres terlebih dahulu.`
+            );
+            return;
+        }
+
+        // Send analyzing message
+        const analyzingMsg = await getBot().sendMessage(
+            chatId,
+            '📄 Menganalisis file...\n\nMohon tunggu beberapa detik...'
+        );
+
+        // Download file from Telegram
+        const fileLink = await getBot().getFileLink(document.file_id);
+        const response = await fetch(fileLink);
+
+        if (!response.ok) {
+            throw new Error('Failed to download document');
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        let imageBuffer = Buffer.from(arrayBuffer);
+
+        console.log(`[DOCUMENT] Downloaded document: ${document.file_name}, Original size: ${imageBuffer.length} bytes`);
+
+        // Compress image
+        const sharp = require('sharp');
+        try {
+            imageBuffer = await sharp(imageBuffer)
+                .resize(1920, 1920, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .jpeg({ quality: 80 })
+                .toBuffer();
+
+            const compressedSizeMB = imageBuffer.length / (1024 * 1024);
+            console.log(`[DOCUMENT] Compressed size: ${compressedSizeMB.toFixed(2)}MB`);
+
+            // Validate compressed size (max 1MB)
+            if (imageBuffer.length > 1024 * 1024) {
+                await getBot().deleteMessage(chatId, analyzingMsg.message_id);
+                await getBot().sendMessage(
+                    chatId,
+                    `⚠️ File terlalu besar setelah kompresi!\n\nUkuran: ${compressedSizeMB.toFixed(2)}MB\n` +
+                    `Maksimal: 1MB\n\n` +
+                    `Tips: Gunakan resolusi lebih rendah atau crop foto.`
+                );
+                return;
+            }
+        } catch (compressionError) {
+            console.error('[DOCUMENT] Compression failed:', compressionError);
+            await getBot().deleteMessage(chatId, analyzingMsg.message_id);
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Gagal memproses gambar.\n\nPastikan file adalah gambar yang valid (JPG/PNG).'
+            );
+            return;
+        }
+
+        // Analyze receipt with Gemini Vision
+        const receiptData = await analyzeReceipt(imageBuffer);
+
+        // Validation: Check if it's a receipt/invoice/proof
+        if (receiptData.is_receipt === false) {
+            await getBot().deleteMessage(chatId, analyzingMsg.message_id);
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ File ini sepertinya bukan struk/invoice/bukti bayar.\n\n' +
+                'Mohon upload:\n' +
+                '• 🧾 Struk belanja\n' +
+                '• 📋 Invoice\n' +
+                '• 📸 Bukti penerimaan/pembayaran\n' +
+                '• 💳 Bukti transfer/kartu kredit\n\n' +
+                'File yang valid dan terang-terangan.'
+            );
+            return;
+        }
+
+        // Validation: Check total amount
+        if (!receiptData.totalAmount || receiptData.totalAmount <= 0) {
+            await getBot().deleteMessage(chatId, analyzingMsg.message_id);
+            await getBot().sendMessage(
+                chatId,
+                '⚠️ Struk/invoice terdeteksi tapi nominal total tidak ditemukan.\n\n' +
+                'Mohon upload ulang dengan pencahayaan yang baik dan pastikan:\n' +
+                '• Angka "Total" terlihat jelas\n' +
+                '• Foto tidak terlipat atau blur\n' +
+                '• Semua bagian penting terlihat'
+            );
+            return;
+        }
+
+        const categories = await getUserCategories(userId);
+        const captionCategoryName = await resolveCaptionCategoryName(documentCaption, categories);
+        const cleanedCaption = cleanCaptionDescription(documentCaption);
+
+        // Create session ID for confirmation
+        const sessionId = require('crypto').randomBytes(4).toString('hex');
+
+        // Store in Firestore temporary session
+        await getDb().collection('receipt_sessions').doc(sessionId).set({
+            userId,
+            telegramId: msg.from!.id,
+            receiptData,
+            photoFileId: document.file_id,
+            photoCaption: cleanedCaption, // Store cleaned caption without category keyword
+            status: 'pending',
+            source: 'document', // Mark as document source
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+        });
+
+        // Format confirmation message with caption
+        const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
+
+        // Edit analyzing message with confirmation
+        await getBot().editMessageText(
+            confirmationText,
+            {
+                chat_id: chatId,
+                message_id: analyzingMsg.message_id,
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '✅ Ya, Simpan', callback_data: `c_${sessionId}` },
+                        { text: '❌ Batal', callback_data: `x_${sessionId}` }
+                    ]]
+                }
+            }
+        );
+
+    } catch (error) {
+        console.error('Error handling document:', error);
+        await getBot().sendMessage(
+            chatId,
+            '❌ Terjadi kesalahan saat memproses file.\n\nSilakan coba lagi atau hubungi developer.'
         );
     }
 }
@@ -744,7 +978,7 @@ async function handleCallbackQuery(
                 return;
             }
 
-            const { receiptData, userId, telegramId, photoFileId } = sessionDoc.data()!;
+            const { receiptData, userId, telegramId, photoFileId, photoCaption } = sessionDoc.data()!;
 
             // Download photo for upload (if photoFileId exists)
             let attachmentData;
@@ -782,7 +1016,8 @@ async function handleCallbackQuery(
                     userId,
                     receiptData,
                     telegramId,
-                    attachmentData
+                    attachmentData,
+                    photoCaption // Pass photo caption as description
                 );
 
                 console.log(`Saved transaction ${transactionId} from receipt session ${sessionId}`);

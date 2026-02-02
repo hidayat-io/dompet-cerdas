@@ -445,8 +445,11 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
         {/* Filter Panel */}
         {showFilters && (
           <div
-            className="rounded-xl border p-4 shadow-sm animate-fade-in-up"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+            className="rounded-xl border-2 p-5 shadow-md animate-fade-in-up"
+            style={{ 
+              backgroundColor: theme.name === 'dark' ? '#1e293b' : '#f8fafc',
+              borderColor: theme.name === 'dark' ? '#334155' : '#cbd5e1'
+            }}
           >
             {/* Filter Mode Tabs */}
             <div

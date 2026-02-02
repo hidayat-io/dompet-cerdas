@@ -11,6 +11,22 @@ import { getJakartaDateString } from '../utils/date';
 const CATEGORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const categoryCache = new Map<string, { expiresAt: number; categories: UserCategory[] }>();
 
+function extractCategoryFromCaption(caption: string): { cleanedDescription: string; categoryHint?: string } {
+    const keywordRegex = /\b(cat|categ|category|kategori|kat|ktg|ktgr|kate)\b\s*[:\-]?\s*([a-zA-ZÀ-ÿ0-9]+(?:\s+[a-zA-ZÀ-ÿ0-9]+){0,2})/i;
+    const match = caption.match(keywordRegex);
+    if (!match) {
+        return { cleanedDescription: caption.trim() };
+    }
+
+    const categoryHint = match[2]?.trim();
+    const cleanedDescription = caption
+        .replace(match[0], ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    return { cleanedDescription, categoryHint };
+}
+
 export interface UserCategory {
     id: string;
     name: string;
@@ -79,18 +95,23 @@ import { AttachmentData } from './storageService';
  * @param receiptData - Data extracted from receipt
  * @param telegramId - Telegram user ID
  * @param attachment - Optional attachment data
+ * @param photoCaption - Optional description from photo caption
  * @returns Transaction ID
  */
 export async function createTransactionFromReceipt(
     userId: string,
     receiptData: ReceiptData,
     telegramId: number,
-    attachment?: AttachmentData
+    attachment?: AttachmentData,
+    photoCaption?: string
 ): Promise<string> {
     console.log('[TRANSACTION] Starting createTransactionFromReceipt for user:', userId);
     console.log('[TRANSACTION] ReceiptData:', JSON.stringify(receiptData));
     if (attachment) {
         console.log('[TRANSACTION] Attachment:', JSON.stringify(attachment));
+    }
+    if (photoCaption) {
+        console.log('[TRANSACTION] Photo caption:', photoCaption);
     }
 
     const db = admin.firestore();
@@ -106,19 +127,40 @@ export async function createTransactionFromReceipt(
         throw new Error('No categories found for user');
     }
 
+    const captionParse = photoCaption ? extractCategoryFromCaption(photoCaption) : undefined;
+    const captionCategoryHint = captionParse?.categoryHint?.trim();
+    const captionDescription = captionParse?.cleanedDescription?.trim();
+
     let categoryId: string;
     let categoryName: string;
     const suggestion = (receiptData.categorySuggestion || '').trim();
-    const directMatch = suggestion
+    const captionDirectMatch = captionCategoryHint
+        ? categories.find((category) => category.name.toLowerCase() === captionCategoryHint.toLowerCase())
+        : undefined;
+    const suggestionDirectMatch = suggestion
         ? categories.find((category) => category.name.toLowerCase() === suggestion.toLowerCase())
         : undefined;
 
-    if (directMatch) {
-        categoryId = directMatch.id;
-        categoryName = directMatch.name;
+    const captionFuzzyMatch = captionCategoryHint
+        ? categories.find((category) => {
+            const name = category.name.toLowerCase();
+            const hint = captionCategoryHint.toLowerCase();
+            return name.includes(hint) || hint.includes(name);
+        })
+        : undefined;
+
+    if (captionDirectMatch) {
+        categoryId = captionDirectMatch.id;
+        categoryName = captionDirectMatch.name;
+    } else if (captionFuzzyMatch) {
+        categoryId = captionFuzzyMatch.id;
+        categoryName = captionFuzzyMatch.name;
+    } else if (suggestionDirectMatch) {
+        categoryId = suggestionDirectMatch.id;
+        categoryName = suggestionDirectMatch.name;
     } else {
         try {
-            const description = [receiptData.merchant, ...(receiptData.items || [])]
+            const description = [captionDescription, receiptData.merchant, ...(receiptData.items || [])]
                 .filter(Boolean)
                 .join(' ')
                 .trim();
@@ -142,11 +184,16 @@ export async function createTransactionFromReceipt(
     // Format date as YYYY-MM-DD (Jakarta Time)
     const dateString = getJakartaDateString(transactionDate);
 
+    // Use photo caption as description if provided, otherwise use merchant name
+    const description = captionDescription && captionDescription.trim()
+        ? captionDescription.trim()
+        : (receiptData.merchant || 'Receipt purchase');
+
     // Create transaction object matching web app schema
     const transaction: Record<string, unknown> = {
         amount: receiptData.totalAmount,
         categoryId,
-        description: receiptData.merchant || 'Receipt purchase',
+        description,
         date: dateString,
         createdAt: new Date().toISOString()
     };
