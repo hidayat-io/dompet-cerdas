@@ -419,7 +419,7 @@ async function handleDocumentMessage(
         // Validate mime type (must be image)
         const mimeType = document.mime_type || '';
         const supportedMimes = ['image/jpeg', 'image/png', 'image/webp'];
-        
+
         if (!supportedMimes.includes(mimeType)) {
             await getBot().sendMessage(
                 chatId,
@@ -603,13 +603,14 @@ async function handleTextMessage(
 
         // Handle low confidence or need clarification
         if (!isActionable(parsedIntent)) {
+            // Delete processing message first
+            await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
+
             if (parsedIntent.clarification_needed) {
                 await getBot().sendMessage(chatId, responseFormatter.formatClarification(parsedIntent.clarification_needed), { parse_mode: 'Markdown' });
             } else {
                 await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
             }
-            // Delete processing message
-            await getBot().deleteMessage(chatId, processingMsg.message_id);
             return;
         }
 
@@ -634,6 +635,7 @@ async function handleTextMessage(
                 }
 
                 const response = responseFormatter.formatExpenseResponse(total, count, timeRangeText);
+                await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
@@ -644,6 +646,7 @@ async function handleTextMessage(
                 const { total, count } = await getTotalIncome(userId, timeRange || 'this_month');
                 const timeRangeText = formatTimeRange(timeRange || 'this_month');
                 const response = responseFormatter.formatIncomeResponse(total, count, timeRangeText);
+                await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
@@ -673,6 +676,7 @@ async function handleTextMessage(
                 }
 
                 const response = responseFormatter.formatBalanceResponse(balance, timeRangeText || undefined);
+                await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
@@ -719,6 +723,7 @@ async function handleTextMessage(
 
                 const categoryText = categoryFilter ? ` kategori ${categoryFilter}` : '';
                 const response = responseFormatter.formatTransactionDetails(details, timeRangeText + categoryText, limitNotice);
+                await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
@@ -736,6 +741,7 @@ async function handleTextMessage(
                 }
 
                 const response = responseFormatter.formatCategoryBreakdown(categories, timeRangeText);
+                await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
@@ -744,8 +750,8 @@ async function handleTextMessage(
                 const { amount, description, category_hint } = parsedIntent.parameters;
 
                 if (!amount || !description) {
+                    await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, '❌ Jumlah atau deskripsi tidak ditemukan.\n\nContoh: "tambah 50000 makan siang"');
-                    await getBot().deleteMessage(chatId, processingMsg.message_id);
                     return;
                 }
 
@@ -815,6 +821,7 @@ async function handleTextMessage(
                 console.log(`Created manual transaction ${transactionId} for user ${userId}`);
 
                 const response = responseFormatter.formatTransactionAdded(amount, categoryChoice.categoryName, description);
+                await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
             }
@@ -823,9 +830,10 @@ async function handleTextMessage(
                 try {
                     const timeRange = parsedIntent.parameters.time_range || 'this_month';
                     const advice = await analyzeFinancialHealth(userId, timeRange);
-                    
+
                     // Format with metadata
                     const formattedAdvice = responseFormatter.formatFinancialAdvice(advice);
+                    await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, formattedAdvice, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error in financial advice:', error);
@@ -839,8 +847,9 @@ async function handleTextMessage(
                 try {
                     const timeRange = parsedIntent.parameters.time_range || 'this_month';
                     const strategy = await generateSavingsStrategy(userId, timeRange);
-                    
+
                     const formattedStrategy = responseFormatter.formatSavingsStrategy(strategy);
+                    await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, formattedStrategy, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error in savings strategy:', error);
@@ -854,8 +863,9 @@ async function handleTextMessage(
                 try {
                     const timeRange = parsedIntent.parameters.time_range || 'this_month';
                     const analysis = await analyzeExpenseReduction(userId, timeRange);
-                    
+
                     const formattedAnalysis = responseFormatter.formatExpenseAnalysis(analysis);
+                    await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, formattedAnalysis, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error in expense analysis:', error);
@@ -869,6 +879,7 @@ async function handleTextMessage(
                 try {
                     const categories = await getUserCategories(userId);
                     const response = responseFormatter.formatCategoryList(categories);
+                    await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error listing categories:', error);
@@ -878,11 +889,11 @@ async function handleTextMessage(
             }
 
             default:
+                await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
         }
 
-        // Delete processing message after response is sent
-        await getBot().deleteMessage(chatId, processingMsg.message_id);
+
 
     } catch (error) {
         console.error('Error handling text message:', error);

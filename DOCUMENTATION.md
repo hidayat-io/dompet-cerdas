@@ -128,6 +128,10 @@ dompet_cerdas/
 - **Add item popup**: Add new items via popup modal (consistent UX)
 - **Apply to real**: Convert simulation items to real transactions
 - **Balance preview**: See projected balance after simulation
+- **Balance mode toggle**: Option to use current month balance only or total balance
+  - Toggle at simulation level (applies to entire simulation)
+  - Visual indicator on simulation cards showing "Saldo bulan ini"
+  - Projected balance calculated from selected base (total or current month)
 - **Improved layout**: Category as main text, item name as secondary, price displayed below
 
 ### 4. 📁 Master Kategori (Categories)
@@ -193,6 +197,7 @@ users/
             ├── id: string
             ├── title: string
             ├── createdAt: string
+            ├── useCurrentMonthBalance?: boolean
             └── items: [
                 {
                     id: string,

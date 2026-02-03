@@ -7,24 +7,28 @@ interface SimulationManagerProps {
     simulations: Simulation[];
     categories: Category[];
     currentBalance: number;
+    currentMonthBalance: number;
     onCreateSimulation: (title: string) => void;
     onDeleteSimulation: (id: string) => void;
     onAddSimulationItem: (simId: string, item: Omit<SimulationItem, 'id'>) => void;
     onUpdateSimulationItem: (simId: string, itemId: string, item: Omit<SimulationItem, 'id'>) => void;
     onDeleteSimulationItem: (simId: string, itemId: string) => void;
     onApplyItemToReal: (item: SimulationItem, date: string) => void;
+    onUpdateSimulationSettings: (simId: string, useCurrentMonthBalance: boolean) => void;
 }
 
 const SimulationManager: React.FC<SimulationManagerProps> = ({
     simulations,
     categories,
     currentBalance,
+    currentMonthBalance,
     onCreateSimulation,
     onDeleteSimulation,
     onAddSimulationItem,
     onUpdateSimulationItem,
     onDeleteSimulationItem,
-    onApplyItemToReal
+    onApplyItemToReal,
+    onUpdateSimulationSettings
 }) => {
     const { theme } = useTheme();
     const [activeSimId, setActiveSimId] = useState<string | null>(null);
@@ -141,10 +145,13 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
         const sim = simulations.find(s => s.id === activeSimId);
         if (!sim) return <div onClick={() => setActiveSimId(null)}>Simulasi tidak ditemukan. Kembali.</div>;
 
+        const useMonthBalance = !!sim.useCurrentMonthBalance;
+        const baseBalance = useMonthBalance ? currentMonthBalance : currentBalance;
+
         const simIncome = sim.items.filter(i => i.type === 'INCOME').reduce((acc, i) => acc + i.amount, 0);
         const simExpense = sim.items.filter(i => i.type === 'EXPENSE').reduce((acc, i) => acc + i.amount, 0);
         const simTotal = simIncome - simExpense;
-        const projectedBalance = currentBalance + simTotal;
+        const projectedBalance = baseBalance + simTotal;
 
         const filteredCategories = categories.filter(c => c.type === newItemType);
 
@@ -191,11 +198,35 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                             <p className="text-lg font-bold" style={{ color: theme.colors.accent }}>{formatRp(projectedBalance)}</p>
                         </div>
                     </div>
+
+                    {/* Toggle: Gunakan Saldo Bulan Ini */}
+                    <label
+                        className="flex items-center justify-between gap-4 p-4 rounded-xl border cursor-pointer hover:bg-opacity-70 transition-all mt-4"
+                        style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
+                    >
+                        <div>
+                            <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>Gunakan saldo bulan ini saja</p>
+                            <p className="text-xs" style={{ color: theme.colors.textMuted }}>Proyeksi simulasi dihitung dari saldo bulan berjalan ({formatRp(currentMonthBalance)})</p>
+                        </div>
+                        <input
+                            type="checkbox"
+                            checked={useMonthBalance}
+                            onChange={e => onUpdateSimulationSettings(sim.id, e.target.checked)}
+                            className="w-5 h-5"
+                            style={{ accentColor: theme.colors.accent }}
+                        />
+                    </label>
                 </div>
 
                 {/* Button Tambah Item */}
                 <button
-                    onClick={() => setShowAddModal(true)}
+                    onClick={() => {
+                        setNewItemName('');
+                        setNewItemAmount('');
+                        setNewItemType('EXPENSE');
+                        setNewItemCategory('');
+                        setShowAddModal(true);
+                    }}
                     className="w-full p-4 rounded-xl border-2 border-dashed transition-all hover:border-solid flex items-center justify-center gap-2 font-medium"
                     style={{
                         borderColor: theme.colors.accent,
@@ -605,6 +636,8 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                         const total = sim.items.reduce((acc, i) => {
                             return i.type === 'INCOME' ? acc + i.amount : acc - i.amount;
                         }, 0);
+                        
+                        const useMonthBalance = !!sim.useCurrentMonthBalance;
 
                         return (
                             <div
@@ -615,7 +648,18 @@ const SimulationManager: React.FC<SimulationManagerProps> = ({
                             >
                                 <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: theme.colors.accent }}></div>
                                 <div className="flex justify-between items-start mb-3">
-                                    <h3 className="font-bold text-lg pr-8" style={{ color: theme.colors.textPrimary }}>{sim.title}</h3>
+                                    <div className="flex-1 pr-8">
+                                        <h3 className="font-bold text-lg mb-1" style={{ color: theme.colors.textPrimary }}>{sim.title}</h3>
+                                        {useMonthBalance && (
+                                            <div className="flex items-center gap-1.5">
+                                                <IconDisplay name="Calendar" size={12} style={{ color: theme.colors.accent }} />
+                                                <span
+                                                    className="text-[10px] font-medium"
+                                                    style={{ color: theme.colors.accent }}
+                                                >Saldo bulan ini</span>
+                                            </div>
+                                        )}
+                                    </div>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onDeleteSimulation(sim.id); }}
                                         className="text-gray-300 hover:text-red-500 p-1 absolute top-4 right-4 z-10 hover:scale-110 transition-transform"

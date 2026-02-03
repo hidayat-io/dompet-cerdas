@@ -295,7 +295,8 @@ function formatExactRupiah(amount: number): string {
 export function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-    return `${date.getDate()} ${months[date.getMonth()]}`;
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    return `${date.getDate()} ${months[date.getMonth()]} - ${days[date.getDay()]}`;
 }
 
 /**

@@ -45,6 +45,7 @@ export interface Simulation {
   title: string;
   items: SimulationItem[];
   createdAt: string;
+  useCurrentMonthBalance?: boolean;
 }
 
 // Icon names available for selection (150+ icons from Lucide React)

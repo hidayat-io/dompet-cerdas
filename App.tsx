@@ -420,6 +420,12 @@ function App() {
     }
   };
 
+  const updateSimulationSettings = async (simId: string, useCurrentMonthBalance: boolean) => {
+    if (!user) return;
+    const simRef = doc(db, 'users', user.uid, 'simulations', simId);
+    await setDoc(simRef, { useCurrentMonthBalance }, { merge: true });
+  };
+
   const deleteSimulationItem = async (simId: string, itemId: string) => {
     if (!user) return;
     const simRef = doc(db, 'users', user.uid, 'simulations', simId);
@@ -461,6 +467,20 @@ function App() {
   };
 
   const currentBalance = transactions.reduce((acc, t) => {
+    const type = categories.find(c => c.id === t.categoryId)?.type;
+    return type === 'INCOME' ? acc + t.amount : acc - t.amount;
+  }, 0);
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentMonthBalance = transactions.reduce((acc, t) => {
+    if (!t.date) return acc;
+    const [yearStr, monthStr] = t.date.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    if (year !== currentYear || month !== currentMonth) return acc;
+
     const type = categories.find(c => c.id === t.categoryId)?.type;
     return type === 'INCOME' ? acc + t.amount : acc - t.amount;
   }, 0);
@@ -694,12 +714,14 @@ function App() {
                 simulations={simulations}
                 categories={categories}
                 currentBalance={currentBalance}
+                currentMonthBalance={currentMonthBalance}
                 onCreateSimulation={createSimulation}
                 onDeleteSimulation={deleteSimulation}
                 onAddSimulationItem={addSimulationItem}
                 onUpdateSimulationItem={updateSimulationItem}
                 onDeleteSimulationItem={deleteSimulationItem}
                 onApplyItemToReal={applySimulationItemToReal}
+                onUpdateSimulationSettings={updateSimulationSettings}
               />
             )}
 
