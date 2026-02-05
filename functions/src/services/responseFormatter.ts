@@ -368,21 +368,38 @@ ${lines.join('\n')}
 💰 Total: ${formatExactRupiah(totalAmount)}`;
 }
 
-/**
- * Format transaction details list
- */
 export function formatTransactionDetails(
     details: TransactionDetail[],
     timeRange: string,
     notice?: string
 ): string {
     if (details.length === 0) {
-        return `📋 Belum ada pengeluaran ${timeRange}.`;
+        return `📋 Belum ada transaksi ${timeRange}.`;
     }
 
-    const total = details.reduce((sum, item) => sum + item.amount, 0);
-    const header = `📋 *Detail pengeluaran ${timeRange}*\n\n💰 Total: ${formatExactRupiah(total)} (${details.length} transaksi)\n`;
-    const noticeText = notice ? `\n${notice}\n` : '';
+    // Separate income and expenses
+    const expenses = details.filter(d => d.type === 'EXPENSE');
+    const income = details.filter(d => d.type === 'INCOME');
+
+    const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
+    const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
+    const netBalance = totalIncome - totalExpense;
+
+    // Build header with summary
+    let header = `📋 *Detail transaksi ${timeRange}*\n\n`;
+    header += `💰 Ringkasan:\n`;
+    if (income.length > 0) {
+        header += `  ➕ Pemasukan: ${formatExactRupiah(totalIncome)} (${income.length}x)\n`;
+    }
+    if (expenses.length > 0) {
+        header += `  ➖ Pengeluaran: ${formatExactRupiah(totalExpense)} (${expenses.length}x)\n`;
+    }
+    if (income.length > 0 && expenses.length > 0) {
+        header += `  💎 Saldo: ${formatExactRupiah(netBalance)}\n`;
+    }
+    header += `\n`;
+
+    const noticeText = notice ? `${notice}\n\n` : '';
 
     // Show date if range is more than 1 day
     const showDate = !['hari ini', 'kemarin'].includes(timeRange.toLowerCase());
@@ -401,7 +418,8 @@ export function formatTransactionDetails(
         const sections = Object.keys(grouped).map(date => {
             const items = grouped[date].map((item) => {
                 const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
-                return `• ${item.description}\n  💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
+                const typeIndicator = item.type === 'INCOME' ? '➕' : '➖';
+                return `${typeIndicator} ${item.description}\n  💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
             }).join('\n');
             return `\n📅 *${date}*\n${items}`;
         }).join('\n');
@@ -411,7 +429,8 @@ export function formatTransactionDetails(
         // Simple list for single day
         const items = details.map((item, index) => {
             const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
-            return `\n${index + 1}. *${item.description}*\n   💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
+            const typeIndicator = item.type === 'INCOME' ? '➕' : '➖';
+            return `\n${index + 1}. ${typeIndicator} *${item.description}*\n   💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
         }).join('');
         return header + noticeText + items;
     }

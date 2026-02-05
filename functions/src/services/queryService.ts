@@ -408,6 +408,7 @@ export interface TransactionDetail {
     date: string;
     createdAt: string;
     icon?: string;
+    type: 'INCOME' | 'EXPENSE'; // Transaction type
 }
 
 /**
@@ -552,20 +553,16 @@ export async function getTransactionDetails(
         .get();
 
     const categories = new Map<string, { name: string; type: string; icon: string }>();
-    const expenseCategoryIds = new Set<string>();
 
     categoriesSnapshot.forEach(doc => {
         const cat = doc.data();
         categories.set(doc.id, { name: cat.name, type: cat.type, icon: cat.icon || 'Package' });
-        if (cat.type === 'EXPENSE') {
-            expenseCategoryIds.add(doc.id);
-        }
     });
 
     // Use AI to match category filter if provided
     let matchedCategoryName: string | null = null;
     if (categoryFilter) {
-        // Get ALL category names for matching (not just expense)
+        // Get ALL category names for matching (both expense and income)
         const allCategoryNames: string[] = [];
         categories.forEach((catInfo) => {
             allCategoryNames.push(catInfo.name);
@@ -580,29 +577,7 @@ export async function getTransactionDetails(
             return [];
         }
 
-        // Check if matched category is EXPENSE type
-        let isExpenseCategory = false;
-        console.log(`[CategoryMatch] Checking if "${matchedCategoryName}" is EXPENSE type...`);
-        console.log(`[CategoryMatch] Expense category IDs:`, Array.from(expenseCategoryIds));
-
-        categories.forEach((catInfo, catId) => {
-            if (catInfo.name === matchedCategoryName) {
-                console.log(`[CategoryMatch] Found category "${catInfo.name}" with id=${catId}, type=${catInfo.type}, isInExpenseSet=${expenseCategoryIds.has(catId)}`);
-                if (expenseCategoryIds.has(catId)) {
-                    isExpenseCategory = true;
-                }
-            }
-        });
-
-        console.log(`[CategoryMatch] isExpenseCategory result: ${isExpenseCategory}`);
-
-        if (!isExpenseCategory) {
-            // Category found but it's INCOME, not EXPENSE
-            console.log(`[CategoryMatch] Category "${matchedCategoryName}" found but it's INCOME type, bot only shows EXPENSE details`);
-            return [];
-        }
-
-        console.log(`[CategoryMatch] Successfully matched EXPENSE category: "${matchedCategoryName}"`);
+        console.log(`[CategoryMatch] Successfully matched category: "${matchedCategoryName}"`);
     }
 
     // Query transactions by date (no orderBy to avoid index requirement)
@@ -614,17 +589,12 @@ export async function getTransactionDetails(
         .where('date', '<=', endStr)
         .get();
 
-    // Build transaction details (only expenses)
+    // Build transaction details (both expenses and income)
     const details: TransactionDetail[] = [];
 
     snapshot.forEach(doc => {
         const data = doc.data();
         const categoryId = data.categoryId;
-
-        // Only process expense categories
-        if (!expenseCategoryIds.has(categoryId)) {
-            return;
-        }
 
         const categoryInfo = categories.get(categoryId);
         const categoryName = categoryInfo?.name || 'Other';
@@ -641,7 +611,8 @@ export async function getTransactionDetails(
             category: categoryName,
             date: data.date,
             createdAt: data.createdAt || data.date,
-            icon: categoryIcon
+            icon: categoryIcon,
+            type: (categoryInfo?.type as 'INCOME' | 'EXPENSE') || 'EXPENSE'
         });
     });
 
