@@ -316,16 +316,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
       // Show success notification
       if (onShowNotification) {
         onShowNotification('success', 'Berhasil!', initialData ? 'Transaksi berhasil diupdate!' : 'Transaksi berhasil disimpan!', true);
+        onClose();
       } else {
         setToastMessage(initialData ? '✅ Transaksi berhasil diupdate!' : '✅ Transaksi berhasil disimpan!');
         setToastType('success');
         setShowToast(true);
+        setTimeout(() => {
+          onClose();
+        }, 200);
       }
-
-      // Close modal after short delay
-      setTimeout(() => {
-        onClose();
-      }, onShowNotification ? 1000 : 500);
 
     } catch (error) {
       console.error('Error saving transaction:', error);

@@ -1,7 +1,7 @@
 # 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.2.3
 
 **Status**: ✅ Fully Documented  
-**Last Updated**: February 3, 2026  
+**Last Updated**: March 14, 2026  
 **Version**: 2.2.3  
 **Live URL**: https://dompas.indoomega.my.id
 
@@ -19,6 +19,7 @@
 - ✅ Receipt scanning via Telegram (Vision API)
 - ✅ Natural language queries ("berapa pengeluaran hari ini?")
 - ✅ AI financial advisor dengan rekomendasi hemat
+- ✅ Web AI analysis dengan 3 mode + backend quota per user
 - ✅ Excel export dengan date range selection
 - ✅ Multi-category dengan 150+ icons
 - ✅ Secure account linking via token
@@ -31,15 +32,9 @@
 | File | Deskripsi |
 |------|-----------|
 | **README.md** | Quick start, features overview, deployment instructions |
-| **DOCUMENTATION.md** | Technical documentation lengkap (919 lines) |
-| **TELEGRAM_BOT_TECHNICAL_PLAN.md** | Detailed Telegram bot architecture & flows (838 lines) |
+| **DOKUMENTASI_LENGKAP.md** | Canonical project documentation dan indeks dokumentasi |
 | **docs/TELEGRAM_INTEGRATION.md** | Telegram bot technical docs dengan NLU & Vision API |
-| **functions/README.md** | Cloud Functions setup & deployment guide |
-| **TESTING.md** | Testing guide dengan 9 test cases & NLU fixes |
-| **PHASE_1_COMPLETE.md** | Phase 1 implementation summary & checklist |
-| **DEPLOYMENT_SUCCESS.md** | Phase 1 deployment confirmation & status |
-| **DEBUGGING_GUIDE.md** | Firestore index troubleshooting |
-| **CORS_FIX_COMPLETE.md** | CORS headers fix untuk bot notifications |
+| **TESTING.md** | Testing guide dengan regression checklist bot |
 | **landing-page/DOCUMENTATION.md** | Landing page customization guide |
 | **utils/README.md** | File compression utility documentation |
 
@@ -139,14 +134,13 @@ dompet_cerdas/
 | **Database** | Firestore | 12.x | Real-time NoSQL DB |
 | **Storage** | Firebase Storage | 12.x | Receipt images |
 | **Hosting** | Firebase Hosting | - | CDN global |
-| **Functions** | Cloud Functions | Node 20 | Backend serverless |
+| **Functions** | Cloud Functions | Node 22 | Backend serverless |
 | **AI - Vision** | Gemini Vision | 2.0 Flash | Receipt OCR |
 | **AI - NLU** | Gemini NLU | 2.0 Flash | Intent parsing |
 | **AI - Advisor** | Gemini 2.0 Flash | 2.0 Flash | Financial insights |
 | **Bot SDK** | node-telegram-bot-api | Latest | Telegram integration |
-| **Excel** | SheetJS | Latest | .xlsx export |
+| **Excel** | ExcelJS | Latest | .xlsx export |
 | **Images** | Sharp | Latest | Image compression |
-| **File Download** | FileSaver.js | Latest | Browser download |
 
 ---
 
@@ -188,12 +182,12 @@ dompet_cerdas/
 
 ### 5️⃣ AI Financial Advisor 🆕
 - **Gemini Integration**: Deep financial analysis
-- **Three Analysis Types**:
-  1. Financial Health: Overall insights & recommendations
-  2. Savings Strategy: Forward-looking savings plan
-  3. Expense Analysis: Identify reducible expenses
+- **Three Web Analysis Modes**:
+  1. Financial Health: Overall cashflow health & stability
+  2. Spending Pattern: Dominant categories, frequency, and outliers
+  3. Savings Advice: Data-bounded savings opportunities
 - **Smart Sampling**: Top expenses + recent + diverse categories
-- **Rate Limiting**: 30s cooldown, 10/hour, 50/day per user
+- **Backend Quota**: 20s cooldown, 12 analyses/day, 30,000 tokens/day per user
 - **Scope Limited**: Only user's transaction data
 
 ### 6️⃣ Excel Export
@@ -201,7 +195,14 @@ dompet_cerdas/
 - **Auto-Format**: Currency & summary rows
 - **Filename**: `Transaksi_YYYY-MM-DD_YYYY-MM-DD.xlsx`
 - **File Validation**: Max 10MB
-- **Data URL Approach**: Reliable download
+- **Blob Download**: Browser-native download via `writeBuffer()`
+- **Library**: ExcelJS with lazy-loaded export chunk
+
+### 8️⃣ Security & Dependency Hardening
+- **Functions Runtime**: Upgraded to Node.js 22
+- **Web AI**: Moved to callable Cloud Function for quota enforcement
+- **Root Audit**: Frontend dependency audit cleaned after replacing SheetJS
+- **Backend Note**: Remaining audit findings are tied to `node-telegram-bot-api` transitive dependencies
 
 ### 7️⃣ Theme System (Light/Dark)
 - **Toggle**: Dark/Light mode switch
@@ -395,7 +396,7 @@ curl -X POST "https://api.telegram.org/bot{TOKEN}/deleteWebhook"
 ### Infrastructure
 
 - **Frontend Hosting**: Firebase Hosting (CDN Global)
-- **Backend**: Cloud Functions (Node.js 20, asia-southeast1 region)
+- **Backend**: Cloud Functions (Node.js 22, asia-southeast1 region)
 - **Database**: Firestore
 - **Storage**: Firebase Storage
 - **CDN/Proxy**: Cloudflare Worker (reverse proxy)
@@ -530,23 +531,6 @@ firebase functions:log
 - Deployment instructions
 - Version history
 
-### DOCUMENTATION.md (919 lines)
-- Complete technical reference
-- Database schema detail
-- Component architecture
-- Theme system
-- Deployment flow
-- Mobile navigation layout
-
-### TELEGRAM_BOT_TECHNICAL_PLAN.md (838 lines)
-- Executive summary
-- Feature overview (NLU, Vision, Account Linking)
-- Detailed architecture diagrams
-- Gemini AI integration strategy
-- Account linking flow
-- Security measures
-- Rate limiting
-
 ### docs/TELEGRAM_INTEGRATION.md (403 lines)
 - Bot overview & capabilities
 - Changelog (v2.2.2 - v2.0)
@@ -557,15 +541,6 @@ firebase functions:log
 - Query examples
 - Firestore schema
 
-### functions/README.md
-- Setup instructions
-- Directory structure
-- Development & deployment
-- Environment variables
-- Function descriptions
-- Testing procedures
-- Troubleshooting guide
-
 ### TESTING.md
 - NLU test fix summary
 - 9 mandatory test cases
@@ -573,33 +548,10 @@ firebase functions:log
 - Manual regression tests
 - Logging guide
 
-### PHASE_1_COMPLETE.md
-- Implementation summary
-- Files created/modified
-- Next steps for user
-- Testing checklist
-- Phase 2 & 3 preview
-- Cost estimate
-
-### DEPLOYMENT_SUCCESS.md
-- Phase 1 deployment status
-- Deployed functions list
-- Bot configuration
-- Testing checklist
-- Useful commands
-
-### DEBUGGING_GUIDE.md
-- Firestore index missing issue
-- Solution applied
-- Check index status
-- Testing after fix
-- Timeline
-
-### CORS_FIX_COMPLETE.md
-- Bot notification issue
-- CORS headers fix
-- Testing end-to-end flow
-- What's working now
+### Removed obsolete docs
+- `DOCUMENTATION.md` dihapus karena duplikat lama dari dokumentasi utama
+- `TELEGRAM_BOT_TECHNICAL_PLAN.md` dihapus karena masih draft/planning phase
+- `functions/README.md` dihapus karena status implementasinya tertinggal dari kondisi aktual
 
 ### landing-page/DOCUMENTATION.md
 - Landing page overview
@@ -750,4 +702,3 @@ firebase functions:log
 **Last Updated**: February 3, 2026  
 **Status**: ✅ Production Ready  
 **Support**: Check documentation or Firebase console logs
-

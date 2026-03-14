@@ -4,8 +4,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, db, storage, firebaseApp } from './firebase';
+import { auth, db, storage } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
 import { Category, Transaction, Simulation, SimulationItem } from './types';
@@ -17,7 +16,8 @@ import SimulationManager from './components/SimulationManager';
 import AuthLogin from './components/AuthLogin';
 import Settings from './components/Settings';
 import LinkTelegram from './components/LinkTelegram';
-import { getFinancialAdvice } from './services/geminiService';
+import ReactMarkdown from 'react-markdown';
+import { FinancialAnalysisMode, FinancialAnalysisResult, getFinancialAdvice } from './services/geminiService';
 import IconDisplay from './components/IconDisplay';
 import { useTheme } from './contexts/ThemeContext';
 import NotificationModal, { NotificationType } from './components/NotificationModal';
@@ -25,8 +25,6 @@ import NotificationModal, { NotificationType } from './components/NotificationMo
 // ... (skip content)
 
 type View = 'DASHBOARD' | 'TRANSACTIONS' | 'CATEGORIES' | 'SIMULATION' | 'AI_ADVISOR' | 'SETTINGS';
-
-const functions = getFunctions(firebaseApp, 'asia-southeast1');
 
 function App() {
   const { theme } = useTheme();
@@ -44,8 +42,10 @@ function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [simulations, setSimulations] = useState<Simulation[]>([]);
 
-  const [aiAnalysis, setAiAnalysis] = useState<string>("");
+  const [aiAnalysis, setAiAnalysis] = useState<FinancialAnalysisResult | null>(null);
+  const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [aiAnalysisMode, setAiAnalysisMode] = useState<FinancialAnalysisMode>('HEALTH');
 
   // Notification State
   const [notification, setNotification] = useState<{
@@ -370,7 +370,7 @@ function App() {
     if (!user) return;
     const isUsed = transactions.some(t => t.categoryId === id);
     if (isUsed) {
-      showNotification('error', 'Tidak Dapat Dihapus', 'Kategori ini tidak bisa dihapus karena masih digunakan dalam transaksi.', false);
+      showNotification('error', 'Tidak Dapat Dihapus', 'Kategori ini tidak bisa dihapus karena masih digunakan dalam transaksi.', true);
       return;
     }
     await deleteDoc(doc(db, 'users', user.uid, 'categories', id));
@@ -460,10 +460,19 @@ function App() {
   // --- AI Logic ---
   const handleAiAnalysis = async () => {
     setIsLoadingAi(true);
-    setAiAnalysis("");
-    const result = await getFinancialAdvice(transactions, categories);
-    setAiAnalysis(result);
-    setIsLoadingAi(false);
+    setAiAnalysis(null);
+    setAiAnalysisError(null);
+
+    try {
+      const result = await getFinancialAdvice(transactions, categories, aiAnalysisMode);
+      setAiAnalysis(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal menjalankan Analisis AI.';
+      setAiAnalysisError(message);
+      showNotification('error', 'Analisis Gagal', message, true);
+    } finally {
+      setIsLoadingAi(false);
+    }
   };
 
   const currentBalance = transactions.reduce((acc, t) => {
@@ -487,6 +496,39 @@ function App() {
 
   const formatBalance = (val: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+
+  const formatShortDate = (date: string) =>
+    new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date));
+
+  const aiModeOptions: Array<{
+    id: FinancialAnalysisMode;
+    label: string;
+    shortLabel: string;
+    description: string;
+    icon: string;
+  }> = [
+    {
+      id: 'HEALTH',
+      label: 'Kesehatan Finansial',
+      shortLabel: 'Kesehatan',
+      description: 'Fokus ke arus kas, keseimbangan pemasukan-pengeluaran, dan stabilitas data keuangan.',
+      icon: 'HeartPulse'
+    },
+    {
+      id: 'SPENDING',
+      label: 'Pola Pengeluaran',
+      shortLabel: 'Pengeluaran',
+      description: 'Fokus ke kategori dominan, frekuensi transaksi, dan pola belanja yang menonjol.',
+      icon: 'BarChart2'
+    },
+    {
+      id: 'SAVINGS',
+      label: 'Saran Hemat',
+      shortLabel: 'Hemat',
+      description: 'Fokus ke peluang efisiensi berdasarkan transaksi dan kategori yang benar-benar ada.',
+      icon: 'PiggyBank'
+    }
+  ];
 
 
   // --- RENDER ---
@@ -736,45 +778,416 @@ function App() {
 
             {currentView === 'AI_ADVISOR' && (
               <div className="space-y-6 animate-fade-in-up">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Analisis Keuangan Cerdas</h2>
-                    <p className="text-gray-500 text-sm mt-1">Dapatkan wawasan tentang kebiasaan belanja Anda menggunakan Gemini AI.</p>
+                <div
+                  className="relative overflow-hidden rounded-[28px] border p-6 md:p-8"
+                  style={{
+                    background: theme.name === 'dark'
+                      ? 'linear-gradient(135deg, rgba(30,41,59,0.98) 0%, rgba(49,46,129,0.52) 100%)'
+                      : 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(238,242,255,0.95) 100%)',
+                    borderColor: theme.colors.border,
+                    boxShadow: theme.name === 'dark'
+                      ? '0 28px 80px rgba(2, 6, 23, 0.35)'
+                      : '0 24px 60px rgba(79, 70, 229, 0.08)'
+                  }}
+                >
+                  <div
+                    className="absolute right-0 top-0 h-40 w-40 rounded-full blur-3xl"
+                    style={{ backgroundColor: `${theme.colors.accent}22` }}
+                  />
+                  <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                    <div className="max-w-2xl">
+                      <div
+                        className="mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+                        style={{
+                          backgroundColor: theme.name === 'dark' ? 'rgba(129,140,248,0.18)' : '#EEF2FF',
+                          color: theme.name === 'dark' ? '#C7D2FE' : '#4338CA'
+                        }}
+                      >
+                        <IconDisplay name="Sparkles" size={14} />
+                        Analisis AI
+                      </div>
+                      <h2 className="text-2xl md:text-3xl font-bold tracking-tight" style={{ color: theme.colors.textPrimary }}>
+                        Analisis keuangan yang hanya berbasis transaksi Anda
+                      </h2>
+                      <p className="text-sm md:text-base mt-2 max-w-xl leading-7" style={{ color: theme.colors.textSecondary }}>
+                        Sistem hanya mengirim ringkasan dan sampel transaksi yang paling relevan agar hemat token, lalu AI diminta memberi insight berdasarkan data Anda saja tanpa asumsi di luar transaksi.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleAiAnalysis}
+                      disabled={isLoadingAi || transactions.length === 0}
+                      className="flex items-center justify-center gap-2 rounded-2xl px-6 py-3 font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.colors.accent} 0%, ${theme.name === 'dark' ? '#8B5CF6' : '#6366F1'} 100%)`,
+                        boxShadow: theme.name === 'dark'
+                          ? '0 18px 36px rgba(99, 102, 241, 0.28)'
+                          : '0 18px 36px rgba(79, 70, 229, 0.22)'
+                      }}
+                    >
+                      {isLoadingAi ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                          Menganalisis...
+                        </>
+                      ) : (
+                        <>
+                          <IconDisplay name="Zap" size={18} />
+                          Jalankan Analisis
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    onClick={handleAiAnalysis}
-                    disabled={isLoadingAi || transactions.length === 0}
-                    className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg w-full md:w-auto justify-center"
-                  >
-                    {isLoadingAi ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                        Menganalisis...
-                      </>
-                    ) : (
-                      <>
-                        <IconDisplay name="Zap" size={18} />
-                        Mulai Analisis
-                      </>
-                    )}
-                  </button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  {aiModeOptions.map((mode) => {
+                    const isActive = aiAnalysisMode === mode.id;
+                    return (
+                      <button
+                        key={mode.id}
+                        onClick={() => {
+                          setAiAnalysisMode(mode.id);
+                          setAiAnalysis(null);
+                          setAiAnalysisError(null);
+                        }}
+                        className="rounded-[24px] border p-5 text-left transition-all"
+                        style={{
+                          background: isActive
+                            ? (theme.name === 'dark'
+                              ? 'linear-gradient(135deg, rgba(79,70,229,0.30) 0%, rgba(99,102,241,0.18) 100%)'
+                              : 'linear-gradient(135deg, rgba(238,242,255,1) 0%, rgba(224,231,255,0.92) 100%)')
+                            : theme.colors.bgCard,
+                          borderColor: isActive ? theme.colors.accent : theme.colors.border,
+                          boxShadow: isActive
+                            ? (theme.name === 'dark'
+                              ? '0 20px 40px rgba(79, 70, 229, 0.18)'
+                              : '0 20px 40px rgba(99, 102, 241, 0.12)')
+                            : 'none'
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                            style={{
+                              backgroundColor: isActive
+                                ? (theme.name === 'dark' ? 'rgba(99,102,241,0.22)' : '#FFFFFF')
+                                : theme.colors.bgHover,
+                              color: isActive ? theme.colors.accent : theme.colors.textSecondary
+                            }}
+                          >
+                            <IconDisplay name={mode.icon} size={20} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
+                              {mode.label}
+                            </p>
+                            <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>
+                              {mode.shortLabel}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="mt-4 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
+                          {mode.description}
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {transactions.length === 0 && (
-                  <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg border border-yellow-200">
-                    Belum ada data transaksi. Silakan tambah transaksi terlebih dahulu agar AI dapat menganalisisnya.
+                  <div
+                    className="rounded-2xl border p-5"
+                    style={{
+                      backgroundColor: theme.name === 'dark' ? 'rgba(120, 53, 15, 0.22)' : '#FFFBEB',
+                      borderColor: theme.name === 'dark' ? 'rgba(245, 158, 11, 0.25)' : '#FDE68A',
+                      color: theme.name === 'dark' ? '#FDE68A' : '#92400E'
+                    }}
+                  >
+                    Belum ada data transaksi. Tambahkan transaksi terlebih dahulu agar Analisis AI bisa memberi insight yang relevan.
+                  </div>
+                )}
+
+                {!aiAnalysis && !isLoadingAi && transactions.length > 0 && (
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {[
+                      {
+                        title: 'Data yang dipakai',
+                        value: `${transactions.length} transaksi`,
+                        description: 'AI hanya melihat data transaksi dan kategori Anda.'
+                      },
+                      {
+                        title: 'Hemat token',
+                        value: 'Ringkasan + sampel',
+                        description: 'Yang dikirim bukan seluruh histori mentah, tapi agregasi dan transaksi penting.'
+                      },
+                      {
+                        title: 'Batas pengetahuan',
+                        value: 'Data Anda saja',
+                        description: 'Analisis dilarang menebak kondisi di luar angka transaksi.'
+                      }
+                    ].map((item) => (
+                      <div
+                        key={item.title}
+                        className="rounded-2xl border p-5"
+                        style={{
+                          backgroundColor: theme.colors.bgCard,
+                          borderColor: theme.colors.border
+                        }}
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+                          {item.title}
+                        </p>
+                        <p className="mt-3 text-xl font-bold" style={{ color: theme.colors.textPrimary }}>
+                          {item.value}
+                        </p>
+                        <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
+                          {item.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isLoadingAi && (
+                  <div
+                    className="rounded-[28px] border p-6 md:p-8"
+                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent"
+                        style={{ borderColor: theme.colors.accent, borderTopColor: 'transparent' }}
+                      />
+                      <div>
+                        <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>Sedang menyusun analisis</p>
+                        <p className="text-sm" style={{ color: theme.colors.textSecondary }}>
+                          AI sedang menyusun mode {aiModeOptions.find((mode) => mode.id === aiAnalysisMode)?.label.toLowerCase()} dari ringkasan transaksi dan sampel transaksi penting Anda.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {aiAnalysisError && !isLoadingAi && (
+                  <div
+                    className="rounded-2xl border p-5"
+                    style={{
+                      backgroundColor: theme.name === 'dark' ? 'rgba(127, 29, 29, 0.24)' : '#FEF2F2',
+                      borderColor: theme.name === 'dark' ? 'rgba(248, 113, 113, 0.25)' : '#FECACA'
+                    }}
+                  >
+                    <p className="font-semibold" style={{ color: theme.name === 'dark' ? '#FCA5A5' : '#B91C1C' }}>
+                      Analisis belum bisa ditampilkan
+                    </p>
+                    <p className="text-sm mt-2" style={{ color: theme.name === 'dark' ? '#FECACA' : '#7F1D1D' }}>
+                      {aiAnalysisError}
+                    </p>
                   </div>
                 )}
 
                 {aiAnalysis && (
-                  <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-purple-100 relative overflow-hidden animate-fade-in-up">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-indigo-500"></div>
-                    <div className="prose prose-purple max-w-none">
-                      <div className="whitespace-pre-wrap leading-relaxed text-gray-700 text-sm md:text-base">
-                        {aiAnalysis}
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      {[
+                        {
+                          title: 'Transaksi dianalisis',
+                          value: `${aiAnalysis.summary.totalTransactionsAnalyzed}/${aiAnalysis.summary.totalTransactions}`,
+                          description: 'Sampel terpilih setelah diringkas untuk efisiensi token.'
+                        },
+                        {
+                          title: 'Total pemasukan',
+                          value: formatBalance(aiAnalysis.summary.incomeTotal),
+                          description: 'Akumulasi transaksi kategori pemasukan.'
+                        },
+                        {
+                          title: 'Total pengeluaran',
+                          value: formatBalance(aiAnalysis.summary.expenseTotal),
+                          description: 'Akumulasi transaksi kategori pengeluaran.'
+                        },
+                        {
+                          title: 'Saldo bersih data',
+                          value: formatBalance(aiAnalysis.summary.netBalance),
+                          description: 'Selisih pemasukan dan pengeluaran pada data yang tersedia.'
+                        },
+                        {
+                          title: 'Mode analisis',
+                          value: aiModeOptions.find((mode) => mode.id === aiAnalysis.mode)?.shortLabel || 'AI',
+                          description: 'Jenis pembacaan data yang sedang aktif saat ini.'
+                        },
+                        {
+                          title: 'Sisa token harian',
+                          value: aiAnalysis.usage
+                            ? `${aiAnalysis.usage.remainingDailyTokens.toLocaleString('id-ID')}/${aiAnalysis.usage.dailyTokenLimit.toLocaleString('id-ID')}`
+                            : '-',
+                          description: 'Kuota biaya Analisis AI per user per hari dari backend.'
+                        }
+                      ].map((item) => (
+                        <div
+                          key={item.title}
+                          className="rounded-2xl border p-5"
+                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+                            {item.title}
+                          </p>
+                          <p className="mt-3 text-xl font-bold leading-tight" style={{ color: theme.colors.textPrimary }}>
+                            {item.value}
+                          </p>
+                          <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
+                            {item.description}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
+                      <div
+                        className="relative overflow-hidden rounded-[28px] border p-6 md:p-8"
+                        style={{
+                          backgroundColor: theme.colors.bgCard,
+                          borderColor: theme.colors.border
+                        }}
+                      >
+                        <div className="absolute inset-x-0 top-0 h-1.5" style={{
+                          background: `linear-gradient(90deg, ${theme.colors.accent} 0%, ${theme.name === 'dark' ? '#8B5CF6' : '#A5B4FC'} 100%)`
+                        }} />
+                        <div className="prose max-w-none">
+                          <ReactMarkdown
+                            components={{
+                              h2: ({ children }) => (
+                                <h2 className="mt-6 mb-3 text-xl font-bold" style={{ color: theme.colors.textPrimary }}>
+                                  {children}
+                                </h2>
+                              ),
+                              p: ({ children }) => (
+                                <p className="mb-3 text-sm md:text-[15px] leading-7" style={{ color: theme.colors.textSecondary }}>
+                                  {children}
+                                </p>
+                              ),
+                              ul: ({ children }) => (
+                                <ul className="mb-4 space-y-2 pl-5 list-disc" style={{ color: theme.colors.textSecondary }}>
+                                  {children}
+                                </ul>
+                              ),
+                              li: ({ children }) => (
+                                <li className="text-sm md:text-[15px] leading-7">{children}</li>
+                              ),
+                              strong: ({ children }) => (
+                                <strong style={{ color: theme.colors.textPrimary }}>{children}</strong>
+                              ),
+                              code: ({ children }) => (
+                                <code
+                                  className="rounded px-1.5 py-0.5 text-xs"
+                                  style={{
+                                    backgroundColor: theme.colors.bgHover,
+                                    color: theme.colors.textPrimary
+                                  }}
+                                >
+                                  {children}
+                                </code>
+                              )
+                            }}
+                          >
+                            {aiAnalysis.markdown}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div
+                          className="rounded-[28px] border p-5"
+                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+                            Dasar Analisis
+                          </p>
+                          <div className="mt-4 space-y-3 text-sm">
+                            <div>
+                              <p style={{ color: theme.colors.textMuted }}>Rentang data</p>
+                              <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>
+                                {aiAnalysis.summary.analyzedDateRange
+                                  ? `${formatShortDate(aiAnalysis.summary.analyzedDateRange.start)} - ${formatShortDate(aiAnalysis.summary.analyzedDateRange.end)}`
+                                  : 'Tidak tersedia'}
+                              </p>
+                            </div>
+                            <div>
+                              <p style={{ color: theme.colors.textMuted }}>Komposisi sampel</p>
+                              <p className="font-semibold leading-6" style={{ color: theme.colors.textPrimary }}>
+                                {aiAnalysis.summary.samplesUsed.recent} terbaru, {aiAnalysis.summary.samplesUsed.largestExpense} terbesar, {aiAnalysis.summary.samplesUsed.categoryAnchors} jangkar kategori, {aiAnalysis.summary.samplesUsed.incomeAnchors} pemasukan
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          className="rounded-[28px] border p-5"
+                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+                            Kategori Pengeluaran Utama
+                          </p>
+                          <div className="mt-4 space-y-3">
+                            {aiAnalysis.summary.topCategories.length > 0 ? aiAnalysis.summary.topCategories.map((category) => (
+                              <div key={category.name}>
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                  <div>
+                                    <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{category.name}</p>
+                                    <p style={{ color: theme.colors.textMuted }}>{category.count} transaksi</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{formatBalance(category.total)}</p>
+                                    <p style={{ color: theme.colors.textMuted }}>{category.percentage}%</p>
+                                  </div>
+                                </div>
+                                <div className="mt-2 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.colors.bgHover }}>
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${Math.min(category.percentage, 100)}%`,
+                                      background: `linear-gradient(90deg, ${theme.colors.accent} 0%, ${theme.name === 'dark' ? '#A78BFA' : '#818CF8'} 100%)`
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )) : (
+                              <p className="text-sm" style={{ color: theme.colors.textSecondary }}>
+                                Belum ada pengeluaran yang cukup untuk diringkas per kategori.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className="rounded-[28px] border p-5"
+                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+                            Ringkasan Bulanan
+                          </p>
+                          <div className="mt-4 space-y-3">
+                            {aiAnalysis.summary.monthlySummaries.length > 0 ? aiAnalysis.summary.monthlySummaries.map((month) => (
+                              <div key={month.month} className="rounded-2xl px-4 py-3" style={{ backgroundColor: theme.colors.bgHover }}>
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{month.month}</p>
+                                  <p className="text-sm" style={{ color: month.net >= 0 ? theme.colors.income : theme.colors.expense }}>
+                                    {formatBalance(month.net)}
+                                  </p>
+                                </div>
+                                <div className="mt-2 flex items-center justify-between gap-3 text-xs" style={{ color: theme.colors.textSecondary }}>
+                                  <span>Pemasukan {formatBalance(month.income)}</span>
+                                  <span>Pengeluaran {formatBalance(month.expense)}</span>
+                                </div>
+                              </div>
+                            )) : (
+                              <p className="text-sm" style={{ color: theme.colors.textSecondary }}>
+                                Ringkasan bulanan belum tersedia.
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             )}

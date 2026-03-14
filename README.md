@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.0.3
+# DompetCerdas - Smart Expense Tracker v2.2.3
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -13,7 +13,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - Manual transaction entry
 - Category management
 - Financial simulations with balance mode toggle
-- AI financial advisor
+- AI financial advisor with 3 analysis modes and backend quota
 - Excel export with date range selection
 
 ### 🤖 Telegram Bot (@dompas_bot)
@@ -28,10 +28,11 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 |-----------|------------|
 | Frontend | React 19, TypeScript, Vite |
 | Hosting | **Firebase Hosting** (CDN Global) |
-| Backend | Firebase Functions (Node.js 20) |
+| Backend | Firebase Functions (Node.js 22) |
 | Database | Firestore |
 | Storage | Firebase Storage |
 | AI | Gemini 2.0 (Vision & NLU) |
+| Excel Export | ExcelJS |
 | Bot | node-telegram-bot-api |
 
 ## Quick Start
@@ -71,14 +72,16 @@ firebase deploy --only firestore    # Firestore rules only
 
 ## Documentation
 
-- [Deploy Guide](deploy/DEPLOY_GUIDE.md) - Firebase Hosting deployment
-- [Telegram Integration](docs/TELEGRAM_INTEGRATION.md) - Technical docs for bot implementation
-- [Technical Documentation](DOCUMENTATION.md) - Full technical reference
+- [DOKUMENTASI_LENGKAP.md](./DOKUMENTASI_LENGKAP.md) - Referensi dokumentasi utama proyek
+- [docs/TELEGRAM_INTEGRATION.md](./docs/TELEGRAM_INTEGRATION.md) - Dokumentasi teknis integrasi bot Telegram
+- [TESTING.md](./TESTING.md) - Panduan test bot dan regression checklist
 
 ## Environment Variables
 
 ### Web App (.env.local)
 ```
+# Frontend AI analysis now uses Cloud Functions.
+# VITE_GEMINI_API_KEY is only needed for client-side category validation fallback.
 VITE_GEMINI_API_KEY=your_gemini_api_key
 ```
 
@@ -90,6 +93,10 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ## Version History
 
+- **v2.2.3** - Node 22 functions runtime, backend-enforced AI analysis quota, 3 AI analysis modes, ExcelJS migration, and documentation cleanup
+- **v2.2.2** - Document upload support, caption parsing, and compression improvements
+- **v2.2.1** - Stable Gemini model migration, list categories, smarter NLU
+- **v2.2.0** - AI Financial Advisor improvements for Telegram bot
 - **v2.0.3** - Simulation balance mode: option to use current month balance or total balance
 - **v2.0.2** - Migrated to Firebase Hosting, Timezone fixes, Security hardening
 - **v2.0.1** - Bot category selection via Firestore categories + cache refresh, improved NLU for shorthand amounts

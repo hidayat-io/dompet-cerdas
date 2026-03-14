@@ -70,7 +70,7 @@ import {
   Plus, Minus, X, Check, Edit, Save,
   ArrowRight, ArrowLeft, ArrowUp, ArrowDown, RefreshCw,
   Search, Filter, Settings, Menu, MoreHorizontal, MoreVertical,
-  AlertCircle, Info, HelpCircle, CheckCircle, XCircle,
+  AlertCircle, AlertTriangle, Info, HelpCircle, CheckCircle, XCircle,
   Calendar, CalendarDays, LogOut, Download, Database
 } from 'lucide-react';
 
@@ -153,7 +153,7 @@ const IconDisplay: React.FC<IconDisplayProps> = ({ name, className = "", size = 
     Plus, Minus, X, Check, Edit, Save,
     ArrowRight, ArrowLeft, ArrowUp, ArrowDown, RefreshCw,
     Search, Filter, Settings, Menu, MoreHorizontal, MoreVertical,
-    AlertCircle, Info, HelpCircle, CheckCircle, XCircle,
+    AlertCircle, AlertTriangle, Info, HelpCircle, CheckCircle, XCircle,
     Calendar, CalendarDays, LogOut, Download, Database
   };
 

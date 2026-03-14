@@ -13,7 +13,7 @@ interface ToastProps {
 const Toast: React.FC<ToastProps> = ({
     message,
     type = 'success',
-    duration = 3000,
+    duration = 1600,
     onClose
 }) => {
     const { theme } = useTheme();

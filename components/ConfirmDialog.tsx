@@ -146,7 +146,7 @@ export const Toast: React.FC<ToastProps> = ({
     onClose,
     message,
     type = 'success',
-    duration = 3000
+    duration = 1600
 }) => {
     const { theme } = useTheme();
 

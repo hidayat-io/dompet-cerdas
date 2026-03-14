@@ -73,7 +73,7 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
             }
             // 'all' = no date filter
 
-            const result = exportToExcel({
+            const result = await exportToExcel({
                 transactions,
                 categories,
                 startDate,

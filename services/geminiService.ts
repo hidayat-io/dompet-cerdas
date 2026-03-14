@@ -1,62 +1,90 @@
 import { GoogleGenAI } from "@google/genai";
-import { Transaction, Category } from "../types";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { firebaseApp } from "../firebase";
+import { Category, Transaction } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+
+const createAiClient = () => {
+  if (!apiKey) {
+    return null;
+  }
+
+  return new GoogleGenAI({ apiKey });
+};
+
+export type FinancialAnalysisMode = "HEALTH" | "SPENDING" | "SAVINGS";
+
+type CategorySummary = {
+  name: string;
+  total: number;
+  count: number;
+  percentage: number;
+};
+
+type MonthSummary = {
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+};
+
+export interface FinancialAnalysisResult {
+  mode: FinancialAnalysisMode;
+  markdown: string;
+  summary: {
+    totalTransactions: number;
+    totalTransactionsAnalyzed: number;
+    analyzedDateRange: {
+      start: string;
+      end: string;
+    } | null;
+    incomeTotal: number;
+    expenseTotal: number;
+    netBalance: number;
+    topCategories: CategorySummary[];
+    monthlySummaries: MonthSummary[];
+    samplesUsed: {
+      recent: number;
+      largestExpense: number;
+      categoryAnchors: number;
+      incomeAnchors: number;
+    };
+  };
+  usage?: {
+    promptTokens: number;
+    candidateTokens: number;
+    totalTokens: number;
+    remainingDailyTokens: number;
+    dailyTokenLimit: number;
+  };
+}
 
 export const getFinancialAdvice = async (
-  transactions: Transaction[],
-  categories: Category[]
-): Promise<string> => {
-  if (!apiKey) {
-    return "API Key belum dikonfigurasi. Silakan atur process.env.API_KEY untuk menggunakan fitur analisis AI.";
-  }
+  _transactions: Transaction[],
+  _categories: Category[],
+  mode: FinancialAnalysisMode = "HEALTH"
+): Promise<FinancialAnalysisResult> => {
+  const functions = getFunctions(firebaseApp, "asia-southeast1");
+  const analyzeFinancialData = httpsCallable<{ mode: FinancialAnalysisMode }, FinancialAnalysisResult>(
+    functions,
+    "analyzeFinancialData"
+  );
 
-  // Prepare data context
-  const categoriesMap = categories.reduce((acc, cat) => {
-    acc[cat.id] = cat.name;
-    return acc;
-  }, {} as Record<string, string>);
-
-  const dataSummary = transactions.map(t => ({
-    date: t.date,
-    amount: t.amount,
-    category: categoriesMap[t.categoryId] || 'Unknown',
-    desc: t.description
-  })).slice(0, 50); // Limit to last 50 for token efficiency
-
-  const prompt = `
-    Bertindaklah sebagai penasihat keuangan pribadi yang bijak.
-    Saya memiliki data transaksi berikut (dalam format JSON):
-    ${JSON.stringify(dataSummary)}
-    
-    Tolong berikan analisis singkat dan 3 saran praktis dalam Bahasa Indonesia untuk memperbaiki kesehatan finansial saya.
-    Fokus pada kategori pengeluaran terbesar atau pola yang tidak biasa.
-    Gunakan format markdown yang rapi.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text || "Maaf, saya tidak dapat menghasilkan analisis saat ini.";
-  } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Terjadi kesalahan saat menghubungi asisten AI.";
-  }
+  const response = await analyzeFinancialData({ mode });
+  return response.data;
 };
 
 export const validateCategoryWithAI = async (
   newName: string,
   existingCategories: Category[]
 ): Promise<string[]> => {
-  if (!apiKey) return [];
+  const ai = createAiClient();
+  if (!ai) return [];
 
-  // Optimization: If list is empty, no need to check
   if (existingCategories.length === 0) return [];
 
-  const categoryNames = existingCategories.map(c => c.name).join(", ");
+  const categoryNames = existingCategories.map((category) => category.name).join(", ");
 
   const prompt = `
     Bertindaklah sebagai sistem validasi data yang cerdas.
@@ -67,24 +95,21 @@ export const validateCategoryWithAI = async (
 
     Instruksi:
     1. Bandingkan "Kategori Baru" dengan setiap item di "Daftar Kategori Existing".
-    2. Cari yang artinya SAMA PERCIS, MIRIP (Synonym), atau TYPO (e.g. "Fud" vs "Food", "Bill" vs "Tagihan").
-    3. Jika dtemukan kemiripan yang signifikan, sebutkan nama kategori existing tersebut.
-    4. JANGAN sebutkan jika maknanya berbeda jauh (misal "Investasi" vs "Makan" itu beda).
-    5. Outputkan HANYA dalam format JSON Array string berisi nama-nama kategori existing yang konflik. Contoh: ["Makan", "Jajan"].
-    6. Jika tidak ada yang mirip, outputkan array kosong: [].
-    
-    Hanya outputkan JSON murni tanpa markdown block.
+    2. Cari yang artinya SAMA PERSIS, MIRIP (sinonim), atau TYPO.
+    3. Jika ditemukan kemiripan yang signifikan, sebutkan nama kategori existing tersebut.
+    4. Jangan sebutkan jika maknanya berbeda jauh.
+    5. Outputkan HANYA JSON Array string berisi nama kategori existing yang konflik.
+    6. Jika tidak ada yang mirip, outputkan [].
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: "gemini-1.5-flash",
       contents: prompt,
     });
 
     const text = response.text || "[]";
-    // Clean up markdown code blocks if any
-    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanJson);
   } catch (error) {
     console.error("Gemini Validation Error:", error);

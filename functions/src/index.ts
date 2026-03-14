@@ -2,11 +2,12 @@
  * Firebase Cloud Functions for DompetCerdas Telegram Bot
  */
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
 import { initBot, processUpdate } from './bot';
 import { getUserCategories } from './services/transactionService';
 import { linkTelegramAccount, validateLinkToken } from './services/linkService';
+import { analyzeFinancialDataForWeb, WebFinancialAnalysisMode } from './services/webAnalysisService';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -168,4 +169,27 @@ export const refreshCategoryCache = functions
         const userId = context.auth.uid;
         await getUserCategories(userId, true);
         return { success: true };
+    });
+
+/**
+ * Web AI financial analysis with per-user quota enforcement
+ */
+export const analyzeFinancialData = functions
+    .region('asia-southeast1')
+    .https.onCall(async (data, context) => {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+        }
+
+        const mode = (data?.mode || 'HEALTH') as WebFinancialAnalysisMode;
+        if (!['HEALTH', 'SPENDING', 'SAVINGS'].includes(mode)) {
+            throw new functions.https.HttpsError('invalid-argument', 'Invalid analysis mode.');
+        }
+
+        try {
+            return await analyzeFinancialDataForWeb(context.auth.uid, mode);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to analyze financial data.';
+            throw new functions.https.HttpsError('failed-precondition', message);
+        }
     });

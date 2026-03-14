@@ -6,6 +6,12 @@ DompetCerdas v2.1 includes full Telegram bot integration for expense tracking vi
 
 ## Changelog
 
+### v2.2.3 (March 14, 2026) - Platform Hardening
+- ☁️ **Functions Runtime Upgrade**: Cloud Functions runtime upgraded to Node.js 22
+- 🔐 **Web AI Moved Server-Side**: Web financial analysis now runs via callable function, not directly from browser
+- 🧮 **Per-User AI Quota**: Added backend quota for web AI analysis
+- 📊 **Three Web AI Modes**: Financial Health, Spending Pattern, and Savings Advice
+
 ### v2.2.2 (February 2, 2026) - Receipt Upload Enhancements
 - 📎 **Document Upload Support**: Image files sent as documents are now supported (JPG/PNG/WEBP)
 - 🗜️ **Mandatory Compression**: All uploads are compressed before storage

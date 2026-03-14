@@ -27,6 +27,13 @@ export interface ReceiptData {
     is_receipt?: boolean;
 }
 
+export interface FinancialInsightsResult {
+    text: string;
+    promptTokens: number;
+    candidateTokens: number;
+    totalTokens: number;
+}
+
 /**
  * Analyze receipt image using Gemini Vision API
  * @param imageBuffer - Image buffer from Telegram
@@ -151,6 +158,14 @@ function formatDate(dateStr: string): string {
  * Updated: Using stable gemini-2.0-flash model (Jan 2026)
  */
 export async function generateFinancialInsights(dataPrompt: string): Promise<string> {
+    const result = await generateFinancialInsightsWithUsage(dataPrompt);
+    return result.text;
+}
+
+/**
+ * Generate financial insights and return token usage metadata when available.
+ */
+export async function generateFinancialInsightsWithUsage(dataPrompt: string): Promise<FinancialInsightsResult> {
     try {
         const model = genAI.getGenerativeModel({ 
             model: 'gemini-2.0-flash',
@@ -210,13 +225,29 @@ ATURAN KETAT (WAJIB DIIKUTI):
         
         const result = await model.generateContent(dataPrompt);
         const response = result.response.text();
+        const usage = (result.response as any)?.usageMetadata;
+        const estimatedPromptTokens = Math.ceil(dataPrompt.length / 4);
+        const estimatedResponseTokens = Math.ceil(response.length / 4);
+        const promptTokens = usage?.promptTokenCount ?? estimatedPromptTokens;
+        const candidateTokens = usage?.candidatesTokenCount ?? estimatedResponseTokens;
+        const totalTokens = usage?.totalTokenCount ?? (promptTokens + candidateTokens);
         
         // Validate response is not off-topic
         if (isOffTopicResponse(response)) {
-            return "Maaf, terjadi kesalahan dalam analisis. Pastikan pertanyaan kamu terkait data transaksi keuangan. Ketik /help untuk panduan.";
+            return {
+                text: "Maaf, terjadi kesalahan dalam analisis. Pastikan pertanyaan kamu terkait data transaksi keuangan. Ketik /help untuk panduan.",
+                promptTokens,
+                candidateTokens,
+                totalTokens
+            };
         }
         
-        return response;
+        return {
+            text: response,
+            promptTokens,
+            candidateTokens,
+            totalTokens
+        };
         
     } catch (error) {
         console.error('Error generating financial insights:', error);
