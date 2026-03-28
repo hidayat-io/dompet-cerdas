@@ -7,9 +7,18 @@ import * as admin from 'firebase-admin';
 import { ReceiptData } from './geminiService';
 import { classifyCategory } from './nluService';
 import { getJakartaDateString } from '../utils/date';
+import { getAccountContext, getCategoriesCollection, getTransactionsCollection } from './accountService';
 
 const CATEGORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const categoryCache = new Map<string, { expiresAt: number; categories: UserCategory[] }>();
+const DEFAULT_CATEGORY_DOCS = [
+    { id: 'c1', name: 'Gaji', type: 'INCOME', icon: 'Wallet', color: '#10b981' },
+    { id: 'c2', name: 'Bonus', type: 'INCOME', icon: 'Gift', color: '#34d399' },
+    { id: 'c3', name: 'Makanan', type: 'EXPENSE', icon: 'Utensils', color: '#f87171' },
+    { id: 'c4', name: 'Transport', type: 'EXPENSE', icon: 'Car', color: '#60a5fa' },
+    { id: 'c5', name: 'Belanja', type: 'EXPENSE', icon: 'ShoppingBag', color: '#f472b6' },
+    { id: 'c6', name: 'Tagihan', type: 'EXPENSE', icon: 'Zap', color: '#fbbf24' },
+] as const;
 
 function extractCategoryFromCaption(caption: string): { cleanedDescription: string; categoryHint?: string } {
     const keywordRegex = /\b(cat|categ|category|kategori|kat|ktg|ktgr|kate)\b\s*[:\-]?\s*([a-zA-ZÀ-ÿ0-9]+(?:\s+[a-zA-ZÀ-ÿ0-9]+){0,2})/i;
@@ -33,20 +42,42 @@ export interface UserCategory {
     type?: string;
 }
 
-export async function getUserCategories(userId: string, forceRefresh = false): Promise<UserCategory[]> {
-    const cached = categoryCache.get(userId);
+export type CategoryTypePreference = 'INCOME' | 'EXPENSE';
+export interface ManualTransactionInput {
+    amount: number;
+    description: string;
+    categoryName: string;
+    categoryIdOverride?: string;
+}
+
+async function seedDefaultCategories(context: Awaited<ReturnType<typeof getAccountContext>>): Promise<UserCategory[]> {
+    const categoriesCollection = getCategoriesCollection(context);
+    const batch = admin.firestore().batch();
+
+    DEFAULT_CATEGORY_DOCS.forEach((category) => {
+        batch.set(categoriesCollection.doc(category.id), category, { merge: true });
+    });
+
+    await batch.commit();
+
+    return DEFAULT_CATEGORY_DOCS.map((category) => ({
+        id: category.id,
+        name: category.name,
+        type: category.type,
+    }));
+}
+
+export async function getUserCategories(userId: string, forceRefresh = false, accountId?: string): Promise<UserCategory[]> {
+    const context = await getAccountContext(userId, accountId);
+    const cacheKey = `${userId}:${context.usesLegacyPaths ? 'legacy' : context.accountId}`;
+    const cached = categoryCache.get(cacheKey);
     if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
         return cached.categories;
     }
 
-    const db = admin.firestore();
-    const snapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .get();
+    const snapshot = await getCategoriesCollection(context).get();
 
-    const categories = snapshot.docs.map((doc) => {
+    let categories: UserCategory[] = snapshot.docs.map((doc) => {
         const data = doc.data() as { name?: string; type?: string };
         return {
             id: doc.id,
@@ -55,7 +86,11 @@ export async function getUserCategories(userId: string, forceRefresh = false): P
         };
     });
 
-    categoryCache.set(userId, {
+    if (categories.length === 0) {
+        categories = await seedDefaultCategories(context);
+    }
+
+    categoryCache.set(cacheKey, {
         expiresAt: Date.now() + CATEGORY_CACHE_TTL_MS,
         categories
     });
@@ -63,10 +98,22 @@ export async function getUserCategories(userId: string, forceRefresh = false): P
     return categories;
 }
 
-function getFallbackCategory(categories: UserCategory[]): UserCategory {
+export function getFallbackCategory(
+    categories: UserCategory[],
+    preferredType: CategoryTypePreference = 'EXPENSE'
+): UserCategory {
     const fallbackNames = new Set(['lainnya', 'other', 'others']);
     const otherCategory = categories.find((category) => fallbackNames.has(category.name.toLowerCase()));
-    return otherCategory || categories[0];
+    if (otherCategory) {
+        return otherCategory;
+    }
+
+    const preferredCategory = categories.find((category) => category.type === preferredType);
+    if (preferredCategory) {
+        return preferredCategory;
+    }
+
+    return categories[0];
 }
 
 /**
@@ -89,6 +136,42 @@ export interface Transaction {
 
 import { AttachmentData } from './storageService';
 
+async function resolveManualTransactionCategoryId(
+    userId: string,
+    categoryName: string,
+    categoryIdOverride: string | undefined,
+    categories: UserCategory[]
+): Promise<string> {
+    if (categoryIdOverride) {
+        return categoryIdOverride;
+    }
+
+    if (categories.length === 0) {
+        throw new Error('No categories found for user');
+    }
+
+    const normalizedCategoryName = categoryName.toLowerCase();
+    const directMatch = categories.find(
+        (category) => category.name.toLowerCase() === normalizedCategoryName
+    );
+
+    return (directMatch || getFallbackCategory(categories)).id;
+}
+
+function buildManualTransactionPayload(
+    amount: number,
+    categoryId: string,
+    description: string
+) {
+    return {
+        amount,
+        categoryId,
+        description,
+        date: getJakartaDateString(),
+        createdAt: new Date().toISOString()
+    };
+}
+
 /**
  * Create a transaction from receipt data
  * @param userId - Firebase user ID
@@ -103,7 +186,8 @@ export async function createTransactionFromReceipt(
     receiptData: ReceiptData,
     telegramId: number,
     attachment?: AttachmentData,
-    photoCaption?: string
+    photoCaption?: string,
+    accountId?: string
 ): Promise<string> {
     console.log('[TRANSACTION] Starting createTransactionFromReceipt for user:', userId);
     console.log('[TRANSACTION] ReceiptData:', JSON.stringify(receiptData));
@@ -114,14 +198,15 @@ export async function createTransactionFromReceipt(
         console.log('[TRANSACTION] Photo caption:', photoCaption);
     }
 
-    const db = admin.firestore();
+    const context = await getAccountContext(userId, accountId);
+    const transactionsCollection = getTransactionsCollection(context);
 
     // Use today's date instead of receipt date
     const transactionDate = new Date();
 
     console.log('[TRANSACTION] Using today\'s date:', transactionDate.toISOString());
 
-    const categories = await getUserCategories(userId);
+    const categories = await getUserCategories(userId, false, context.accountId);
     if (categories.length === 0) {
         console.error('[TRANSACTION] ERROR: No categories found for user');
         throw new Error('No categories found for user');
@@ -204,15 +289,11 @@ export async function createTransactionFromReceipt(
     }
 
     console.log('[TRANSACTION] Transaction object:', JSON.stringify(transaction));
-    console.log('[TRANSACTION] About to write to Firestore path:', `users/${userId}/transactions`);
+    console.log('[TRANSACTION] About to write to Firestore path:', transactionsCollection.path);
 
     // Add to user's transactions collection
     try {
-        const docRef = await db
-            .collection('users')
-            .doc(userId)
-            .collection('transactions')
-            .add(transaction);
+        const docRef = await transactionsCollection.add(transaction);
 
         console.log('[TRANSACTION] Firestore write completed successfully');
         console.log('[TRANSACTION] Document path:', docRef.path);
@@ -248,45 +329,62 @@ export async function createManualTransaction(
     description: string,
     categoryName: string,
     telegramId?: number,
-    categoryIdOverride?: string
+    categoryIdOverride?: string,
+    accountId?: string
 ): Promise<string> {
-    const db = admin.firestore();
+    const context = await getAccountContext(userId, accountId);
+    const transactionsCollection = getTransactionsCollection(context);
 
-    let categoryId: string;
-    if (categoryIdOverride) {
-        categoryId = categoryIdOverride;
-    } else {
-        const categories = await getUserCategories(userId);
-        if (categories.length === 0) {
-            throw new Error('No categories found for user');
-        }
+    const categories = categoryIdOverride
+        ? []
+        : await getUserCategories(userId, false, context.accountId);
+    const categoryId = await resolveManualTransactionCategoryId(
+        userId,
+        categoryName,
+        categoryIdOverride,
+        categories
+    );
+    const transaction = buildManualTransactionPayload(amount, categoryId, description);
 
-        const normalizedCategoryName = categoryName.toLowerCase();
-        const directMatch = categories.find(
-            (category) => category.name.toLowerCase() === normalizedCategoryName
-        );
-
-        categoryId = (directMatch || getFallbackCategory(categories)).id;
-    }
-
-    // Format date as YYYY-MM-DD (Jakarta Time)
-    const dateString = getJakartaDateString();
-
-    const transaction = {
-        amount,
-        categoryId,
-        description,
-        date: dateString,
-        createdAt: new Date().toISOString()
-    };
-
-    const docRef = await db
-        .collection('users')
-        .doc(userId)
-        .collection('transactions')
-        .add(transaction);
+    const docRef = await transactionsCollection.add(transaction);
 
     console.log(`Created manual transaction ${docRef.id} for user ${userId}`);
 
     return docRef.id;
+}
+
+export async function createManualTransactionsBatch(
+    userId: string,
+    items: ManualTransactionInput[],
+    accountId?: string
+): Promise<string[]> {
+    if (items.length === 0) {
+        throw new Error('No transaction items provided');
+    }
+
+    const context = await getAccountContext(userId, accountId);
+    const transactionsCollection = getTransactionsCollection(context);
+    const categories = items.some((item) => !item.categoryIdOverride)
+        ? await getUserCategories(userId, false, context.accountId)
+        : [];
+
+    const batch = admin.firestore().batch();
+    const docIds: string[] = [];
+
+    for (const item of items) {
+        const categoryId = await resolveManualTransactionCategoryId(
+            userId,
+            item.categoryName,
+            item.categoryIdOverride,
+            categories
+        );
+        const docRef = transactionsCollection.doc();
+        batch.set(docRef, buildManualTransactionPayload(item.amount, categoryId, item.description));
+        docIds.push(docRef.id);
+    }
+
+    await batch.commit();
+    console.log(`Created ${docIds.length} manual transactions for user ${userId}`);
+
+    return docIds;
 }

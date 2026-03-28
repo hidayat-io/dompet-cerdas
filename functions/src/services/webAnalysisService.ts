@@ -1,5 +1,6 @@
 import { getDb } from '../index';
 import { generateFinancialInsightsWithUsage } from './geminiService';
+import { getScopedCollections } from './accountService';
 
 export type WebFinancialAnalysisMode = 'HEALTH' | 'SPENDING' | 'SAVINGS';
 
@@ -339,10 +340,11 @@ async function commitUsage(userId: string, previousDailyTokensUsed: number, tota
     return Math.max(0, WEB_ANALYSIS_LIMITS.dailyTokenLimit - nextTotal);
 }
 
-async function getUserData(userId: string) {
+async function getUserData(userId: string, accountId?: string) {
+    const { categoriesCollection, transactionsCollection } = await getScopedCollections(userId, accountId);
     const [categoriesSnap, transactionsSnap] = await Promise.all([
-        getDb().collection('users').doc(userId).collection('categories').get(),
-        getDb().collection('users').doc(userId).collection('transactions').get(),
+        categoriesCollection.get(),
+        transactionsCollection.get(),
     ]);
 
     const categories: CategoryDoc[] = categoriesSnap.docs.map((doc) => ({
@@ -360,10 +362,11 @@ async function getUserData(userId: string) {
 
 export async function analyzeFinancialDataForWeb(
     userId: string,
-    mode: WebFinancialAnalysisMode
+    mode: WebFinancialAnalysisMode,
+    accountId?: string
 ): Promise<WebFinancialAnalysisResult> {
     const reservation = await checkAndReserveDailyBudget(userId);
-    const { categories, transactions } = await getUserData(userId);
+    const { categories, transactions } = await getUserData(userId, accountId);
 
     if (transactions.length === 0) {
         throw new Error('Belum ada transaksi yang bisa dianalisis.');

@@ -2,9 +2,26 @@
 
 ## Overview
 
-DompetCerdas v2.1 includes full Telegram bot integration for expense tracking via @dompas_bot. Users can upload receipt photos, add transactions via natural language, and query their expenses directly from Telegram.
+DompetCerdas includes full Telegram bot integration for expense tracking via @dompas_bot. Users can upload receipt photos, add transactions via natural language, send multiple transactions in one message, use voice note input, switch Telegram account context with `/akun`, and query expenses directly from Telegram.
+
+## Current Scope
+
+- Receipt scanning with preview
+- Manual transaction input with preview + confirm
+- Multi-transaction in one message
+- Voice note transcription + preview
+- Telegram-specific default account
+- `/akun` for account switching
+- All major responses include account header
 
 ## Changelog
+
+### v2.6.0 (March 28, 2026) - Telegram Input & Account Context
+- 🧾 **Preview + Confirm**: Manual transaction text no longer auto-saves
+- 🧩 **Multi-Transaction**: One message can contain multiple transactions with item removal before save
+- 🎤 **Voice Note Input**: Short voice notes are transcribed, previewed, and confirmed before save
+- 🧭 **Telegram Account Context**: Added `/akun` flow and Telegram-specific default account
+- 🛡️ **Hardening**: Added regression tests for parser, session safety, preview flow, and voice flow
 
 ### v2.2.3 (March 14, 2026) - Platform Hardening
 - ☁️ **Functions Runtime Upgrade**: Cloud Functions runtime upgraded to Node.js 22
@@ -401,8 +418,30 @@ All handlers use try-catch with:
 
 ## Testing
 
-Test commands via Telegram:
-1. `/start` - Should show link token
-2. Upload receipt photo - Should analyze and confirm
-3. "berapa pengeluaran bulan ini?" - Should return total
-4. "tambah 50000 makan siang" - Should create transaction
+### Automated
+
+```bash
+cd functions
+node test-nlu.js
+node test-transaction-parser.js
+node test-telegram-hardening.js
+node test-telegram-bot-flow.js
+```
+
+### Manual Telegram Smoke Tests
+
+1. `/start` - Should show link token or linked-account welcome
+2. `/akun` - Should show active Telegram account and switching options
+3. Upload receipt photo - Should analyze and confirm
+4. `berapa pengeluaran bulan ini?` - Should return total with account header
+5. `makan siang 25rb` - Should show preview first, not auto-save
+6. `makan 25rb, parkir 5rb` - Should show 2-item preview
+7. Tap `Hapus 1` from a multi-item preview - Should remove only that item and re-render preview
+8. Send a short voice note like `makan 25 ribu, parkir 5 ribu` - Should transcribe, show preview, and wait for confirmation
+
+### Regression Rule
+
+Every Telegram input bug must be converted into a regression test before closing the fix:
+- parsing / input-shape bugs → `functions/test-transaction-parser.js`
+- session / formatter / Firestore safety bugs → `functions/test-telegram-hardening.js`
+- preview / confirm / account context / voice flow bugs → `functions/test-telegram-bot-flow.js`

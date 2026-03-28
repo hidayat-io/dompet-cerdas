@@ -2,16 +2,36 @@ import React from 'react';
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer
 } from 'recharts';
-import { Transaction, Category } from '../types';
+import { Transaction, Category, Budget } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
+import { getBudgetOverview, getBudgetSummaries, getMonthKey } from '../utils/budget';
 
 interface DashboardProps {
   transactions: Transaction[];
   categories: Category[];
+  budgets: Budget[];
+  showGettingStarted: boolean;
+  activeAccountName: string;
+  telegramLinked: boolean;
+  onGoToTransactions: () => void;
+  onGoToBudgets: () => void;
+  onGoToSettings: () => void;
+  onOpenOnboarding: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ transactions, categories }) => {
+const Dashboard: React.FC<DashboardProps> = ({
+  transactions,
+  categories,
+  budgets,
+  showGettingStarted,
+  activeAccountName,
+  telegramLinked,
+  onGoToTransactions,
+  onGoToBudgets,
+  onGoToSettings,
+  onOpenOnboarding,
+}) => {
   const { theme } = useTheme();
 
   const totalIncome = transactions
@@ -23,6 +43,9 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, categories }) => {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const balance = totalIncome - totalExpense;
+  const currentMonthKey = getMonthKey();
+  const currentBudgetSummaries = getBudgetSummaries(budgets, transactions, categories, currentMonthKey);
+  const currentBudgetOverview = getBudgetOverview(currentBudgetSummaries);
 
   // Data untuk Grafik (Top 5 Pengeluaran)
   const expenseByCategory = categories
@@ -50,6 +73,118 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, categories }) => {
         <p className="text-xs font-medium uppercase tracking-wider" style={{ color: theme.colors.textMuted }}>{currentDate}</p>
         <h2 className="text-xl font-bold" style={{ color: theme.colors.textPrimary }}>Ringkasan Keuangan</h2>
       </div>
+
+      {showGettingStarted && (
+        <div
+          className="rounded-[28px] border p-5 md:p-6"
+          style={{
+            backgroundColor: theme.colors.bgCard,
+            borderColor: theme.colors.border
+          }}
+        >
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="max-w-2xl">
+              <div
+                className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
+              >
+                <IconDisplay name="Sparkles" size={14} />
+                Mulai Dari Sini
+              </div>
+              <h3 className="mt-3 text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>
+                Biar {activeAccountName} cepat terisi dan mudah dipahami
+              </h3>
+              <p className="mt-2 text-sm leading-7" style={{ color: theme.colors.textSecondary }}>
+                Untuk user baru, langkah paling aman biasanya begini: catat transaksi dulu, lalu atur anggaran kalau sudah mulai rutin.
+              </p>
+            </div>
+            <button
+              onClick={onOpenOnboarding}
+              className="rounded-full px-5 py-3 text-sm font-semibold"
+              style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
+            >
+              Lihat Panduan Singkat
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            {[
+              {
+                title: '1. Catat transaksi dulu',
+                description: 'Mulai dari yang simpel, misalnya makan siang, parkir, atau gaji.',
+                actionLabel: 'Buka Transaksi',
+                action: onGoToTransactions,
+                icon: 'BookOpen',
+              },
+              {
+                title: '2. Buat anggaran kalau sudah rutin',
+                description: 'Pilih kategori yang ingin dipantau, tidak perlu semua sekaligus.',
+                actionLabel: 'Buka Anggaran',
+                action: onGoToBudgets,
+                icon: 'PiggyBank',
+              },
+              {
+                title: telegramLinked ? '3. Telegram sudah siap' : '3. Hubungkan Telegram',
+                description: telegramLinked
+                  ? 'Anda sudah bisa catat lewat chat atau voice note tanpa buka aplikasi.'
+                  : 'Kalau ingin lebih cepat, hubungkan Telegram supaya input terasa natural.',
+                actionLabel: telegramLinked ? 'Buka Pengaturan' : 'Hubungkan Sekarang',
+                action: onGoToSettings,
+                icon: 'Send',
+              },
+            ].map((item) => (
+              <button
+                key={item.title}
+                onClick={item.action}
+                className="rounded-[24px] border p-5 text-left transition-colors"
+                style={{
+                  backgroundColor: theme.colors.bgHover,
+                  borderColor: theme.colors.border,
+                }}
+              >
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.accent }}
+                >
+                  <IconDisplay name={item.icon} size={20} />
+                </div>
+                <h4 className="mt-4 text-base font-semibold" style={{ color: theme.colors.textPrimary }}>
+                  {item.title}
+                </h4>
+                <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
+                  {item.description}
+                </p>
+                <p className="mt-4 text-sm font-semibold" style={{ color: theme.colors.accent }}>
+                  {item.actionLabel}
+                </p>
+              </button>
+            ))}
+          </div>
+
+          <div
+            className="mt-5 rounded-[24px] border p-4"
+            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+              Contoh Input Telegram / Input Natural
+            </p>
+            <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
+              Pakai contoh ini saat mencatat lewat Telegram. Sistem akan baca dulu, lalu minta konfirmasi sebelum disimpan.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {['makan siang 25rb', 'kopi 18rb, parkir 5rb', 'bulan ini jatah makan 2 juta'].map((example) => (
+                <span
+                  key={example}
+                  className="rounded-full px-3 py-1.5 text-sm"
+                  style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.textPrimary }}
+                >
+                  {example}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Card - Saldo Utama (Tampilan ala E-Wallet) */}
       <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 text-white shadow-xl shadow-indigo-200 relative overflow-hidden">
@@ -87,6 +222,71 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, categories }) => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div
+          className="rounded-2xl border p-5"
+          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+        >
+          <div className="flex items-center gap-2">
+            <IconDisplay name="Wallet" size={16} style={{ color: theme.colors.accent }} />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+              Anggaran Bulan Ini
+            </p>
+          </div>
+          <p className="mt-3 text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>
+            {formatRp(currentBudgetOverview.totalBudget)}
+          </p>
+          <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
+            {currentBudgetOverview.activeBudgetCount > 0
+              ? `${currentBudgetOverview.activeBudgetCount} anggaran sedang dipantau`
+              : 'Belum ada anggaran bulan ini'}
+          </p>
+        </div>
+
+        <div
+          className="rounded-2xl border p-5"
+          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+        >
+          <div className="flex items-center gap-2">
+            <IconDisplay name="TrendingUp" size={16} className="transform rotate-180" style={{ color: theme.colors.expense }} />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+              Sudah Terpakai
+            </p>
+          </div>
+          <p className="mt-3 text-2xl font-bold" style={{ color: theme.colors.expense }}>
+            {formatRp(currentBudgetOverview.totalSpent)}
+          </p>
+          <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
+            Sisa {formatRp(currentBudgetOverview.remaining)}
+          </p>
+        </div>
+
+        <div
+          className="rounded-2xl border p-5"
+          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+        >
+          <div className="flex items-center gap-2">
+            <IconDisplay name="AlertCircle" size={16} style={{ color: currentBudgetOverview.overBudgetCount > 0 ? theme.colors.expense : theme.colors.accent }} />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+              Status Anggaran
+            </p>
+          </div>
+          <p
+            className="mt-3 text-2xl font-bold"
+            style={{ color: currentBudgetOverview.overBudgetCount > 0 ? theme.colors.expense : theme.colors.textPrimary }}
+          >
+            {currentBudgetOverview.overBudgetCount > 0 ? `${currentBudgetOverview.overBudgetCount} lewat` : 'Aman'}
+          </p>
+          <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
+            {currentBudgetOverview.overBudgetCount > 0
+              ? 'Ada anggaran yang sudah melewati batas'
+              : currentBudgetOverview.activeBudgetCount > 0
+                ? 'Belum ada anggaran yang melewati batas'
+                : 'Atur anggaran untuk mulai memantau'}
+          </p>
         </div>
       </div>
 

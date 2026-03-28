@@ -109,7 +109,7 @@ async function checkAdvisorRateLimit(userId: string): Promise<void> {
 /**
  * Get monthly aggregates for historical context
  */
-async function getMonthlyAggregates(userId: string, months: number): Promise<MonthlyAggregate[]> {
+async function getMonthlyAggregates(userId: string, months: number, accountId?: string): Promise<MonthlyAggregate[]> {
     const aggregates: MonthlyAggregate[] = [];
     
     for (let i = 0; i < months; i++) {
@@ -123,9 +123,9 @@ async function getMonthlyAggregates(userId: string, months: number): Promise<Mon
             // Note: Using 'this_month' with manual date filtering would be ideal,
             // but for now we'll use all_time and filter manually or implement monthly queries differently
             const [expenses, income, breakdown] = await Promise.all([
-                getTotalExpenses(userId, 'this_month'),  // TODO: Implement proper monthly query
-                getTotalIncome(userId, 'this_month'),
-                getCategoryBreakdown(userId, 'this_month')
+                getTotalExpenses(userId, 'this_month', undefined, undefined, accountId),  // TODO: Implement proper monthly query
+                getTotalIncome(userId, 'this_month', accountId),
+                getCategoryBreakdown(userId, 'this_month', undefined, accountId)
             ]);
             
             const topCategory = breakdown[0];
@@ -252,7 +252,8 @@ function formatCurrency(amount: number): string {
  */
 export async function analyzeFinancialHealth(
     userId: string,
-    timeRange: TimeRange = 'this_month'
+    timeRange: TimeRange = 'this_month',
+    accountId?: string
 ): Promise<string> {
     // Check rate limit
     await checkAdvisorRateLimit(userId);
@@ -266,12 +267,12 @@ export async function analyzeFinancialHealth(
         balance,
         monthlyHistory
     ] = await Promise.all([
-        getTotalExpenses(userId, timeRange),
-        getTotalExpenses(userId, 'last_month'),
-        getCategoryBreakdown(userId, timeRange),
-        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount'),
-        getBalance(userId),
-        getMonthlyAggregates(userId, 3)  // Last 3 months aggregate
+        getTotalExpenses(userId, timeRange, undefined, undefined, accountId),
+        getTotalExpenses(userId, 'last_month', undefined, undefined, accountId),
+        getCategoryBreakdown(userId, timeRange, undefined, accountId),
+        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount', accountId),
+        getBalance(userId, undefined, undefined, undefined, accountId),
+        getMonthlyAggregates(userId, 3, accountId)  // Last 3 months aggregate
     ]);
     
     // Select relevant transactions (token efficient)
@@ -354,7 +355,8 @@ ATURAN:
  */
 export async function generateSavingsStrategy(
     userId: string,
-    timeRange: TimeRange = 'this_month'
+    timeRange: TimeRange = 'this_month',
+    accountId?: string
 ): Promise<string> {
     await checkAdvisorRateLimit(userId);
     
@@ -364,10 +366,10 @@ export async function generateSavingsStrategy(
         monthlyHistory,
         recentTransactions
     ] = await Promise.all([
-        getTotalExpenses(userId, timeRange),
-        getCategoryBreakdown(userId, timeRange),
-        getMonthlyAggregates(userId, 3),
-        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount')
+        getTotalExpenses(userId, timeRange, undefined, undefined, accountId),
+        getCategoryBreakdown(userId, timeRange, undefined, accountId),
+        getMonthlyAggregates(userId, 3, accountId),
+        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount', accountId)
     ]);
     
     const selectedTransactions = selectRelevantTransactions(recentTransactions, 50);
@@ -430,7 +432,8 @@ ATURAN:
  */
 export async function analyzeExpenseReduction(
     userId: string,
-    timeRange: TimeRange = 'this_month'
+    timeRange: TimeRange = 'this_month',
+    accountId?: string
 ): Promise<string> {
     await checkAdvisorRateLimit(userId);
     
@@ -438,8 +441,8 @@ export async function analyzeExpenseReduction(
         breakdown,
         allTransactions
     ] = await Promise.all([
-        getCategoryBreakdown(userId, timeRange),
-        getTransactionDetails(userId, timeRange, undefined, undefined, 150, undefined, 'amount')
+        getCategoryBreakdown(userId, timeRange, undefined, accountId),
+        getTransactionDetails(userId, timeRange, undefined, undefined, 150, undefined, 'amount', accountId)
     ]);
     
     // For expense analysis, we want more detail

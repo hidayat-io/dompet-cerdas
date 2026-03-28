@@ -373,13 +373,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Delete Button (Header - Mobile & Desktop) */}
+            {/* Delete Button (Header - Mobile only) */}
             {initialData && onDelete && (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={isSaving}
-                className="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                className="md:hidden p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: '#ef4444',
                   color: 'white'

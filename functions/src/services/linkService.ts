@@ -5,6 +5,7 @@
 
 import * as admin from 'firebase-admin';
 import { generateSecureToken } from '../utils/crypto';
+import { getActiveAccountId, getAccountSummary, getUserAccounts } from './accountService';
 
 // Helper to get Firestore instance
 const getDb = () => admin.firestore();
@@ -26,9 +27,15 @@ export interface TelegramLink {
     username?: string;
     firstName: string;
     lastName?: string;
+    defaultAccountId?: string;
     linkedAt: admin.firestore.Timestamp;
     active: boolean;
     lastInteraction: admin.firestore.Timestamp;
+}
+
+export interface TelegramLinkContext {
+    userId: string;
+    link: TelegramLink;
 }
 
 /**
@@ -117,6 +124,7 @@ export async function linkTelegramAccount(
     }
 ): Promise<void> {
     const now = admin.firestore.Timestamp.now();
+    const defaultAccountId = await getActiveAccountId(userId);
 
     // Mark token as used
     await getDb().collection('link_tokens').doc(token).update({
@@ -130,6 +138,7 @@ export async function linkTelegramAccount(
         username: telegramUser.username,
         firstName: telegramUser.first_name || 'Telegram',
         lastName: telegramUser.last_name,
+        defaultAccountId,
         linkedAt: now,
         active: true,
         lastInteraction: now,
@@ -151,6 +160,11 @@ export async function linkTelegramAccount(
 export async function checkTelegramLink(
     telegramId: number
 ): Promise<string | null> {
+    const context = await getTelegramLinkContext(telegramId);
+    return context?.userId || null;
+}
+
+export async function getTelegramLinkContext(telegramId: number): Promise<TelegramLinkContext | null> {
     const snapshot = await getDb()
         .collectionGroup('telegram_link')
         .where('telegramId', '==', telegramId)
@@ -167,7 +181,10 @@ export async function checkTelegramLink(
     const docPath = snapshot.docs[0].ref.path;
     const userId = docPath.split('/')[1];
 
-    return userId;
+    return {
+        userId,
+        link: snapshot.docs[0].data() as TelegramLink,
+    };
 }
 
 /**
@@ -175,15 +192,15 @@ export async function checkTelegramLink(
  * @param telegramId - Telegram user ID
  */
 export async function updateLastInteraction(telegramId: number): Promise<void> {
-    const userId = await checkTelegramLink(telegramId);
+    const context = await getTelegramLinkContext(telegramId);
 
-    if (!userId) {
+    if (!context?.userId) {
         return;
     }
 
     await getDb()
         .collection('users')
-        .doc(userId)
+        .doc(context.userId)
         .collection('telegram_link')
         .doc('main')
         .update({
@@ -197,15 +214,15 @@ export async function updateLastInteraction(telegramId: number): Promise<void> {
  * @param telegramId - Telegram user ID
  */
 export async function unlinkTelegramAccount(telegramId: number): Promise<boolean> {
-    const userId = await checkTelegramLink(telegramId);
+    const context = await getTelegramLinkContext(telegramId);
 
-    if (!userId) {
+    if (!context?.userId) {
         return false; // Account not linked
     }
 
     await getDb()
         .collection('users')
-        .doc(userId)
+        .doc(context.userId)
         .collection('telegram_link')
         .doc('main')
         .update({
@@ -214,4 +231,63 @@ export async function unlinkTelegramAccount(telegramId: number): Promise<boolean
         });
 
     return true;
+}
+
+export async function getTelegramAccountState(telegramId: number): Promise<{
+    userId: string;
+    defaultAccountId?: string;
+    defaultAccountName?: string;
+    accounts: Array<{ id: string; name: string; type?: string }>;
+} | null> {
+    const context = await getTelegramLinkContext(telegramId);
+    if (!context) return null;
+
+    const fallbackAccountId = await getActiveAccountId(context.userId);
+    const defaultAccountId = context.link.defaultAccountId || fallbackAccountId;
+    const [accountSummary, accounts] = await Promise.all([
+        getAccountSummary(context.userId, defaultAccountId),
+        getUserAccounts(context.userId),
+    ]);
+
+    return {
+        userId: context.userId,
+        defaultAccountId: accountSummary.id || defaultAccountId,
+        defaultAccountName: accountSummary.name,
+        accounts,
+    };
+}
+
+export async function updateTelegramDefaultAccount(userId: string, accountId: string): Promise<void> {
+    const accountSummary = await getAccountSummary(userId, accountId);
+    if (!accountSummary.id) {
+        throw new Error('Account not found');
+    }
+
+    await getDb()
+        .collection('users')
+        .doc(userId)
+        .collection('telegram_link')
+        .doc('main')
+        .set({
+            defaultAccountId: accountSummary.id,
+            updatedAt: admin.firestore.Timestamp.now(),
+        }, { merge: true });
+}
+
+export async function updateTelegramDefaultAccountByTelegramId(telegramId: number, accountId: string): Promise<{
+    userId: string;
+    accountId: string;
+    accountName?: string;
+} | null> {
+    const context = await getTelegramLinkContext(telegramId);
+    if (!context) return null;
+
+    await updateTelegramDefaultAccount(context.userId, accountId);
+    const accountSummary = await getAccountSummary(context.userId, accountId);
+
+    return {
+        userId: context.userId,
+        accountId: accountSummary.id || accountId,
+        accountName: accountSummary.name,
+    };
 }

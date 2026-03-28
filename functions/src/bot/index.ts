@@ -5,14 +5,22 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { handleStartCommand } from './commands/start';
 import { handleHelpCommand } from './commands/help';
-import { checkTelegramLink, updateLastInteraction, unlinkTelegramAccount } from '../services/linkService';
-import { analyzeReceipt, formatReceiptData } from '../services/geminiService';
-import { createTransactionFromReceipt, createManualTransaction, getUserCategories, UserCategory } from '../services/transactionService';
+import {
+    checkTelegramLink,
+    getTelegramAccountState,
+    updateLastInteraction,
+    unlinkTelegramAccount,
+    updateTelegramDefaultAccountByTelegramId
+} from '../services/linkService';
+import { analyzeReceipt, formatReceiptData, transcribeAudioToText } from '../services/geminiService';
+import { createTransactionFromReceipt, createManualTransactionsBatch, getFallbackCategory, getUserCategories, UserCategory } from '../services/transactionService';
 import { parseIntent, isActionable, classifyCategory } from '../services/nluService';
+import { parseTransactionMessageHybrid, ParsedTransactionDraft } from '../services/transactionParsingService';
 import { getTotalExpenses, getTotalIncome, getBalance, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
 import { analyzeFinancialHealth, generateSavingsStrategy, analyzeExpenseReduction } from '../services/advisorService';
 import * as responseFormatter from '../services/responseFormatter';
 import { getDb } from '../index';
+import { sanitizeFirestoreData } from '../utils/firestore';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
@@ -21,7 +29,56 @@ let bot: TelegramBot | null = null;
 const RATE_LIMIT_WINDOW_MS = 10_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const DUPLICATE_SUPPRESS_MS = 5_000;
+const TEXT_TRANSACTION_SESSION_TTL_MS = 30 * 60 * 1000;
 const userRateLimit = new Map<number, { windowStart: number; count: number; lastText?: string; lastTextAt?: number }>();
+
+type TelegramAccountState = Awaited<ReturnType<typeof getTelegramAccountState>>;
+type TextTransactionSessionItem = ParsedTransactionDraft & { categoryId: string; categoryName: string };
+type TextTransactionSessionData = {
+    status: string;
+    createdAt?: { toMillis?: () => number };
+    userId: string;
+    accountId?: string | null;
+    accountName?: string | null;
+    rawMessage?: string;
+    sourceType?: 'text' | 'voice';
+    usedAI?: boolean;
+    items: Array<Partial<TextTransactionSessionItem>>;
+};
+
+function normalizeTextTransactionSessionItems(
+    items: Array<Partial<TextTransactionSessionItem>>
+): TextTransactionSessionItem[] {
+    return items
+        .map((item) => {
+            const amount = typeof item.amount === 'number' && Number.isFinite(item.amount)
+                ? Math.round(item.amount)
+                : 0;
+            const description = typeof item.description === 'string' ? item.description.trim() : '';
+            const categoryId = typeof item.categoryId === 'string' ? item.categoryId.trim() : '';
+            const categoryName = typeof item.categoryName === 'string' ? item.categoryName.trim() : '';
+            const sourceText = typeof item.sourceText === 'string' && item.sourceText.trim()
+                ? item.sourceText.trim()
+                : description;
+            const categoryHint = typeof item.category_hint === 'string' && item.category_hint.trim()
+                ? item.category_hint.trim()
+                : undefined;
+
+            if (!amount || !description || !categoryId || !categoryName) {
+                return null;
+            }
+
+            return {
+                amount,
+                description,
+                categoryId,
+                categoryName,
+                sourceText,
+                ...(categoryHint ? { category_hint: categoryHint } : {}),
+            } satisfies TextTransactionSessionItem;
+        })
+        .filter((item): item is TextTransactionSessionItem => !!item);
+}
 
 function extractCaptionCategoryHint(caption: string): string | undefined {
     const keywordRegex = /\b(cat|categ|category|kategori|kat|ktg|ktgr|kate)\b\s*[:\-]?\s*([a-zA-ZÀ-ÿ0-9]+(?:\s+[a-zA-ZÀ-ÿ0-9]+){0,2})/i;
@@ -104,6 +161,330 @@ function shouldThrottleUser(telegramId: number, text?: string): { blocked: boole
     }
 
     return { blocked: false };
+}
+
+function buildAccountKeyboard(
+    accounts: Array<{ id: string; name: string; type?: string }>,
+    activeAccountId?: string
+) {
+    return {
+        inline_keyboard: accounts.map((account) => ([
+            {
+                text: `${account.id === activeAccountId ? '✅ ' : ''}${account.name}`,
+                callback_data: `switch_account:${account.id}`,
+            }
+        ]))
+    };
+}
+
+function buildTextTransactionDraftKeyboard(sessionId: string, items: TextTransactionSessionItem[]) {
+    const rows: Array<Array<{ text: string; callback_data: string }>> = [[
+        { text: items.length > 1 ? '✅ Simpan Semua' : '✅ Simpan', callback_data: `mtc_${sessionId}` },
+        { text: '❌ Batal', callback_data: `mtx_${sessionId}` }
+    ]];
+
+    if (items.length > 1) {
+        const removeButtons = items.map((_, index) => ({
+            text: `🗑 Hapus ${index + 1}`,
+            callback_data: `mtr_${sessionId}_${index}`,
+        }));
+
+        for (let i = 0; i < removeButtons.length; i += 2) {
+            rows.push(removeButtons.slice(i, i + 2));
+        }
+    }
+
+    return { inline_keyboard: rows };
+}
+
+function renderTextTransactionDraft(
+    sessionId: string,
+    items: TextTransactionSessionItem[],
+    accountName?: string | null,
+    usedAI = false,
+    sourceType: 'text' | 'voice' = 'text',
+    rawMessage?: string
+) {
+    const transcriptNote = sourceType === 'voice' && rawMessage?.trim()
+        ? `🎤 *Hasil suara:* _${responseFormatter.escapeMarkdown(rawMessage.trim())}_\n\n`
+        : '';
+    return {
+        text: responseFormatter.withAccountHeader(
+            transcriptNote + responseFormatter.formatTransactionDraftPreview(
+                items.map((item) => ({
+                    amount: item.amount,
+                    description: item.description,
+                    categoryName: item.categoryName,
+                })),
+                usedAI
+            ),
+            accountName || undefined
+        ),
+        options: {
+            parse_mode: 'Markdown' as const,
+            reply_markup: buildTextTransactionDraftKeyboard(sessionId, items)
+        }
+    };
+}
+
+function isTextTransactionSessionExpired(sessionData: TextTransactionSessionData): boolean {
+    const createdAtMs = sessionData.createdAt?.toMillis?.() || 0;
+    return sessionData.status !== 'pending' || (createdAtMs > 0 && Date.now() - createdAtMs > TEXT_TRANSACTION_SESSION_TTL_MS);
+}
+
+async function resolveCategoryChoice(
+    description: string,
+    categories: UserCategory[],
+    categoryHint?: string
+): Promise<{ categoryId: string; categoryName: string; confidence: 'high' | 'medium' | 'low' }> {
+    if (categories.length === 0) {
+        throw new Error('No categories available for Telegram transaction');
+    }
+
+    const normalizedHint = categoryHint?.toLowerCase().trim();
+    const directMatch = normalizedHint
+        ? categories.find((category) => category.name.toLowerCase() === normalizedHint)
+        : undefined;
+
+    const hintAliasMap: Record<string, string[]> = {
+        food: ['makan', 'makanan', 'kuliner', 'food', 'minum', 'snack', 'camil', 'camilan', 'warteg', 'warung', 'resto', 'restaurant', 'cafe', 'kopi'],
+        transportation: ['transport', 'transportasi', 'travel', 'perjalanan', 'bensin', 'bbm', 'parkir', 'taksi', 'ojek', 'gojek', 'grab', 'pertamina'],
+        shopping: ['belanja', 'shopping', 'market', 'minimarket', 'indomaret', 'alfamart', 'supermarket', 'mall'],
+        bill: ['tagihan', 'bill', 'hutang', 'utang', 'cicilan', 'kredit', 'pinjaman', 'bayar hutang', 'bayar utang'],
+        income: ['gaji', 'salary', 'bonus', 'thr', 'fee', 'komisi', 'bayaran', 'income', 'pemasukan'],
+    };
+
+    const fuzzyMatch = normalizedHint
+        ? categories.find((category) => {
+            const name = category.name.toLowerCase();
+            if (normalizedHint && (name.includes(normalizedHint) || normalizedHint.includes(name))) {
+                return true;
+            }
+
+            const aliases = hintAliasMap[normalizedHint] || [];
+            return aliases.some((alias) => name.includes(alias));
+        })
+        : undefined;
+
+    if (directMatch) {
+        return {
+            categoryId: directMatch.id,
+            categoryName: directMatch.name,
+            confidence: 'high'
+        };
+    }
+
+    if (fuzzyMatch) {
+        return {
+            categoryId: fuzzyMatch.id,
+            categoryName: fuzzyMatch.name,
+            confidence: 'high'
+        };
+    }
+
+    try {
+        return await classifyCategory(description, categories);
+    } catch (classificationError) {
+        console.error('Category classification failed:', classificationError);
+        const fallbackCategory = getFallbackCategory(
+            categories,
+            normalizedHint === 'income' || /gaji|salary|bonus|thr|fee|bayaran|komisi|income|pemasukan/i.test(description)
+                ? 'INCOME'
+                : 'EXPENSE'
+        );
+        return {
+            categoryId: fallbackCategory.id,
+            categoryName: fallbackCategory.name,
+            confidence: 'low'
+        };
+    }
+}
+
+async function createTextTransactionDraftSession(params: {
+    userId: string;
+    telegramId: number;
+    accountId?: string;
+    accountName?: string;
+    rawMessage: string;
+    sourceType?: 'text' | 'voice';
+    items: TextTransactionSessionItem[];
+    usedAI: boolean;
+}): Promise<string> {
+    const sessionId = require('crypto').randomBytes(4).toString('hex');
+    const sanitizedItems = normalizeTextTransactionSessionItems(params.items);
+    if (sanitizedItems.length === 0) {
+        throw new Error('No valid transaction items to store in draft session');
+    }
+
+    await getDb().collection('text_transaction_sessions').doc(sessionId).set(sanitizeFirestoreData({
+        userId: params.userId,
+        telegramId: params.telegramId,
+        accountId: params.accountId || null,
+        accountName: params.accountName || null,
+        rawMessage: params.rawMessage,
+        sourceType: params.sourceType || 'text',
+        items: sanitizedItems,
+        usedAI: params.usedAI,
+        status: 'pending',
+        createdAt: new Date(),
+    }));
+    return sessionId;
+}
+
+async function createAndSendTransactionDraftPreview(params: {
+    chatId: number;
+    userId: string;
+    telegramId: number;
+    accountId?: string;
+    accountName?: string | null;
+    rawMessage: string;
+    sourceType?: 'text' | 'voice';
+    items: ParsedTransactionDraft[];
+    usedAI: boolean;
+}): Promise<void> {
+    const categories = await getUserCategories(params.userId, false, params.accountId);
+    const resolvedItems = await Promise.all(params.items.map(async (item) => {
+        const categoryChoice = await resolveCategoryChoice(item.description, categories, item.category_hint);
+        return {
+            ...item,
+            categoryId: categoryChoice.categoryId,
+            categoryName: categoryChoice.categoryName,
+        };
+    }));
+    const validResolvedItems = normalizeTextTransactionSessionItems(resolvedItems);
+
+    if (validResolvedItems.length === 0) {
+        throw new Error('Failed to build valid transaction draft items');
+    }
+
+    const sourceType = params.sourceType || 'text';
+    const sessionId = await createTextTransactionDraftSession({
+        userId: params.userId,
+        telegramId: params.telegramId,
+        accountId: params.accountId,
+        accountName: params.accountName || undefined,
+        rawMessage: params.rawMessage,
+        sourceType,
+        items: validResolvedItems,
+        usedAI: params.usedAI,
+    });
+
+    const draftPreview = renderTextTransactionDraft(
+        sessionId,
+        validResolvedItems,
+        params.accountName,
+        params.usedAI,
+        sourceType,
+        params.rawMessage
+    );
+
+    await getBot().sendMessage(
+        params.chatId,
+        draftPreview.text,
+        draftPreview.options
+    );
+}
+
+async function handleVoiceLikeMessage(
+    msg: TelegramBot.Message,
+    userId: string,
+    telegramAccountState: TelegramAccountState,
+    fileId: string,
+    mimeType: string,
+    durationSeconds?: number,
+    fileSize?: number
+): Promise<void> {
+    const chatId = msg.chat.id;
+    const accountId = telegramAccountState?.defaultAccountId;
+    const accountName = telegramAccountState?.defaultAccountName;
+
+    try {
+        if (durationSeconds && durationSeconds > 180) {
+            await getBot().sendMessage(
+                chatId,
+                responseFormatter.withAccountHeader(
+                    '⚠️ Voice note terlalu panjang.\n\nMaksimal 3 menit per kiriman ya.',
+                    accountName
+                ),
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        if (fileSize && fileSize > 10 * 1024 * 1024) {
+            await getBot().sendMessage(
+                chatId,
+                responseFormatter.withAccountHeader(
+                    '⚠️ File audio terlalu besar.\n\nMaksimal 10MB per kiriman ya.',
+                    accountName
+                ),
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        const processingMsg = await getBot().sendMessage(
+            chatId,
+            '🎤 Mendengarkan voice note...\n\nMohon tunggu beberapa detik...'
+        );
+
+        const fileLink = await getBot().getFileLink(fileId);
+        const response = await fetch(fileLink);
+        if (!response.ok) {
+            throw new Error('Failed to download audio file');
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = Buffer.from(arrayBuffer);
+        const transcript = (await transcribeAudioToText(audioBuffer, mimeType)).trim();
+
+        if (!transcript) {
+            await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
+            await getBot().sendMessage(
+                chatId,
+                responseFormatter.withAccountHeader(
+                    '⚠️ Voice note belum berhasil dipahami.\n\nCoba ulang dengan ucapan yang lebih jelas, singkat, dan langsung sebut transaksi ya.',
+                    accountName
+                ),
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        const hybridParse = await parseTransactionMessageHybrid(transcript);
+        if (hybridParse && hybridParse.items.length > 0) {
+            await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
+            await createAndSendTransactionDraftPreview({
+                chatId,
+                userId,
+                telegramId: msg.from!.id,
+                accountId,
+                accountName,
+                rawMessage: transcript,
+                sourceType: 'voice',
+                items: hybridParse.items,
+                usedAI: hybridParse.usedAI,
+            });
+            return;
+        }
+
+        await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
+        await getBot().sendMessage(
+            chatId,
+            responseFormatter.withAccountHeader(
+                `⚠️ Voice note berhasil ditranskrip, tapi belum terbaca sebagai transaksi.\n\n🎤 Hasil suara: _${responseFormatter.escapeMarkdown(transcript)}_\n\nCoba sebut lebih langsung, misalnya: _makan 25 ribu, parkir 5 ribu_.`,
+                accountName
+            ),
+            { parse_mode: 'Markdown' }
+        );
+    } catch (error) {
+        console.error('Error handling voice message:', error);
+        await getBot().sendMessage(
+            chatId,
+            responseFormatter.withAccountHeader('❌ Terjadi kesalahan saat memproses voice note. Silakan coba lagi.', accountName),
+            { parse_mode: 'Markdown' }
+        );
+    }
 }
 
 /**
@@ -193,21 +574,49 @@ async function handleMessage(msg: TelegramBot.Message): Promise<void> {
         return;
     }
 
+    const telegramAccountState = await getTelegramAccountState(telegramId);
+
     // Handle photo (receipt upload)
     if (msg.photo) {
-        await handlePhotoMessage(msg, userId);
+        await handlePhotoMessage(msg, userId, telegramAccountState);
         return;
     }
 
     // Handle documents/files (image files as documents)
     if (msg.document) {
-        await handleDocumentMessage(msg, userId);
+        await handleDocumentMessage(msg, userId, telegramAccountState);
+        return;
+    }
+
+    if (msg.voice) {
+        await handleVoiceLikeMessage(
+            msg,
+            userId,
+            telegramAccountState,
+            msg.voice.file_id,
+            msg.voice.mime_type || 'audio/ogg',
+            msg.voice.duration,
+            msg.voice.file_size
+        );
+        return;
+    }
+
+    if (msg.audio) {
+        await handleVoiceLikeMessage(
+            msg,
+            userId,
+            telegramAccountState,
+            msg.audio.file_id,
+            msg.audio.mime_type || 'audio/mpeg',
+            msg.audio.duration,
+            msg.audio.file_size
+        );
         return;
     }
 
     // Handle text (natural language query)
     if (text) {
-        await handleTextMessage(msg, userId);
+        await handleTextMessage(msg, userId, telegramAccountState);
         return;
     }
 }
@@ -217,6 +626,8 @@ async function handleMessage(msg: TelegramBot.Message): Promise<void> {
  */
 async function handleCommand(msg: TelegramBot.Message): Promise<void> {
     const command = msg.text?.split(' ')[0].toLowerCase();
+    const telegramId = msg.from?.id;
+    const linkedState = telegramId ? await getTelegramAccountState(telegramId) : null;
 
     switch (command) {
         case '/start':
@@ -225,13 +636,17 @@ async function handleCommand(msg: TelegramBot.Message): Promise<void> {
 
         case '/help':
         case '/bantuan':
-            await handleHelpCommand(getBot(), msg);
+            await handleHelpCommand(getBot(), msg, linkedState?.defaultAccountName);
             break;
 
         case '/link':
         case '/hubungkan':
             // Same as /start for now
             await handleStartCommand(getBot(), msg);
+            break;
+
+        case '/akun':
+            await handleAccountCommand(msg, linkedState);
             break;
 
         case '/unlink':
@@ -242,7 +657,11 @@ async function handleCommand(msg: TelegramBot.Message): Promise<void> {
         default:
             await getBot().sendMessage(
                 msg.chat.id,
-                '❓ Command tidak dikenal. Ketik /help untuk melihat panduan.'
+                responseFormatter.withAccountHeader(
+                    '❓ Command tidak dikenal. Ketik /help untuk melihat panduan.',
+                    linkedState?.defaultAccountName
+                ),
+                { parse_mode: 'Markdown' }
             );
     }
 }
@@ -285,12 +704,49 @@ async function handleUnlinkCommand(msg: TelegramBot.Message): Promise<void> {
     );
 }
 
+async function handleAccountCommand(
+    msg: TelegramBot.Message,
+    telegramAccountState: TelegramAccountState
+): Promise<void> {
+    const chatId = msg.chat.id;
+
+    if (!telegramAccountState) {
+        await getBot().sendMessage(
+            chatId,
+            '⚠️ Akun belum terhubung. Ketik /start untuk menghubungkan akun.'
+        );
+        return;
+    }
+
+    const response = responseFormatter.withAccountHeader(
+        responseFormatter.formatTelegramAccountStatus(
+            telegramAccountState.defaultAccountName,
+            telegramAccountState.accounts
+        ),
+        telegramAccountState.defaultAccountName
+    );
+
+    if (telegramAccountState.accounts.length <= 1) {
+        await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+        return;
+    }
+
+    await getBot().sendMessage(chatId, response, {
+        parse_mode: 'Markdown',
+        reply_markup: buildAccountKeyboard(
+            telegramAccountState.accounts,
+            telegramAccountState.defaultAccountId
+        )
+    });
+}
+
 /**
  * Handle photo messages (receipt upload)
  */
 async function handlePhotoMessage(
     msg: TelegramBot.Message,
-    userId: string
+    userId: string,
+    telegramAccountState: TelegramAccountState
 ): Promise<void> {
     const chatId = msg.chat.id;
     const photo = msg.photo![msg.photo!.length - 1]; // Get highest resolution
@@ -356,7 +812,7 @@ async function handlePhotoMessage(
             return;
         }
 
-        const categories = await getUserCategories(userId);
+        const categories = await getUserCategories(userId, false, telegramAccountState?.defaultAccountId);
         const captionCategoryName = await resolveCaptionCategoryName(photoCaption, categories);
         const cleanedCaption = cleanCaptionDescription(photoCaption);
 
@@ -365,7 +821,7 @@ async function handlePhotoMessage(
         const sessionId = require('crypto').randomBytes(4).toString('hex');
 
         // Store in Firestore temporary session
-        await getDb().collection('receipt_sessions').doc(sessionId).set({
+        await getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
             userId,
             telegramId: msg.from!.id,
             receiptData,
@@ -374,14 +830,18 @@ async function handlePhotoMessage(
             status: 'pending',
             createdAt: new Date(),
             expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-        });
+        }));
 
         // Format confirmation message with caption
         const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
+        const messageWithHeader = responseFormatter.withAccountHeader(
+            confirmationText,
+            telegramAccountState?.defaultAccountName
+        );
 
         // Edit analyzing message with confirmation
         await getBot().editMessageText(
-            confirmationText,
+            messageWithHeader,
             {
                 chat_id: chatId,
                 message_id: analyzingMsg.message_id,
@@ -409,7 +869,8 @@ async function handlePhotoMessage(
  */
 async function handleDocumentMessage(
     msg: TelegramBot.Message,
-    userId: string
+    userId: string,
+    telegramAccountState: TelegramAccountState
 ): Promise<void> {
     const chatId = msg.chat.id;
     const document = msg.document!;
@@ -533,7 +994,7 @@ async function handleDocumentMessage(
             return;
         }
 
-        const categories = await getUserCategories(userId);
+        const categories = await getUserCategories(userId, false, telegramAccountState?.defaultAccountId);
         const captionCategoryName = await resolveCaptionCategoryName(documentCaption, categories);
         const cleanedCaption = cleanCaptionDescription(documentCaption);
 
@@ -541,7 +1002,7 @@ async function handleDocumentMessage(
         const sessionId = require('crypto').randomBytes(4).toString('hex');
 
         // Store in Firestore temporary session
-        await getDb().collection('receipt_sessions').doc(sessionId).set({
+        await getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
             userId,
             telegramId: msg.from!.id,
             receiptData,
@@ -551,14 +1012,18 @@ async function handleDocumentMessage(
             source: 'document', // Mark as document source
             createdAt: new Date(),
             expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-        });
+        }));
 
         // Format confirmation message with caption
         const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
+        const messageWithHeader = responseFormatter.withAccountHeader(
+            confirmationText,
+            telegramAccountState?.defaultAccountName
+        );
 
         // Edit analyzing message with confirmation
         await getBot().editMessageText(
-            confirmationText,
+            messageWithHeader,
             {
                 chat_id: chatId,
                 message_id: analyzingMsg.message_id,
@@ -586,10 +1051,13 @@ async function handleDocumentMessage(
  */
 async function handleTextMessage(
     msg: TelegramBot.Message,
-    userId: string
+    userId: string,
+    telegramAccountState: TelegramAccountState
 ): Promise<void> {
     const chatId = msg.chat.id;
     const text = msg.text || '';
+    const accountId = telegramAccountState?.defaultAccountId;
+    const accountName = telegramAccountState?.defaultAccountName;
 
     // Send processing message immediately
     const processingMsg = await getBot().sendMessage(
@@ -598,6 +1066,35 @@ async function handleTextMessage(
     );
 
     try {
+        const hybridParse = await parseTransactionMessageHybrid(text);
+        if (hybridParse && hybridParse.items.length > 0) {
+            await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
+            await createAndSendTransactionDraftPreview({
+                chatId,
+                userId,
+                telegramId: msg.from!.id,
+                accountId,
+                accountName,
+                rawMessage: text,
+                sourceType: 'text',
+                items: hybridParse.items,
+                usedAI: hybridParse.usedAI,
+            });
+            return;
+        }
+        if (hybridParse?.clarificationNeeded) {
+            await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
+            await getBot().sendMessage(
+                chatId,
+                responseFormatter.withAccountHeader(
+                    responseFormatter.formatClarification(hybridParse.clarificationNeeded),
+                    accountName
+                ),
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
         // Parse intent using Gemini NLU
         const parsedIntent = await parseIntent(text);
 
@@ -607,9 +1104,17 @@ async function handleTextMessage(
             await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
 
             if (parsedIntent.clarification_needed) {
-                await getBot().sendMessage(chatId, responseFormatter.formatClarification(parsedIntent.clarification_needed), { parse_mode: 'Markdown' });
+                await getBot().sendMessage(
+                    chatId,
+                    responseFormatter.withAccountHeader(responseFormatter.formatClarification(parsedIntent.clarification_needed), accountName),
+                    { parse_mode: 'Markdown' }
+                );
             } else {
-                await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
+                await getBot().sendMessage(
+                    chatId,
+                    responseFormatter.withAccountHeader(responseFormatter.formatUnknownIntent(), accountName),
+                    { parse_mode: 'Markdown' }
+                );
             }
             return;
         }
@@ -620,7 +1125,7 @@ async function handleTextMessage(
                 const timeRange = parsedIntent.parameters.time_range;
                 const daysAgo = parsedIntent.parameters.days_ago;
                 const customMonth = parsedIntent.parameters.custom_month;
-                const { total, count } = await getTotalExpenses(userId, timeRange || 'this_month', daysAgo, customMonth);
+                const { total, count } = await getTotalExpenses(userId, timeRange || 'this_month', daysAgo, customMonth, accountId);
 
                 let timeRangeText: string;
                 if (customMonth) {
@@ -634,7 +1139,10 @@ async function handleTextMessage(
                     timeRangeText = formatTimeRange(timeRange || 'this_month');
                 }
 
-                const response = responseFormatter.formatExpenseResponse(total, count, timeRangeText);
+                const response = responseFormatter.withAccountHeader(
+                    responseFormatter.formatExpenseResponse(total, count, timeRangeText),
+                    accountName
+                );
                 await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -643,9 +1151,12 @@ async function handleTextMessage(
             case 'query_income': {
                 const timeRange = parsedIntent.parameters.time_range;
                 // For now, ignore daysAgo for income queries - use timeRange only
-                const { total, count } = await getTotalIncome(userId, timeRange || 'this_month');
+                const { total, count } = await getTotalIncome(userId, timeRange || 'this_month', accountId);
                 const timeRangeText = formatTimeRange(timeRange || 'this_month');
-                const response = responseFormatter.formatIncomeResponse(total, count, timeRangeText);
+                const response = responseFormatter.withAccountHeader(
+                    responseFormatter.formatIncomeResponse(total, count, timeRangeText),
+                    accountName
+                );
                 await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -661,7 +1172,7 @@ async function handleTextMessage(
                 const hasTimeRange = typeof timeRange === 'string' && timeRange.length > 0;
 
                 const daysAgo = hasDaysAgo ? daysAgoRaw : undefined;
-                const balance = await getBalance(userId, hasTimeRange ? timeRange : undefined, daysAgo, hasCustomMonth ? customMonth : undefined);
+                const balance = await getBalance(userId, hasTimeRange ? timeRange : undefined, daysAgo, hasCustomMonth ? customMonth : undefined, accountId);
 
                 let timeRangeText = '';
                 if (hasCustomMonth && customMonth) {
@@ -675,7 +1186,10 @@ async function handleTextMessage(
                     timeRangeText = ` (${formatTimeRange(timeRange)})`;
                 }
 
-                const response = responseFormatter.formatBalanceResponse(balance, timeRangeText || undefined);
+                const response = responseFormatter.withAccountHeader(
+                    responseFormatter.formatBalanceResponse(balance, timeRangeText || undefined),
+                    accountName
+                );
                 await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -704,7 +1218,7 @@ async function handleTextMessage(
                 const effectiveTimeRange = (limit && !timeRange && !specificDate && daysAgo === undefined)
                     ? 'all_time'
                     : (timeRange || 'this_month');
-                const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo, limit, specificDate, sortBy);
+                const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo, limit, specificDate, sortBy, accountId);
 
                 let timeRangeText: string;
                 if (limit && sortBy === 'amount') {
@@ -722,7 +1236,10 @@ async function handleTextMessage(
                 }
 
                 const categoryText = categoryFilter ? ` kategori ${categoryFilter}` : '';
-                const response = responseFormatter.formatTransactionDetails(details, timeRangeText + categoryText, limitNotice);
+                const response = responseFormatter.withAccountHeader(
+                    responseFormatter.formatTransactionDetails(details, timeRangeText + categoryText, limitNotice),
+                    accountName
+                );
                 await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -731,7 +1248,7 @@ async function handleTextMessage(
             case 'category_breakdown': {
                 const timeRange = parsedIntent.parameters.time_range;
                 const daysAgo = parsedIntent.parameters.days_ago;
-                const categories = await getCategoryBreakdown(userId, timeRange || 'this_month', daysAgo);
+                const categories = await getCategoryBreakdown(userId, timeRange || 'this_month', daysAgo, accountId);
 
                 let timeRangeText: string;
                 if (daysAgo !== undefined) {
@@ -740,7 +1257,10 @@ async function handleTextMessage(
                     timeRangeText = formatTimeRange(timeRange || 'this_month');
                 }
 
-                const response = responseFormatter.formatCategoryBreakdown(categories, timeRangeText);
+                const response = responseFormatter.withAccountHeader(
+                    responseFormatter.formatCategoryBreakdown(categories, timeRangeText),
+                    accountName
+                );
                 await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                 await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 break;
@@ -751,94 +1271,68 @@ async function handleTextMessage(
 
                 if (!amount || !description) {
                     await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
-                    await getBot().sendMessage(chatId, '❌ Jumlah atau deskripsi tidak ditemukan.\n\nContoh: "tambah 50000 makan siang"');
+                    await getBot().sendMessage(
+                        chatId,
+                        responseFormatter.withAccountHeader('❌ Jumlah atau deskripsi tidak ditemukan.\n\nContoh: "tambah 50000 makan siang"', accountName),
+                        { parse_mode: 'Markdown' }
+                    );
                     return;
                 }
 
-                const categories = await getUserCategories(userId);
-                let categoryChoice: { categoryId: string; categoryName: string; confidence: 'high' | 'medium' | 'low' };
-                const normalizedHint = category_hint?.toLowerCase().trim();
-                const directMatch = normalizedHint
-                    ? categories.find((category) => category.name.toLowerCase() === normalizedHint)
-                    : undefined;
-
-                const hintAliasMap: Record<string, string[]> = {
-                    food: ['makan', 'makanan', 'kuliner', 'food', 'minum', 'snack', 'camil', 'camilan', 'warteg', 'warung', 'resto', 'restaurant', 'cafe', 'kopi'],
-                    transportation: ['transport', 'transportasi', 'travel', 'perjalanan', 'bensin', 'bbm', 'parkir', 'taksi', 'ojek', 'gojek', 'grab', 'pertamina'],
-                    shopping: ['belanja', 'shopping', 'market', 'minimarket', 'indomaret', 'alfamart', 'supermarket', 'mall']
-                };
-
-                const fuzzyMatch = normalizedHint
-                    ? categories.find((category) => {
-                        const name = category.name.toLowerCase();
-                        if (normalizedHint && (name.includes(normalizedHint) || normalizedHint.includes(name))) {
-                            return true;
-                        }
-
-                        const aliases = hintAliasMap[normalizedHint] || [];
-                        return aliases.some((alias) => name.includes(alias));
-                    })
-                    : undefined;
-
-                if (directMatch) {
-                    categoryChoice = {
-                        categoryId: directMatch.id,
-                        categoryName: directMatch.name,
-                        confidence: 'high'
-                    };
-                } else if (fuzzyMatch) {
-                    categoryChoice = {
-                        categoryId: fuzzyMatch.id,
-                        categoryName: fuzzyMatch.name,
-                        confidence: 'high'
-                    };
-                } else {
-                    try {
-                        categoryChoice = await classifyCategory(description, categories);
-                    } catch (classificationError) {
-                        console.error('Category classification failed:', classificationError);
-                        const fallbackNames = new Set(['lainnya', 'other', 'others']);
-                        const otherCategory = categories.find((category) => fallbackNames.has(category.name.toLowerCase()));
-                        const fallbackCategory = otherCategory || categories[0];
-                        categoryChoice = {
-                            categoryId: fallbackCategory.id,
-                            categoryName: fallbackCategory.name,
-                            confidence: 'low' as const
-                        };
-                    }
-                }
-
-                // Create transaction
-                const transactionId = await createManualTransaction(
+                const categories = await getUserCategories(userId, false, accountId);
+                const categoryChoice = await resolveCategoryChoice(description, categories, category_hint);
+                const sessionId = await createTextTransactionDraftSession({
                     userId,
+                    telegramId: msg.from!.id,
+                    accountId,
+                    accountName,
+                    rawMessage: text,
+                    usedAI: false,
+                    items: [{
+                        amount,
+                        description,
+                        category_hint,
+                        sourceText: text,
+                        categoryId: categoryChoice.categoryId,
+                        categoryName: categoryChoice.categoryName,
+                    }]
+                });
+                const singleDraftItem: TextTransactionSessionItem = {
                     amount,
                     description,
-                    categoryChoice.categoryName,
-                    msg.from?.id,
-                    categoryChoice.categoryId
-                );
+                    category_hint,
+                    sourceText: text,
+                    categoryId: categoryChoice.categoryId,
+                    categoryName: categoryChoice.categoryName,
+                };
+                const draftPreview = renderTextTransactionDraft(sessionId, [singleDraftItem], accountName, false);
+                
 
-                console.log(`Created manual transaction ${transactionId} for user ${userId}`);
-
-                const response = responseFormatter.formatTransactionAdded(amount, categoryChoice.categoryName, description);
                 await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
-                await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
+                await getBot().sendMessage(
+                    chatId,
+                    draftPreview.text,
+                    draftPreview.options
+                );
                 break;
             }
 
             case 'financial_advice': {
                 try {
                     const timeRange = parsedIntent.parameters.time_range || 'this_month';
-                    const advice = await analyzeFinancialHealth(userId, timeRange);
+                    const advice = await analyzeFinancialHealth(userId, timeRange, accountId);
 
                     // Format with metadata
-                    const formattedAdvice = responseFormatter.formatFinancialAdvice(advice);
+                    const formattedAdvice = responseFormatter.withAccountHeader(
+                        responseFormatter.formatFinancialAdvice(advice),
+                        accountName
+                    );
                     await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, formattedAdvice, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error in financial advice:', error);
                     const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat menganalisis data keuangan.';
-                    await getBot().sendMessage(chatId, `❌ ${errorMsg}`);
+                    await getBot().sendMessage(chatId, responseFormatter.withAccountHeader(`❌ ${errorMsg}`, accountName), { parse_mode: 'Markdown' });
                 }
                 break;
             }
@@ -846,15 +1340,18 @@ async function handleTextMessage(
             case 'savings_strategy': {
                 try {
                     const timeRange = parsedIntent.parameters.time_range || 'this_month';
-                    const strategy = await generateSavingsStrategy(userId, timeRange);
+                    const strategy = await generateSavingsStrategy(userId, timeRange, accountId);
 
-                    const formattedStrategy = responseFormatter.formatSavingsStrategy(strategy);
+                    const formattedStrategy = responseFormatter.withAccountHeader(
+                        responseFormatter.formatSavingsStrategy(strategy),
+                        accountName
+                    );
                     await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, formattedStrategy, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error in savings strategy:', error);
                     const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat membuat strategi hemat.';
-                    await getBot().sendMessage(chatId, `❌ ${errorMsg}`);
+                    await getBot().sendMessage(chatId, responseFormatter.withAccountHeader(`❌ ${errorMsg}`, accountName), { parse_mode: 'Markdown' });
                 }
                 break;
             }
@@ -862,35 +1359,41 @@ async function handleTextMessage(
             case 'expense_analysis': {
                 try {
                     const timeRange = parsedIntent.parameters.time_range || 'this_month';
-                    const analysis = await analyzeExpenseReduction(userId, timeRange);
+                    const analysis = await analyzeExpenseReduction(userId, timeRange, accountId);
 
-                    const formattedAnalysis = responseFormatter.formatExpenseAnalysis(analysis);
+                    const formattedAnalysis = responseFormatter.withAccountHeader(
+                        responseFormatter.formatExpenseAnalysis(analysis),
+                        accountName
+                    );
                     await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, formattedAnalysis, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error in expense analysis:', error);
                     const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat menganalisis pengeluaran.';
-                    await getBot().sendMessage(chatId, `❌ ${errorMsg}`);
+                    await getBot().sendMessage(chatId, responseFormatter.withAccountHeader(`❌ ${errorMsg}`, accountName), { parse_mode: 'Markdown' });
                 }
                 break;
             }
 
             case 'list_categories': {
                 try {
-                    const categories = await getUserCategories(userId);
-                    const response = responseFormatter.formatCategoryList(categories);
+                    const categories = await getUserCategories(userId, false, accountId);
+                    const response = responseFormatter.withAccountHeader(
+                        responseFormatter.formatCategoryList(categories),
+                        accountName
+                    );
                     await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
                     await getBot().sendMessage(chatId, response, { parse_mode: 'Markdown' });
                 } catch (error) {
                     console.error('Error listing categories:', error);
-                    await getBot().sendMessage(chatId, '❌ Gagal mengambil daftar kategori.');
+                    await getBot().sendMessage(chatId, responseFormatter.withAccountHeader('❌ Gagal mengambil daftar kategori.', accountName), { parse_mode: 'Markdown' });
                 }
                 break;
             }
 
             default:
                 await getBot().deleteMessage(chatId, processingMsg.message_id).catch(() => { });
-                await getBot().sendMessage(chatId, responseFormatter.formatUnknownIntent(), { parse_mode: 'Markdown' });
+                await getBot().sendMessage(chatId, responseFormatter.withAccountHeader(responseFormatter.formatUnknownIntent(), accountName), { parse_mode: 'Markdown' });
         }
 
 
@@ -899,7 +1402,7 @@ async function handleTextMessage(
         console.error('Error handling text message:', error);
         console.error('Error details - message:', text);
         console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
-        await getBot().sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
+        await getBot().sendMessage(chatId, responseFormatter.withAccountHeader('❌ Terjadi kesalahan. Silakan coba lagi.', accountName), { parse_mode: 'Markdown' });
         // Try to delete processing message even on error
         try {
             await getBot().deleteMessage(chatId, processingMsg.message_id);
@@ -958,6 +1461,48 @@ async function handleCallbackQuery(
             });
         }
     }
+    else if (callbackData?.startsWith('switch_account:')) {
+        const accountId = callbackData.replace('switch_account:', '');
+
+        try {
+            const updated = await updateTelegramDefaultAccountByTelegramId(telegramId, accountId);
+            if (!updated?.accountName) {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Akun tidak ditemukan.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const refreshedState = await getTelegramAccountState(telegramId);
+            const response = responseFormatter.withAccountHeader(
+                responseFormatter.formatTelegramAccountStatus(
+                    refreshedState?.defaultAccountName || updated.accountName,
+                    refreshedState?.accounts || []
+                ),
+                refreshedState?.defaultAccountName || updated.accountName
+            );
+
+            await getBot().editMessageText(response, {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'Markdown',
+                reply_markup: refreshedState && refreshedState.accounts.length > 1
+                    ? buildAccountKeyboard(refreshedState.accounts, refreshedState.defaultAccountId)
+                    : undefined
+            });
+
+            await getBot().answerCallbackQuery(query.id, {
+                text: `Akun aktif: ${updated.accountName}`
+            });
+        } catch (error) {
+            console.error('Error switching telegram account:', error);
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Gagal mengganti akun.',
+                show_alert: true
+            });
+        }
+    }
     // Handle cancel unlink
     else if (callbackData === 'cancel_unlink') {
         // Delete the confirmation message
@@ -973,6 +1518,219 @@ async function handleCallbackQuery(
         await getBot().answerCallbackQuery(query.id, {
             text: 'Dibatalkan'
         });
+    }
+    else if (callbackData?.startsWith('mtc_')) {
+        const sessionId = callbackData.replace('mtc_', '');
+
+        try {
+            const sessionDoc = await getDb().collection('text_transaction_sessions').doc(sessionId).get();
+            if (!sessionDoc.exists) {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Draft tidak ditemukan.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const sessionData = sessionDoc.data() as TextTransactionSessionData;
+            if (isTextTransactionSessionExpired(sessionData)) {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Draft sudah kadaluarsa. Kirim ulang pesan transaksi ya.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const validItems = normalizeTextTransactionSessionItems(sessionData.items || []);
+            if (validItems.length === 0) {
+                await sessionDoc.ref.update({
+                    status: 'invalid',
+                    invalidatedAt: new Date(),
+                });
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Draft tidak valid. Kirim ulang pesan transaksi ya.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const savedItems: Array<{ amount: number; description: string; categoryName: string }> = [];
+            await createManualTransactionsBatch(
+                sessionData.userId,
+                validItems.map((item) => ({
+                    amount: item.amount,
+                    description: item.description,
+                    categoryName: item.categoryName,
+                    categoryIdOverride: item.categoryId,
+                })),
+                sessionData.accountId || undefined
+            );
+            savedItems.push(...validItems.map((item) => ({
+                amount: item.amount,
+                description: item.description,
+                categoryName: item.categoryName,
+            })));
+
+            await sessionDoc.ref.update({
+                status: 'confirmed',
+                confirmedAt: new Date(),
+            });
+
+            await getBot().editMessageText(
+                responseFormatter.withAccountHeader(
+                    responseFormatter.formatTransactionBatchAdded(savedItems),
+                    sessionData.accountName || (await getTelegramAccountState(telegramId))?.defaultAccountName
+                ),
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                }
+            );
+
+            await getBot().answerCallbackQuery(query.id, {
+                text: validItems.length > 1 ? 'Semua transaksi tersimpan' : 'Transaksi tersimpan'
+            });
+        } catch (error) {
+            console.error('Error confirming text transaction draft:', error);
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Gagal menyimpan transaksi.',
+                show_alert: true
+            });
+        }
+    }
+    else if (callbackData?.startsWith('mtx_')) {
+        const sessionId = callbackData.replace('mtx_', '');
+
+        try {
+            const sessionDoc = await getDb().collection('text_transaction_sessions').doc(sessionId).get();
+            if (sessionDoc.exists) {
+                await sessionDoc.ref.update({
+                    status: 'cancelled',
+                    cancelledAt: new Date(),
+                });
+            }
+
+            await getBot().editMessageText(
+                responseFormatter.withAccountHeader(
+                    '❌ *Dibatalkan*\n\nDraft transaksi tidak disimpan.',
+                    (await getTelegramAccountState(telegramId))?.defaultAccountName
+                ),
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                }
+            );
+
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Dibatalkan'
+            });
+        } catch (error) {
+            console.error('Error cancelling text transaction draft:', error);
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Terjadi kesalahan.',
+                show_alert: true
+            });
+        }
+    }
+    else if (callbackData?.startsWith('mtr_')) {
+        const match = callbackData.match(/^mtr_([^_]+)_(\d+)$/);
+        if (!match) {
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Aksi hapus tidak valid.',
+                show_alert: true
+            });
+            return;
+        }
+
+        const [, sessionId, rawIndex] = match;
+        const itemIndex = parseInt(rawIndex, 10);
+
+        try {
+            const sessionDoc = await getDb().collection('text_transaction_sessions').doc(sessionId).get();
+            if (!sessionDoc.exists) {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Draft tidak ditemukan.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const sessionData = sessionDoc.data() as TextTransactionSessionData;
+            if (isTextTransactionSessionExpired(sessionData)) {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Draft sudah kadaluarsa. Kirim ulang pesan transaksi ya.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const validItems = normalizeTextTransactionSessionItems(sessionData.items || []);
+            if (itemIndex < 0 || itemIndex >= validItems.length) {
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Item tidak ditemukan.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            const nextItems = validItems.filter((_, index) => index !== itemIndex);
+
+            if (nextItems.length === 0) {
+                await sessionDoc.ref.update({
+                    status: 'cancelled',
+                    cancelledAt: new Date(),
+                });
+
+                await getBot().editMessageText(
+                    responseFormatter.withAccountHeader(
+                        '❌ *Dibatalkan*\n\nSemua item sudah dihapus, jadi draft transaksi tidak disimpan.',
+                        sessionData.accountName || (await getTelegramAccountState(telegramId))?.defaultAccountName
+                    ),
+                    {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'Markdown'
+                    }
+                );
+
+                await getBot().answerCallbackQuery(query.id, {
+                    text: 'Semua item dihapus'
+                });
+                return;
+            }
+
+            await sessionDoc.ref.update({
+                items: nextItems,
+                updatedAt: new Date(),
+            });
+
+            const updatedPreview = renderTextTransactionDraft(
+                sessionId,
+                nextItems,
+                sessionData.accountName || (await getTelegramAccountState(telegramId))?.defaultAccountName,
+                Boolean(sessionData.usedAI),
+                sessionData.sourceType || 'text',
+                sessionData.rawMessage
+            );
+
+            await getBot().editMessageText(updatedPreview.text, {
+                chat_id: chatId,
+                message_id: messageId,
+                ...updatedPreview.options,
+            });
+
+            await getBot().answerCallbackQuery(query.id, {
+                text: `Item ${itemIndex + 1} dihapus`
+            });
+        } catch (error) {
+            console.error('Error removing draft item:', error);
+            await getBot().answerCallbackQuery(query.id, {
+                text: 'Gagal menghapus item.',
+                show_alert: true
+            });
+        }
     }
     // Handle receipt confirmation
     else if (callbackData?.startsWith('c_')) {
@@ -990,6 +1748,7 @@ async function handleCallbackQuery(
             }
 
             const { receiptData, userId, telegramId, photoFileId, photoCaption } = sessionDoc.data()!;
+            const telegramAccountState = await getTelegramAccountState(telegramId);
 
             // Download photo for upload (if photoFileId exists)
             let attachmentData;
@@ -1028,7 +1787,8 @@ async function handleCallbackQuery(
                     receiptData,
                     telegramId,
                     attachmentData,
-                    photoCaption // Pass photo caption as description
+                    photoCaption, // Pass photo caption as description
+                    telegramAccountState?.defaultAccountId
                 );
 
                 console.log(`Saved transaction ${transactionId} from receipt session ${sessionId}`);
@@ -1051,11 +1811,14 @@ async function handleCallbackQuery(
             const formattedAmount = receiptData.totalAmount.toLocaleString('id-ID');
 
             await getBot().editMessageText(
-                `✅ *Transaksi berhasil disimpan!*\n\n` +
-                `💰 Total: Rp ${formattedAmount}\n` +
-                `🏪 Merchant: ${receiptData.merchant}\n` +
-                `📁 Kategori: ${receiptData.categorySuggestion}\n\n` +
-                `Data sudah tersimpan ke DompetCerdas! 🎉`,
+                responseFormatter.withAccountHeader(
+                    `✅ *Transaksi berhasil disimpan!*\n\n` +
+                    `💰 Total: Rp ${formattedAmount}\n` +
+                    `🏪 Merchant: ${receiptData.merchant}\n` +
+                    `📁 Kategori: ${receiptData.categorySuggestion}\n\n` +
+                    `Data sudah tersimpan ke DompetCerdas! 🎉`,
+                    telegramAccountState?.defaultAccountName
+                ),
                 {
                     chat_id: chatId,
                     message_id: messageId,
@@ -1086,7 +1849,10 @@ async function handleCallbackQuery(
             }
 
             await getBot().editMessageText(
-                '❌ *Dibatalkan*\n\nData struk tidak disimpan.',
+                responseFormatter.withAccountHeader(
+                    '❌ *Dibatalkan*\n\nData struk tidak disimpan.',
+                    (await getTelegramAccountState(telegramId))?.defaultAccountName
+                ),
                 {
                     chat_id: chatId,
                     message_id: messageId,

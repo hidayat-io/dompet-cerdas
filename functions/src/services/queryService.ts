@@ -3,10 +3,10 @@
  * Handles querying transaction data from Firestore
  */
 
-import * as admin from 'firebase-admin';
 import { TimeRange } from './nluService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getJakartaDate } from '../utils/date';
+import { getScopedCollections } from './accountService';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -133,9 +133,10 @@ export async function getTotalExpenses(
     userId: string,
     timeRange?: TimeRange,
     daysAgo?: number,
-    customMonth?: string
+    customMonth?: string,
+    accountId?: string
 ): Promise<{ total: number; count: number }> {
-    const db = admin.firestore();
+    const { transactionsCollection, categoriesCollection } = await getScopedCollections(userId, accountId);
 
     // Get date range
     let startStr: string;
@@ -158,20 +159,13 @@ export async function getTotalExpenses(
     }
 
     // Query by date string (web app uses string format, not Timestamp)
-    const snapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('transactions')
+    const snapshot = await transactionsCollection
         .where('date', '>=', startStr)
         .where('date', '<=', endStr)
         .get();
 
     // Get categories to determine which are expenses
-    const categoriesSnapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .get();
+    const categoriesSnapshot = await categoriesCollection.get();
 
     const expenseCategoryIds = new Set<string>();
     categoriesSnapshot.forEach(doc => {
@@ -200,26 +194,20 @@ export async function getTotalExpenses(
  */
 export async function getTotalIncome(
     userId: string,
-    timeRange: TimeRange = 'this_month'
+    timeRange: TimeRange = 'this_month',
+    accountId?: string
 ): Promise<{ total: number; count: number }> {
-    const db = admin.firestore();
+    const { transactionsCollection, categoriesCollection } = await getScopedCollections(userId, accountId);
     const { startStr, endStr } = getDateRange(timeRange);
 
     // Query by date string (web app uses string format, not Timestamp)
-    const snapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('transactions')
+    const snapshot = await transactionsCollection
         .where('date', '>=', startStr)
         .where('date', '<=', endStr)
         .get();
 
     // Get categories to determine which are income
-    const categoriesSnapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .get();
+    const categoriesSnapshot = await categoriesCollection.get();
 
     const incomeCategoryIds = new Set<string>();
     categoriesSnapshot.forEach(doc => {
@@ -250,16 +238,13 @@ export async function getBalance(
     userId: string,
     timeRange?: TimeRange,
     daysAgo?: number,
-    customMonth?: string
+    customMonth?: string,
+    accountId?: string
 ): Promise<number> {
-    const db = admin.firestore();
+    const { transactionsCollection, categoriesCollection } = await getScopedCollections(userId, accountId);
 
     // Get categories to determine income vs expense
-    const categoriesSnapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .get();
+    const categoriesSnapshot = await categoriesCollection.get();
 
     const categoryTypes = new Map<string, string>();
     categoriesSnapshot.forEach(doc => {
@@ -268,10 +253,7 @@ export async function getBalance(
     });
 
     // Get date range if specified
-    let transactionQuery = db
-        .collection('users')
-        .doc(userId)
-        .collection('transactions');
+    let transactionQuery = transactionsCollection;
 
     if (customMonth) {
         const { startStr, endStr } = getCustomMonthRange(customMonth);
@@ -310,9 +292,10 @@ export async function getBalance(
 export async function getCategoryBreakdown(
     userId: string,
     timeRange?: TimeRange,
-    daysAgo?: number
+    daysAgo?: number,
+    accountId?: string
 ): Promise<CategoryData[]> {
-    const db = admin.firestore();
+    const { transactionsCollection, categoriesCollection } = await getScopedCollections(userId, accountId);
 
     // Get date range
     let startStr: string;
@@ -330,11 +313,7 @@ export async function getCategoryBreakdown(
     }
 
     // Get categories first
-    const categoriesSnapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .get();
+    const categoriesSnapshot = await categoriesCollection.get();
 
     const categories = new Map<string, { name: string; type: string; icon: string }>();
     const expenseCategoryIds = new Set<string>();
@@ -348,10 +327,7 @@ export async function getCategoryBreakdown(
     });
 
     // Query transactions by date
-    const snapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('transactions')
+    const snapshot = await transactionsCollection
         .where('date', '>=', startStr)
         .where('date', '<=', endStr)
         .get();
@@ -522,9 +498,10 @@ export async function getTransactionDetails(
     daysAgo?: number,
     limit?: number,
     specificDate?: string,
-    sortBy?: 'date' | 'amount' // 'date' = recent first, 'amount' = highest first
+    sortBy?: 'date' | 'amount', // 'date' = recent first, 'amount' = highest first
+    accountId?: string
 ): Promise<TransactionDetail[]> {
-    const db = admin.firestore();
+    const { transactionsCollection, categoriesCollection } = await getScopedCollections(userId, accountId);
 
     // Get date range
     let startStr: string;
@@ -546,11 +523,7 @@ export async function getTransactionDetails(
     }
 
     // Get categories first
-    const categoriesSnapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .get();
+    const categoriesSnapshot = await categoriesCollection.get();
 
     const categories = new Map<string, { name: string; type: string; icon: string }>();
 
@@ -581,10 +554,7 @@ export async function getTransactionDetails(
     }
 
     // Query transactions by date (no orderBy to avoid index requirement)
-    const snapshot = await db
-        .collection('users')
-        .doc(userId)
-        .collection('transactions')
+    const snapshot = await transactionsCollection
         .where('date', '>=', startStr)
         .where('date', '<=', endStr)
         .get();

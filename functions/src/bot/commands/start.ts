@@ -4,7 +4,8 @@
  */
 
 import TelegramBot from 'node-telegram-bot-api';
-import { generateLinkToken, checkTelegramLink } from '../../services/linkService';
+import { generateLinkToken, checkTelegramLink, getTelegramAccountState } from '../../services/linkService';
+import { escapeMarkdown, withAccountHeader } from '../../services/responseFormatter';
 
 const WEB_APP_URL = process.env.WEB_APP_URL || 'https://dompas.indoomega.my.id';
 
@@ -14,17 +15,22 @@ export async function handleStartCommand(
 ): Promise<void> {
     const chatId = msg.chat.id;
     const telegramId = msg.from!.id;
-    const firstName = msg.from!.first_name;
+    const firstName = escapeMarkdown(msg.from!.first_name || 'teman');
 
     // Check if already linked
     const userId = await checkTelegramLink(telegramId);
 
     if (userId) {
+        const telegramAccountState = await getTelegramAccountState(telegramId);
         await bot.sendMessage(
             chatId,
-            `✅ Halo ${firstName}! Akun kamu sudah terhubung.\n\n` +
-            `Silakan tanya apa saja tentang keuangan kamu, atau upload foto struk untuk mencatat transaksi! 📸\n\n` +
-            `Ketik /help untuk melihat panduan.`
+            withAccountHeader(
+                `✅ Halo ${firstName}! Akun kamu sudah terhubung.\n\n` +
+                `Silakan tanya apa saja tentang keuangan kamu, atau upload foto struk untuk mencatat transaksi! 📸\n\n` +
+                `Ketik /help untuk melihat panduan, atau /akun untuk ganti akun Telegram.`,
+                telegramAccountState?.defaultAccountName
+            ),
+            { parse_mode: 'Markdown' }
         );
         return;
     }

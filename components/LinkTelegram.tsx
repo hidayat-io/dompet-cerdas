@@ -12,6 +12,7 @@ const LinkTelegram: React.FC = () => {
     const [message, setMessage] = useState('Memuat...');
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
+    const [linkedAccountName, setLinkedAccountName] = useState<string | null>(null);
 
     // Wait for auth state to be ready
     useEffect(() => {
@@ -64,7 +65,11 @@ const LinkTelegram: React.FC = () => {
             console.log('Calling linkTelegram function:', { userId: user.uid });
             const result = await linkTelegram({ token });
             const telegramId = (result.data as { telegramId?: number })?.telegramId;
+            const accountName = (result.data as { accountName?: string })?.accountName;
             console.log('linkTelegram response:', result.data);
+            if (accountName) {
+                setLinkedAccountName(accountName);
+            }
 
             // Notify bot via Cloud Function
             try {
@@ -76,7 +81,7 @@ const LinkTelegram: React.FC = () => {
                 const response = await fetch(functionUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegramId, userId: user.uid }),
+                    body: JSON.stringify({ telegramId, userId: user.uid, accountName }),
                 });
 
                 const result = await response.json();
@@ -91,19 +96,25 @@ const LinkTelegram: React.FC = () => {
             }
 
             setStatus('success');
-            setMessage('🎉 Akun berhasil terhubung! Silakan kembali ke Telegram Bot untuk mulai menggunakan fitur.');
+            sessionStorage.removeItem('telegram_link_token');
+            setMessage(accountName
+                ? `🎉 Akun berhasil terhubung! Telegram sekarang akan memakai Akun Keuangan "${accountName}".`
+                : '🎉 Akun berhasil terhubung! Silakan kembali ke Telegram Bot untuk mulai menggunakan fitur.');
 
         } catch (error: any) {
             console.error('Error linking account:', error);
             const reason = error?.details?.reason;
             if (reason === 'invalid') {
                 setStatus('invalid');
+                sessionStorage.removeItem('telegram_link_token');
                 setMessage('Token tidak valid atau sudah kadaluarsa.');
             } else if (reason === 'used') {
                 setStatus('used');
+                sessionStorage.removeItem('telegram_link_token');
                 setMessage('Token sudah pernah digunakan. Silakan minta link baru dari Telegram Bot.');
             } else if (reason === 'expired') {
                 setStatus('expired');
+                sessionStorage.removeItem('telegram_link_token');
                 setMessage('Token sudah kadaluarsa (max 5 menit). Silakan minta link baru dari Telegram Bot dengan mengirim /start.');
             } else {
                 setStatus('error');
@@ -219,6 +230,19 @@ const LinkTelegram: React.FC = () => {
 
                 {status === 'success' && (
                     <div style={{ marginTop: '20px' }}>
+                        {linkedAccountName && (
+                            <div style={{
+                                marginBottom: '16px',
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                backgroundColor: theme.colors.accentLight,
+                                color: theme.colors.accent,
+                                fontWeight: 600,
+                                fontSize: '14px',
+                            }}>
+                                Akun aktif untuk Telegram: {linkedAccountName}
+                            </div>
+                        )}
                         <p style={{ fontSize: '14px', color: theme.colors.textMuted, marginBottom: '16px' }}>
                             Anda bisa menutup halaman ini dan kembali ke Telegram.
                         </p>

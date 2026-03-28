@@ -1,4 +1,15 @@
 export type TransactionType = 'INCOME' | 'EXPENSE';
+export type AccountType = 'PERSONAL' | 'FAMILY' | 'BUSINESS' | 'SHARED';
+export type AccountRole = 'OWNER';
+
+export interface FinancialAccount {
+  id: string;
+  name: string;
+  type: AccountType;
+  role: AccountRole;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Category {
   id: string;
@@ -32,21 +43,69 @@ export interface Transaction {
   attachmentType?: 'image' | 'pdf';
 }
 
-export interface SimulationItem {
+export type PlanItemStatus = 'PLANNED' | 'DONE' | 'CANCELLED';
+
+export interface PlanItem {
   id: string;
   name: string;
   amount: number;
   type: TransactionType;
   categoryId: string; // Optional mapping to existing categories for color/icon
+  plannedDate?: string;
+  status: PlanItemStatus;
 }
 
-export interface Simulation {
+export interface Plan {
   id: string;
   title: string;
-  items: SimulationItem[];
+  items: PlanItem[];
   createdAt: string;
   useCurrentMonthBalance?: boolean;
 }
+
+export interface Budget {
+  id: string;
+  month: string; // YYYY-MM
+  name: string;
+  categoryIds: string[];
+  limitAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  // Legacy field kept for backward compatibility while old docs are normalized on read.
+  categoryId?: string;
+}
+
+export type DebtKind = 'DEBT' | 'RECEIVABLE';
+export type DebtStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
+
+export interface DebtPayment {
+  id: string;
+  amount: number;
+  date: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface DebtRecord {
+  id: string;
+  kind: DebtKind;
+  personName: string;
+  title: string;
+  amount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: DebtStatus;
+  transactionDate: string;
+  dueDate?: string;
+  notes?: string;
+  payments: DebtPayment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Legacy aliases kept temporarily to reduce transition risk while phase 3 lands.
+export type SimulationItem = PlanItem;
+export type Simulation = Plan;
 
 // Icon names available for selection (150+ icons from Lucide React)
 export type IconName =

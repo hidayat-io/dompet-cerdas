@@ -1,23 +1,29 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.2.3
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.6.0
 
 **Status**: ✅ Fully Documented  
-**Last Updated**: March 14, 2026  
-**Version**: 2.2.3  
+**Last Updated**: March 28, 2026  
+**Version**: 2.6.0  
 **Live URL**: https://dompas.indoomega.my.id
 
 ---
 
 ## 🎯 Ringkasan Eksekutif
 
-**Dompet Cerdas** adalah aplikasi manajemen keuangan pribadi dengan integrasi Telegram bot AI-powered. Pengguna dapat melacak pengeluaran melalui:
-- 📱 **Web App**: Dashboard, entry manual, analytics
-- 🤖 **Telegram Bot**: Receipt scanning, natural language queries, AI advisor
+**Dompet Cerdas** adalah aplikasi manajemen keuangan pribadi dengan integrasi Telegram bot AI-powered. Pengguna dapat melacak keuangan melalui:
+- 📱 **Web App**: Dashboard, entry manual, analytics, rencana, anggaran, hutang piutang
+- 🤖 **Telegram Bot**: Receipt scanning, natural language queries, multi-transaksi, voice note, preview + confirm
 - 🧠 **AI Integration**: Google Gemini untuk OCR receipt dan analisis keuangan
 
 **Key Features**:
+- ✅ Multi-`Akun Keuangan` untuk memisahkan data pribadi, keluarga, bisnis, atau bersama
 - ✅ Dashboard dengan pie chart breakdown
 - ✅ Receipt scanning via Telegram (Vision API)
 - ✅ Natural language queries ("berapa pengeluaran hari ini?")
+- ✅ Preview + confirm sebelum transaksi Telegram disimpan
+- ✅ Telegram `/akun` untuk cek/ganti akun aktif bot
+- ✅ Voice note Telegram untuk transaksi
+- ✅ Rencana transaksi, Anggaran, dan Hutang Piutang
+- ✅ Onboarding ringan untuk user baru
 - ✅ AI financial advisor dengan rekomendasi hemat
 - ✅ Web AI analysis dengan 3 mode + backend quota per user
 - ✅ Excel export dengan date range selection
@@ -33,8 +39,10 @@
 |------|-----------|
 | **README.md** | Quick start, features overview, deployment instructions |
 | **DOKUMENTASI_LENGKAP.md** | Canonical project documentation dan indeks dokumentasi |
+| **docs/PRODUCT_VOCABULARY.md** | Istilah final yang dipakai user-facing |
 | **docs/TELEGRAM_INTEGRATION.md** | Telegram bot technical docs dengan NLU & Vision API |
 | **TESTING.md** | Testing guide dengan regression checklist bot |
+| **deploy/DEPLOY_GUIDE.md** | Deployment flow + smoke check hosting |
 | **landing-page/DOCUMENTATION.md** | Landing page customization guide |
 | **utils/README.md** | File compression utility documentation |
 
@@ -55,11 +63,14 @@ dompet_cerdas/
 ├── components/
 │   ├── AuthLogin.tsx               # Google login UI
 │   ├── Dashboard.tsx               # Analytics & summary view
+│   ├── BudgetManager.tsx           # Anggaran berbasis budget plan
+│   ├── DebtManager.tsx             # Hutang Piutang
+│   ├── OnboardingModal.tsx         # Panduan singkat user baru
 │   ├── TransactionList.tsx         # Transaction history with filters
 │   ├── TransactionForm.tsx         # Add/edit transaction modal
 │   ├── CategoryManager.tsx         # CRUD categories
 │   ├── CategoryFormModal.tsx       # Reusable category modal
-│   ├── SimulationManager.tsx       # Budget "what-if" scenarios
+│   ├── PlanManager.tsx             # Rencana pemasukan/pengeluaran
 │   ├── Settings.tsx                # Theme, export, delete data
 │   ├── ConfirmDialog.tsx           # Confirmation dialog component
 │   ├── NotificationModal.tsx       # Centered notifications
@@ -71,9 +82,12 @@ dompet_cerdas/
 │   └── ThemeContext.tsx            # Light/dark theme provider
 │
 ├── services/
+│   ├── accountService.ts           # Account-scoped Firestore helpers
 │   └── geminiService.ts            # Gemini AI integration
 │
 ├── utils/
+│   ├── accountLabels.ts            # Label Akun Keuangan & filename helpers
+│   ├── budget.ts                   # Normalisasi anggaran dan ringkasan
 │   ├── excelExport.ts              # Excel export with date range
 │   ├── fileCompression.ts          # Image compression before upload
 │   ├── categoryValidation.ts       # Category validation logic
@@ -109,6 +123,9 @@ dompet_cerdas/
 │   ├── icon-192.png               # PWA icon
 │   ├── apple-touch-icon.png       # iOS icon
 │   └── favicon-32.png             # Favicon
+│
+├── scripts/
+│   └── hosting-smoke-check.mjs     # Smoke check hosting pasca deploy
 │
 ├── firebase.json                  # Firebase configuration
 ├── .firebaserc                    # Firebase project aliases
@@ -150,9 +167,16 @@ dompet_cerdas/
 - **Balance Summary**: Total income, expense, current balance
 - **Pie Chart**: Expense breakdown by category dengan persentase
 - **Recent Transactions**: Last 10 transactions grouped by date, newest first
-- **Version Display**: Shows app version (e.g., "v2.2.2")
+- **Getting Started Card**: Muncul saat akun masih kosong untuk membantu user baru mulai dari langkah yang paling aman
+- **Onboarding Entry Point**: Bisa buka panduan singkat langsung dari dashboard
 
-### 2️⃣ Transaksi (Transactions)
+### 2️⃣ Akun Keuangan
+- **Multi-Account**: Satu user bisa punya beberapa `Akun Keuangan`
+- **Active Account Context**: Semua transaksi, kategori, rencana, anggaran, dan hutang piutang scoped ke akun aktif
+- **Telegram Default Account**: Bot Telegram punya akun default sendiri yang bisa berbeda dari akun aktif web
+- **Migration Support**: User lama otomatis dibuatkan akun default `Pribadi`
+
+### 3️⃣ Transaksi (Transactions)
 - **CRUD**: Add, edit, delete transactions
 - **Attachments**: JPG, PNG, GIF, WEBP, PDF support dengan preview
 - **Image Compression**: Auto-compress images sebelum upload
@@ -161,18 +185,16 @@ dompet_cerdas/
 - **Search**: Search by description
 - **Mobile UX**: Filter panel toggle pada mobile
 
-### 3️⃣ Simulasi (Budget Simulation)
-- **What-If Scenarios**: Create multiple simulations
+### 4️⃣ Rencana
+- **Multiple Plans**: Buat beberapa rencana sekaligus
 - **Edit Items**: Full edit dengan modal form
-- **Category Mapping**: Map to actual categories
-- **Balance Preview**: See projected balance
-- **Balance Mode Toggle**: Switch between total balance or current month balance
-  - Toggle at simulation level (applies to all items in that simulation)
-  - Visual indicator with calendar icon on cards using current month balance
-  - Projected balance calculated from selected base
-- **Apply to Real**: Convert simulation to real transaction
+- **Tanggal Rencana**: Set tanggal rencana per item bila diperlukan
+- **Status Item**: Direncanakan, Sudah Dicatat, atau Dibatalkan
+- **Balance Preview**: Lihat proyeksi saldo dari item yang masih aktif
+- **Balance Mode Toggle**: Pilih memakai total saldo atau saldo bulan berjalan
+- **Jadikan Transaksi**: Ubah item rencana jadi transaksi nyata
 
-### 4️⃣ Master Kategori (Categories)
+### 5️⃣ Master Kategori (Categories)
 - **CRUD**: Add, edit, delete categories
 - **Separated Views**: Income vs Expense categories
 - **Icon Selection**: 150+ Lucide icons
@@ -180,7 +202,16 @@ dompet_cerdas/
 - **Type Classification**: Income or Expense
 - **Reusable Modal**: Consistent UX across app
 
-### 5️⃣ AI Financial Advisor 🆕
+### 6️⃣ Anggaran
+- **Budget Plan Bulanan**: User membuat anggaran yang ingin dipantau, bukan semua kategori sekaligus
+- **Multi-Kategori**: Satu anggaran bisa berisi satu atau beberapa kategori
+- **Progress Tracking**: Lihat sudah terpakai, sisa anggaran, dan anggaran yang melebihi batas
+- **Copy Previous Month**: Salin anggaran bulan lalu ke bulan aktif
+- **Dashboard Summary**: Ringkasan anggaran bulan berjalan langsung di dashboard
+- **Detail Anggaran**: Lihat transaksi apa saja yang masuk ke satu anggaran
+- **Account Scoped**: Tiap Akun Keuangan punya anggaran sendiri
+
+### 7️⃣ AI Financial Advisor
 - **Gemini Integration**: Deep financial analysis
 - **Three Web Analysis Modes**:
   1. Financial Health: Overall cashflow health & stability
@@ -190,7 +221,16 @@ dompet_cerdas/
 - **Backend Quota**: 20s cooldown, 12 analyses/day, 30,000 tokens/day per user
 - **Scope Limited**: Only user's transaction data
 
-### 6️⃣ Excel Export
+### 8️⃣ Hutang Piutang
+- **Catat Hutang & Piutang**: Simpan hutang dan piutang sebagai modul terpisah per Akun Keuangan
+- **Progress Pembayaran**: Lihat nominal awal, sudah dibayar, dan sisa yang belum selesai
+- **Riwayat Pembayaran**: Setiap pembayaran tersimpan dengan tanggal dan catatan
+- **Status Sederhana**: Belum lunas, bayar sebagian, dan lunas
+- **Jatuh Tempo**: Tampilkan catatan yang sudah lewat jatuh tempo
+- **Modal Form**: Tambah, edit, catat pembayaran, dan tandai lunas via popup modal
+- **Separate Tracking**: Saat ini modul ini **tidak otomatis mengubah saldo** karena masih diposisikan sebagai tracker terpisah dari transaksi utama
+
+### 9️⃣ Excel Export
 - **Date Range**: Current Month, Custom Range, All Data
 - **Auto-Format**: Currency & summary rows
 - **Filename**: `Transaksi_YYYY-MM-DD_YYYY-MM-DD.xlsx`
@@ -198,13 +238,13 @@ dompet_cerdas/
 - **Blob Download**: Browser-native download via `writeBuffer()`
 - **Library**: ExcelJS with lazy-loaded export chunk
 
-### 8️⃣ Security & Dependency Hardening
+### 🔟 Security & Dependency Hardening
 - **Functions Runtime**: Upgraded to Node.js 22
 - **Web AI**: Moved to callable Cloud Function for quota enforcement
 - **Root Audit**: Frontend dependency audit cleaned after replacing SheetJS
 - **Backend Note**: Remaining audit findings are tied to `node-telegram-bot-api` transitive dependencies
 
-### 7️⃣ Theme System (Light/Dark)
+### 1️⃣1️⃣ Theme System (Light/Dark)
 - **Toggle**: Dark/Light mode switch
 - **Persistence**: Saved to localStorage
 - **Full Palette**: Complete color scheme per theme
@@ -217,6 +257,7 @@ dompet_cerdas/
 ### Commands
 - **`/start`**: Welcome & account linking flow
 - **`/help`**: Usage guide & examples
+- **`/akun`**: Menampilkan akun Telegram aktif dan opsi ganti akun
 - **`/unlink`**: Disconnect account (optional)
 
 ### Natural Language Queries
@@ -249,6 +290,16 @@ User dapat query dengan bahasa Indonesia alami:
 - **Manual Verification**: Confirm or edit before saving
 - **Document Format**: Also supports JPG/PNG as documents (not just photos)
 
+#### ✍️ Manual Transaction Input
+- **Preview First**: Text transaction tidak auto-save
+- **Single Input**: Contoh `makan siang 25rb`
+- **Multi Input**: Contoh `kopi 18rb, parkir 5rb`
+- **Remove Item**: Saat preview multi-transaksi, user bisa hapus item yang salah sebelum simpan
+
+#### 🎤 Voice Input
+- **Voice Note Support**: User bisa kirim voice note transaksi
+- **Transcription + Preview**: Audio ditranskrip dulu, lalu ditampilkan preview untuk konfirmasi
+
 #### ➕ Manual Entry
 - "tambah 50000 makan siang"
 - "catat 150000 bensin"
@@ -271,44 +322,86 @@ User dapat query dengan bahasa Indonesia alami:
 ```javascript
 users/
 └── {userId}/
-    ├── categories/
-    │   └── {categoryId}/
-    │       ├── id: string
+    ├── activeAccountId: string
+    ├── createdAt: string
+    ├── updatedAt: string
+    │
+    ├── accounts/
+    │   └── {accountId}/
     │       ├── name: string
-    │       ├── type: "INCOME" | "EXPENSE"
-    │       ├── icon: string (Lucide icon name)
-    │       └── color: string (hex color)
-    │
-    ├── transactions/
-    │   └── {transactionId}/
-    │       ├── id: string
-    │       ├── amount: number
-    │       ├── date: string (YYYY-MM-DD)
-    │       ├── description: string
-    │       ├── categoryId: string
-    │       ├── createdAt: string (ISO timestamp)
-    │       └── attachment?: {
-    │           ├── url: string
-    │           ├── path: string
-    │           ├── type: "image" | "pdf"
-    │           ├── name: string
-    │           └── size: number
-    │       }
-    │
-    ├── simulations/
-    │   └── {simulationId}/
-    │       ├── id: string
-    │       ├── title: string
+    │       ├── type: "PERSONAL" | "FAMILY" | "BUSINESS" | "SHARED"
+    │       ├── role: "OWNER"
     │       ├── createdAt: string
-    │       └── items: [
-    │           {
-    │               id: string,
-    │               name: string,
-    │               amount: number,
-    │               type: "INCOME" | "EXPENSE",
-    │               categoryId: string
-    │           }
-    │       ]
+    │       ├── updatedAt: string
+    │       │
+    │       ├── categories/
+    │       │   └── {categoryId}/
+    │       │       ├── id: string
+    │       │       ├── name: string
+    │       │       ├── type: "INCOME" | "EXPENSE"
+    │       │       ├── icon: string
+    │       │       └── color: string
+    │       │
+    │       ├── transactions/
+    │       │   └── {transactionId}/
+    │       │       ├── amount: number
+    │       │       ├── date: string (YYYY-MM-DD)
+    │       │       ├── description: string
+    │       │       ├── categoryId: string
+    │       │       ├── createdAt: string
+    │       │       └── attachment?: {
+    │       │           url: string,
+    │       │           path: string,
+    │       │           type: "image" | "pdf",
+    │       │           name: string,
+    │       │           size: number
+    │       │       }
+    │       │
+    │       ├── plans/
+    │       │   └── {planId}/
+    │       │       ├── title: string
+    │       │       ├── createdAt: string
+    │       │       └── items: [
+    │       │           {
+    │       │               id: string,
+    │       │               name: string,
+    │       │               amount: number,
+    │       │               type: "INCOME" | "EXPENSE",
+    │       │               categoryId: string,
+    │       │               plannedDate?: string,
+    │       │               status: "PLANNED" | "DONE" | "CANCELLED"
+    │       │           }
+    │       │       ]
+    │       │
+    │       ├── budgets/
+    │       │   └── {budgetId}/
+    │       │       ├── month: string (YYYY-MM)
+    │       │       ├── name: string
+    │       │       ├── categoryIds: string[]
+    │       │       ├── limitAmount: number
+    │       │       ├── createdAt: string
+    │       │       └── updatedAt: string
+    │       │
+    │       └── debts/
+    │           └── {debtId}/
+    │               ├── kind: "DEBT" | "RECEIVABLE"
+    │               ├── personName: string
+    │               ├── amount: number
+    │               ├── paidAmount: number
+    │               ├── remainingAmount: number
+    │               ├── status: "UNPAID" | "PARTIAL" | "PAID"
+    │               ├── transactionDate: string
+    │               ├── dueDate?: string
+    │               ├── notes?: string
+    │               └── payments: [
+    │                   {
+    │                       id: string,
+    │                       amount: number,
+    │                       date: string,
+    │                       note?: string,
+    │                       createdAt: string
+    │                   }
+    │               ]
     │
     ├── telegram_link/
     │   └── main/
@@ -316,6 +409,7 @@ users/
     │       ├── username: string | null
     │       ├── firstName: string
     │       ├── lastName: string | null
+    │       ├── defaultAccountId: string
     │       ├── linkedAt: Timestamp
     │       ├── active: boolean
     │       └── lastInteraction: Timestamp
@@ -366,18 +460,50 @@ WEB_APP_URL=https://dompas.indoomega.my.id
 ### Firebase Hosting Setup
 
 ```bash
-# Build frontend
-npm run build
+# Jalur aman untuk hosting
+npm run deploy:hosting:safe
 
-# Deploy semua (Hosting + Functions + Rules + Indexes)
-firebase deploy
-
-# Atau deploy terpisah:
-firebase deploy --only hosting          # Frontend only
-firebase deploy --only functions        # Backend only
-firebase deploy --only firestore:rules  # Firestore rules
-firebase deploy --only firestore:indexes # Firestore indexes
+# Atau deploy manual:
+firebase deploy                         # semuanya
+firebase deploy --only hosting          # frontend
+firebase deploy --only functions        # backend
+firebase deploy --only firestore:rules  # rules
+firebase deploy --only firestore:indexes # indexes
 ```
+
+`deploy:hosting:safe` akan:
+1. build frontend
+2. deploy hosting
+3. smoke check root `/`
+4. smoke check route SPA `/link-telegram`
+5. verifikasi asset JS/CSS utama bisa diakses
+
+---
+
+## 🗺️ Phase Summary
+
+Berikut ringkasan implementasi phase yang sudah selesai:
+
+1. **Phase 0 - Product Vocabulary & UX Rules**
+   Istilah produk disederhanakan untuk user awam.
+2. **Phase 1 - Fondasi Akun Keuangan**
+   Semua data utama dipindah ke struktur account-scoped.
+3. **Phase 2 - App Core Becomes Space-Aware**
+   Dashboard, transaksi, kategori, AI, export, dan Telegram mengikuti akun aktif/default.
+4. **Phase 3 - Simulasi → Rencana**
+   Fitur simulasi diubah jadi `Rencana`.
+5. **Phase 4 - Anggaran**
+   Refactor jadi budget plan multi-kategori + salin bulan lalu + detail transaksi per anggaran.
+6. **Phase 5 - Shared Transaction Parsing Engine**
+   Parser hybrid dengan preview + confirm.
+7. **Phase 6 - Telegram Multi-Transaction**
+   Batch preview, confirm, cancel, dan hapus item dari draft.
+8. **Phase 7 - Voice Input**
+   Voice note Telegram ditranskrip lalu dipreview.
+9. **Phase 8 - Hutang Piutang**
+   Modul tracking hutang/piutang dengan redesign UX lebih sederhana.
+10. **Phase 9 - Polish, Onboarding, and Adoption**
+    Onboarding user baru, helper dashboard, dan panduan singkat di Settings.
 
 ### Telegram Webhook Setup
 
@@ -406,16 +532,19 @@ curl -X POST "https://api.telegram.org/bot{TOKEN}/deleteWebhook"
 
 ## 🧪 Testing Guide
 
-### Automated NLU Test
+### Automated Tests
 
 ```bash
 cd functions
 node test-nlu.js
+node test-transaction-parser.js
+node test-telegram-hardening.js
+node test-telegram-bot-flow.js
 ```
 
-✅ Only deploy jika hasil 100% PASS
+✅ Only deploy jika semua script 100% PASS
 
-### Manual Telegram Testing (7 Mandatory Test Cases)
+### Manual Telegram Query Regression
 
 | # | Query | Expected Result |
 |---|-------|-----------------|
@@ -428,6 +557,29 @@ node test-nlu.js
 | 6 | `3 transaksi tertinggi bulan ini` | Top 3 by AMOUNT (not newest) |
 | 8 | `transaksi food bulan ini` | Only Food category this month |
 | 9 | `kategori paling boros` | Category breakdown |
+
+### Manual Telegram Input Regression
+
+| # | Input | Expected Result |
+|---|-------|-----------------|
+| 1 | `makan siang 25rb` | Show preview first, not auto-save |
+| 2 | Confirm input #1 | Transaction is saved |
+| 3 | Cancel input #1 | Draft is cancelled and not saved |
+| 4 | `makan 25rb, parkir 5rb` | Preview 2 transactions |
+| 5 | `makan 25rb; parkir 5rb` | Preview 2 transactions |
+| 6 | `makan 25rb` + newline + `parkir 5rb` | Preview 2 transactions |
+| 7 | `makan 25rb dan parkir 5rb` | Preview 2 transactions |
+| 8 | `hutang 10k, parkir 10k, beli hadiah 100k` | Preview 3 transactions, no crash |
+| 9 | Tap `Hapus 1` from multi-item preview | Removes the selected item and refreshes preview |
+| 10 | `/akun` | Shows active Telegram account and switch options when available |
+| 11 | Voice note: `makan 25 ribu, parkir 5 ribu` | Bot transcribes voice and shows preview before save |
+
+### Regression Rule for Telegram Input
+
+- Every new Telegram input bug must be converted into a regression test
+- Add the case to `test-transaction-parser.js` or `test-telegram-hardening.js`
+- If the bug affects preview/confirm/account switching/voice flow, add or update `test-telegram-bot-flow.js`
+- Re-run all automated tests before deploy
 
 ### View Logs
 
@@ -678,6 +830,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.6.0** | Mar 28, 2026 | Akun Keuangan, Rencana, Anggaran, Telegram multi-input + voice, Hutang Piutang, onboarding |
 | **v2.2.2** | Feb 2, 2026 | Document upload support, caption parsing, compression |
 | **v2.2.1** | Jan 30, 2026 | Gemini model fix, list categories, smarter NLU |
 | **v2.2** | Jan 2026 | AI Financial Advisor, savings strategy, expense analysis |
@@ -699,6 +852,6 @@ firebase functions:log
 
 ---
 
-**Last Updated**: February 3, 2026  
-**Status**: ✅ Production Ready  
+**Last Updated**: March 28, 2026  
+**Status**: ✅ Internal Testing Ready  
 **Support**: Check documentation or Firebase console logs

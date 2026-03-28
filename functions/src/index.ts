@@ -8,15 +8,19 @@ import { initBot, processUpdate } from './bot';
 import { getUserCategories } from './services/transactionService';
 import { linkTelegramAccount, validateLinkToken } from './services/linkService';
 import { analyzeFinancialDataForWeb, WebFinancialAnalysisMode } from './services/webAnalysisService';
+import { getActiveAccountSummary } from './services/accountService';
+import { escapeMarkdown } from './services/responseFormatter';
 
 // Initialize Firebase Admin
 admin.initializeApp();
+const firestore = admin.firestore();
+firestore.settings({ ignoreUndefinedProperties: true });
 
 /**
  * Get Firestore database reference
  */
 export function getDb() {
-    return admin.firestore();
+    return firestore;
 }
 
 /**
@@ -70,7 +74,7 @@ export const notifyLinkSuccess = functions
                 return;
             }
 
-            const { telegramId, userId } = req.body;
+            const { telegramId, userId, accountName: accountNameFromRequest } = req.body;
 
             console.log('notifyLinkSuccess called:', { telegramId, userId });
 
@@ -80,11 +84,15 @@ export const notifyLinkSuccess = functions
                 return;
             }
 
+            const accountSummary = await getActiveAccountSummary(userId);
+            const accountName = accountNameFromRequest || accountSummary.name;
+
             // Send confirmation message to user
             const bot = initBot();
             await bot.sendMessage(
                 telegramId,
                 '✅ *Akun berhasil terhubung!*\n\n' +
+                (accountName ? `Akun aktif saat ini: *${escapeMarkdown(accountName)}*\n\n` : '') +
                 'Sekarang kamu bisa:\n' +
                 '• Tanya tentang keuangan kamu\n' +
                 '• Upload foto struk untuk catat transaksi\n' +
@@ -152,8 +160,15 @@ export const linkTelegram = functions
         };
 
         await linkTelegramAccount(token, context.auth.uid, telegramUser);
+        const accountSummary = await getActiveAccountSummary(context.auth.uid);
 
-        return { success: true, telegramId: validation.telegramId };
+        return {
+            success: true,
+            telegramId: validation.telegramId,
+            accountId: accountSummary.id,
+            accountName: accountSummary.name,
+            accountType: accountSummary.type,
+        };
     });
 
 /**

@@ -1,12 +1,14 @@
 {
   "name": "dompetcerdas---expense-tracker",
   "private": true,
-  "version": "2.2.3",
+  "version": "2.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke:hosting": "node scripts/hosting-smoke-check.mjs",
+    "deploy:hosting:safe": "npm run build && firebase deploy --only hosting --project expensetracker-test-1 --non-interactive && npm run smoke:hosting -- https://expensetracker-test-1.web.app / /link-telegram"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

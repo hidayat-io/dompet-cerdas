@@ -2,25 +2,48 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.2.3
+# DompetCerdas - Smart Expense Tracker v2.6.0
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
 ## Features
 
 ### 🌐 Web Application
+- Multi-`Akun Keuangan` untuk pisah data pribadi, keluarga, bisnis, atau bersama
 - Dashboard with expense analytics
 - Manual transaction entry
 - Category management
-- Financial simulations with balance mode toggle
+- Rencana pemasukan/pengeluaran dengan proyeksi saldo, status item, dan tanggal rencana
+- Anggaran bulanan berbasis plan, bisa satu atau beberapa kategori, dengan progress dan salin bulan lalu
+- Hutang Piutang dengan status lunas/sebagian, riwayat pembayaran, dan jatuh tempo
+- Onboarding ringan untuk user baru, helper dashboard, dan panduan singkat di Settings
 - AI financial advisor with 3 analysis modes and backend quota
 - Excel export with date range selection
 
 ### 🤖 Telegram Bot (@dompas_bot)
 - **Receipt Scanning**: Upload photos, AI extracts data automatically
 - **Natural Language**: "berapa pengeluaran minggu ini?"
-- **Quick Entry**: "tambah 50000 makan siang"
+- **Preview + Confirm**: Input transaksi tidak auto-save, selalu tampil preview sebelum simpan
+- **Multi-Transaction**: Satu pesan bisa berisi banyak transaksi
+- **Voice Note**: Voice note ditranskrip, dipreview, lalu dikonfirmasi
+- **Quick Entry**: "makan siang 25rb" atau "kopi 18rb, parkir 5rb"
+- **Telegram Account Context**: `/akun` untuk cek/ganti akun aktif Telegram
 - **Account Linking**: Secure token-based connection
+
+## Current Product Highlights
+
+- Semua data utama sekarang scoped per `Akun Keuangan`
+- Telegram punya akun default sendiri dan tidak perlu relink untuk pindah akun
+- `Rencana` menggantikan `Simulasi`
+- `Anggaran` berbasis budget plan, bukan auto-render semua kategori
+- `Hutang Piutang` saat ini **tidak otomatis mempengaruhi saldo** karena masih diposisikan sebagai modul tracking terpisah dari transaksi
+- Deploy hosting sekarang wajib lewat smoke check agar root `/` dan route SPA tetap aman setelah rilis
+
+## Current Release
+
+- **Version**: `v2.6.0`
+- **Build Date**: `March 28, 2026`
+- **Status**: Internal testing build yang sudah mencakup phase 0 sampai phase 9
 
 ## Tech Stack
 
@@ -68,12 +91,17 @@ firebase deploy
 firebase deploy --only hosting      # Frontend only
 firebase deploy --only functions    # Backend only
 firebase deploy --only firestore    # Firestore rules only
+
+# Deploy hosting + smoke check wajib
+npm run deploy:hosting:safe
 ```
 
 ## Documentation
 
 - [DOKUMENTASI_LENGKAP.md](./DOKUMENTASI_LENGKAP.md) - Referensi dokumentasi utama proyek
+- [docs/PRODUCT_VOCABULARY.md](./docs/PRODUCT_VOCABULARY.md) - Istilah produk dan aturan copywriting user-facing
 - [docs/TELEGRAM_INTEGRATION.md](./docs/TELEGRAM_INTEGRATION.md) - Dokumentasi teknis integrasi bot Telegram
+- [deploy/DEPLOY_GUIDE.md](./deploy/DEPLOY_GUIDE.md) - Panduan deploy dan smoke check hosting
 - [TESTING.md](./TESTING.md) - Panduan test bot dan regression checklist
 
 ## Environment Variables
@@ -91,19 +119,18 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-## Version History
+## Recent Internal Milestones
 
-- **v2.2.3** - Node 22 functions runtime, backend-enforced AI analysis quota, 3 AI analysis modes, ExcelJS migration, and documentation cleanup
-- **v2.2.2** - Document upload support, caption parsing, and compression improvements
-- **v2.2.1** - Stable Gemini model migration, list categories, smarter NLU
-- **v2.2.0** - AI Financial Advisor improvements for Telegram bot
-- **v2.0.3** - Simulation balance mode: option to use current month balance or total balance
-- **v2.0.2** - Migrated to Firebase Hosting, Timezone fixes, Security hardening
-- **v2.0.1** - Bot category selection via Firestore categories + cache refresh, improved NLU for shorthand amounts
-- **v2.0.0** - Telegram Bot Integration (Receipt OCR, Natural Language, Account Linking)
-- **v1.6.0** - AI Financial Advisor
-- **v1.5.0** - Financial Simulations
-- **v1.0.0** - Initial Release
+- Phase 0: vocabulary produk disederhanakan untuk user awam
+- Phase 1: fondasi `Akun Keuangan` dan migrasi data lama ke struktur account-scoped
+- Phase 2: core app, export, AI, dan Telegram dibuat account-aware
+- Phase 3: `Simulasi` diubah menjadi `Rencana`
+- Phase 4: `Anggaran` jadi budget plan multi-kategori + salin anggaran bulan lalu + detail transaksi per anggaran
+- Phase 5: parser transaksi hybrid, preview, dan confirm sebelum simpan
+- Phase 6: Telegram multi-transaction + hapus item dari preview
+- Phase 7: voice note Telegram dengan transkrip + preview + confirm
+- Phase 8: modul `Hutang Piutang` + redesign UX yang lebih sederhana
+- Phase 9: onboarding user baru, helper dashboard, dan panduan singkat
 
 ## License
 

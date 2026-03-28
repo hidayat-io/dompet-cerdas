@@ -34,6 +34,36 @@ export interface FinancialInsightsResult {
     totalTokens: number;
 }
 
+export async function transcribeAudioToText(audioBuffer: Buffer, mimeType: string): Promise<string> {
+    try {
+        const prompt = `
+Transkripsikan audio bahasa Indonesia ini menjadi teks singkat yang mudah diparse untuk catatan transaksi.
+
+Aturan:
+- Return teks biasa saja, tanpa markdown, tanpa penjelasan tambahan.
+- Jika ada beberapa transaksi, pisahkan dengan koma.
+- Pertahankan nominal agar mudah dipahami, misalnya: 25rb, 10 ribu, 2,5 juta.
+- Jika audio terlalu tidak jelas untuk ditranskripsikan, return string kosong.
+`.trim();
+
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    data: audioBuffer.toString('base64'),
+                    mimeType,
+                }
+            }
+        ]);
+
+        return result.response.text().replace(/```[\s\S]*?```/g, '').trim();
+    } catch (error) {
+        console.error('Error transcribing audio:', error);
+        throw new Error('Failed to transcribe audio: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+}
+
 /**
  * Analyze receipt image using Gemini Vision API
  * @param imageBuffer - Image buffer from Telegram

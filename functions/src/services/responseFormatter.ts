@@ -5,6 +5,15 @@
 
 import { CategoryData, TransactionDetail } from './queryService';
 
+export function escapeMarkdown(text: string): string {
+    return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+}
+
+export function withAccountHeader(message: string, accountName?: string): string {
+    if (!accountName) return message;
+    return `📁 *Akun: ${escapeMarkdown(accountName)}*\n\n${message}`;
+}
+
 /**
  * Convert Lucide icon name to emoji
  */
@@ -358,7 +367,7 @@ export function formatCategoryBreakdown(
     const totalAmount = categories.reduce((sum, cat) => sum + cat.amount, 0);
     const lines = categories.slice(0, 5).map(cat => {
         const emoji = cat.icon ? iconToEmoji(cat.icon) : (CATEGORY_EMOJI[cat.category] || '📦');
-        return `${emoji} ${cat.category}: ${formatRupiah(cat.amount)} (${cat.percentage.toFixed(0)}%)`;
+        return `${emoji} ${escapeMarkdown(cat.category)}: ${formatRupiah(cat.amount)} (${cat.percentage.toFixed(0)}%)`;
     });
 
     return `📊 *Pengeluaran per kategori (${timeRange})*:
@@ -419,9 +428,9 @@ export function formatTransactionDetails(
             const items = grouped[date].map((item) => {
                 const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
                 const typeIndicator = item.type === 'INCOME' ? '➕' : '➖';
-                return `${typeIndicator} ${item.description}\n  💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
+                return `${typeIndicator} ${escapeMarkdown(item.description)}\n  💵 ${formatExactRupiah(item.amount)} • ${emoji} ${escapeMarkdown(item.category)}`;
             }).join('\n');
-            return `\n📅 *${date}*\n${items}`;
+            return `\n📅 *${escapeMarkdown(date)}*\n${items}`;
         }).join('\n');
 
         return header + noticeText + sections;
@@ -430,7 +439,7 @@ export function formatTransactionDetails(
         const items = details.map((item, index) => {
             const emoji = item.icon ? iconToEmoji(item.icon) : (CATEGORY_EMOJI[item.category] || '📦');
             const typeIndicator = item.type === 'INCOME' ? '➕' : '➖';
-            return `\n${index + 1}. ${typeIndicator} *${item.description}*\n   💵 ${formatExactRupiah(item.amount)} • ${emoji} ${item.category}`;
+            return `\n${index + 1}. ${typeIndicator} *${escapeMarkdown(item.description)}*\n   💵 ${formatExactRupiah(item.amount)} • ${emoji} ${escapeMarkdown(item.category)}`;
         }).join('');
         return header + noticeText + items;
     }
@@ -449,13 +458,51 @@ export function formatTransactionAdded(
     return `✅ *Transaksi berhasil ditambahkan!*
 
 💰 ${formatExactRupiah(amount)}
-${emoji} Kategori: ${category}
-📝 Deskripsi: ${description}
+${emoji} Kategori: ${escapeMarkdown(category)}
+📝 Deskripsi: ${escapeMarkdown(description)}
 📅 Tanggal: ${new Date().toLocaleDateString('id-ID', {
         day: 'numeric',
         month: 'short',
         year: 'numeric'
     })}`;
+}
+
+export function formatTransactionDraftPreview(
+    items: Array<{ amount: number; description: string; categoryName: string }>,
+    usedAI: boolean
+): string {
+    const saveLabel = items.length > 1 ? 'Simpan Semua' : 'Simpan';
+    const header = items.length > 1
+        ? `🧾 *Cek Dulu Sebelum Disimpan*\n\nSaya menemukan *${items.length} transaksi* dari pesan kamu.\n`
+        : `🧾 *Cek Dulu Sebelum Disimpan*\n\nSaya menemukan *1 transaksi* dari pesan kamu.\n`;
+    const parserNotice = usedAI
+        ? `\n🤖 Dibantu AI karena format pesannya cukup bebas.\n`
+        : `\n⚡ Diparse cepat tanpa AI karena formatnya sederhana.\n`;
+    const lines = items.map((item, index) => (
+        `${index + 1}. *${escapeMarkdown(item.description)}*\n` +
+        `   💰 ${formatExactRupiah(item.amount)}\n` +
+        `   📁 ${escapeMarkdown(item.categoryName)}`
+    )).join('\n\n');
+    const editHint = items.length > 1
+        ? `\nKalau ada item yang salah, klik tombol *Hapus 1 / Hapus 2 / ...* dulu.\n`
+        : '';
+
+    return `${header}${parserNotice}\n${lines}\n${editHint}\nKlik *${saveLabel}* kalau sudah benar.`;
+}
+
+export function formatTransactionBatchAdded(
+    items: Array<{ amount: number; description: string; categoryName: string }>
+): string {
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+    const list = items.slice(0, 5).map((item, index) => (
+        `${index + 1}. ${escapeMarkdown(item.description)} • ${formatExactRupiah(item.amount)} • ${escapeMarkdown(item.categoryName)}`
+    )).join('\n');
+    const moreNotice = items.length > 5 ? `\n... dan ${items.length - 5} transaksi lainnya` : '';
+
+    return `✅ *Transaksi berhasil ditambahkan!*\n\n` +
+        `📦 Total transaksi: *${items.length}*\n` +
+        `💰 Total nominal: *${formatExactRupiah(totalAmount)}*\n\n` +
+        `${list}${moreNotice}`;
 }
 
 /**
@@ -497,7 +544,7 @@ export function formatCategoryList(categories: Array<{ id: string; name: string;
     if (expenseCategories.length > 0) {
         response += `💸 *Pengeluaran* (${expenseCategories.length} kategori)\n`;
         expenseCategories.forEach((cat, index) => {
-            response += `   ${index + 1}. ${cat.name}\n`;
+            response += `   ${index + 1}. ${escapeMarkdown(cat.name)}\n`;
         });
         response += '\n';
     }
@@ -505,7 +552,7 @@ export function formatCategoryList(categories: Array<{ id: string; name: string;
     if (incomeCategories.length > 0) {
         response += `💰 *Pemasukan* (${incomeCategories.length} kategori)\n`;
         incomeCategories.forEach((cat, index) => {
-            response += `   ${index + 1}. ${cat.name}\n`;
+            response += `   ${index + 1}. ${escapeMarkdown(cat.name)}\n`;
         });
         response += '\n';
     }
@@ -536,4 +583,22 @@ export function formatSavingsStrategy(strategy: string): string {
  */
 export function formatExpenseAnalysis(analysis: string): string {
     return `🔍 *Analisa Pengeluaran - DompetCerdas*\n\n${analysis}\n\n---\n💬 *Butuh strategi hemat?*\nKetik: "tips hemat bulan depan" atau "saran biar hemat"`;
+}
+
+export function formatTelegramAccountStatus(
+    accountName: string | undefined,
+    accounts: Array<{ id: string; name: string; type?: string }>
+): string {
+    const lines = accounts.map((account, index) => {
+        const marker = account.name === accountName ? '✅' : '•';
+        return `${marker} ${index + 1}. ${escapeMarkdown(account.name)}`;
+    });
+
+    return `⚙️ *Akun Telegram*\n\n` +
+        `Akun aktif saat ini: *${escapeMarkdown(accountName || 'Belum dipilih')}*\n\n` +
+        `Daftar akun:\n${lines.join('\n')}`;
+}
+
+export function formatTelegramAccountUpdated(accountName: string): string {
+    return `✅ *Akun Telegram berhasil diganti*\n\nSekarang bot akan memakai akun: *${escapeMarkdown(accountName)}*`;
 }

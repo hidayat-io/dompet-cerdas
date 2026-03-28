@@ -1,18 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   collection, query, onSnapshot, addDoc, deleteDoc, doc, setDoc, writeBatch, getDocs, getDoc, updateDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth, db, storage } from './firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth, db, storage, firebaseApp } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
-import { Category, Transaction, Simulation, SimulationItem } from './types';
+import { AccountType, Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, Transaction } from './types';
 import Dashboard from './components/Dashboard';
+import BudgetManager from './components/BudgetManager';
 import TransactionList from './components/TransactionList';
 import CategoryManager from './components/CategoryManager';
 import TransactionForm from './components/TransactionForm';
-import SimulationManager from './components/SimulationManager';
+import PlanManager from './components/PlanManager';
+import DebtManager from './components/DebtManager';
+import OnboardingModal from './components/OnboardingModal';
 import AuthLogin from './components/AuthLogin';
 import Settings from './components/Settings';
 import LinkTelegram from './components/LinkTelegram';
@@ -21,10 +25,105 @@ import { FinancialAnalysisMode, FinancialAnalysisResult, getFinancialAdvice } fr
 import IconDisplay from './components/IconDisplay';
 import { useTheme } from './contexts/ThemeContext';
 import NotificationModal, { NotificationType } from './components/NotificationModal';
+import {
+  DEFAULT_ACCOUNT_NAME,
+  DEFAULT_ACCOUNT_TYPE,
+  createAccountPayload,
+  getAccountsCollectionRef,
+  getBudgetsCollectionRef,
+  getCategoriesCollectionRef,
+  getDebtsCollectionRef,
+  getLegacySimulationsCollectionRef,
+  getPlansCollectionRef,
+  getTransactionsCollectionRef,
+  getUserDocRef
+} from './services/accountService';
+import { getAccountTypeLabel } from './utils/accountLabels';
+import { getNormalizedBudget, getPreviousMonthKey } from './utils/budget';
 
 // ... (skip content)
 
-type View = 'DASHBOARD' | 'TRANSACTIONS' | 'CATEGORIES' | 'SIMULATION' | 'AI_ADVISOR' | 'SETTINGS';
+type View = 'DASHBOARD' | 'TRANSACTIONS' | 'CATEGORIES' | 'PLANS' | 'BUDGETS' | 'DEBTS' | 'AI_ADVISOR' | 'SETTINGS';
+
+type UserMeta = {
+  activeAccountId?: string;
+  accountMigrationVersion?: number;
+  accountMigrationCompletedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type TelegramLinkMeta = {
+  defaultAccountId?: string;
+};
+
+const functions = getFunctions(firebaseApp, 'asia-southeast1');
+const MIGRATION_BATCH_SIZE = 400;
+const DEFAULT_PLAN_ITEM_STATUS: PlanItemStatus = 'PLANNED';
+
+const getNormalizedDebtStatus = (amount: number, paidAmount: number, status?: DebtStatus): DebtStatus => {
+  if (status === 'PAID' || paidAmount >= amount) return 'PAID';
+  if (status === 'PARTIAL' || paidAmount > 0) return 'PARTIAL';
+  return 'UNPAID';
+};
+
+const normalizeDebtRecord = (debtId: string, rawDebt: Partial<DebtRecord>): DebtRecord => {
+  const amount = typeof rawDebt.amount === 'number' ? rawDebt.amount : 0;
+  const paidAmount = typeof rawDebt.paidAmount === 'number' ? Math.max(0, rawDebt.paidAmount) : 0;
+  const payments = Array.isArray(rawDebt.payments)
+    ? rawDebt.payments
+      .map((payment) => payment as DebtPayment)
+      .filter((payment) => payment && typeof payment.amount === 'number' && typeof payment.date === 'string')
+      .sort((left, right) => right.date.localeCompare(left.date))
+    : [];
+  const normalizedPaidAmount = Math.min(amount, Math.max(paidAmount, payments.reduce((total, payment) => total + payment.amount, 0)));
+  const remainingAmount = Math.max(amount - normalizedPaidAmount, 0);
+
+  return {
+    id: debtId,
+    kind: rawDebt.kind === 'RECEIVABLE' ? 'RECEIVABLE' : 'DEBT',
+    personName: rawDebt.personName || '',
+    title: rawDebt.title || '',
+    amount,
+    paidAmount: normalizedPaidAmount,
+    remainingAmount,
+    status: getNormalizedDebtStatus(amount, normalizedPaidAmount, rawDebt.status),
+    transactionDate: rawDebt.transactionDate || new Date().toISOString().split('T')[0],
+    dueDate: rawDebt.dueDate,
+    notes: rawDebt.notes,
+    payments,
+    createdAt: rawDebt.createdAt || new Date().toISOString(),
+    updatedAt: rawDebt.updatedAt || rawDebt.createdAt || new Date().toISOString(),
+  };
+};
+
+const commitBatchOperations = async (operations: Array<(batch: ReturnType<typeof writeBatch>) => void>) => {
+  for (let index = 0; index < operations.length; index += MIGRATION_BATCH_SIZE) {
+    const batch = writeBatch(db);
+    operations.slice(index, index + MIGRATION_BATCH_SIZE).forEach((operation) => operation(batch));
+    await batch.commit();
+  }
+};
+
+const normalizePlanItem = (item: Partial<PlanItem> & { id: string }): PlanItem => ({
+  id: item.id,
+  name: item.name || '',
+  amount: typeof item.amount === 'number' ? item.amount : 0,
+  type: item.type === 'INCOME' ? 'INCOME' : 'EXPENSE',
+  categoryId: item.categoryId || '',
+  plannedDate: item.plannedDate,
+  status: item.status || DEFAULT_PLAN_ITEM_STATUS,
+});
+
+const normalizePlan = (planId: string, rawPlan: Partial<Plan>): Plan => ({
+  id: planId,
+  title: rawPlan.title || 'Rencana',
+  items: Array.isArray(rawPlan.items)
+    ? rawPlan.items.map((item) => normalizePlanItem(item as Partial<PlanItem> & { id: string }))
+    : [],
+  createdAt: rawPlan.createdAt || new Date().toISOString(),
+  useCurrentMonthBalance: !!rawPlan.useCurrentMonthBalance,
+});
 
 function App() {
   const { theme } = useTheme();
@@ -36,16 +135,28 @@ function App() {
 
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Data States (Synced with Firestore)
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [debts, setDebts] = useState<DebtRecord[]>([]);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [telegramDefaultAccountId, setTelegramDefaultAccountId] = useState<string | null>(null);
+  const [telegramLinked, setTelegramLinked] = useState(false);
 
   const [aiAnalysis, setAiAnalysis] = useState<FinancialAnalysisResult | null>(null);
   const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [aiAnalysisMode, setAiAnalysisMode] = useState<FinancialAnalysisMode>('HEALTH');
+  const normalizedBudgets = useMemo(
+    () => budgets.map((budget) => getNormalizedBudget(budget, categories)),
+    [budgets, categories]
+  );
 
   // Notification State
   const [notification, setNotification] = useState<{
@@ -72,6 +183,15 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user || isLinkTelegramRoute) return;
+
+    const pendingToken = sessionStorage.getItem('telegram_link_token');
+    if (!pendingToken) return;
+
+    window.location.replace(`/link-telegram?token=${encodeURIComponent(pendingToken)}`);
+  }, [user, isLinkTelegramRoute]);
 
   // --- Update Banner State ---
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
@@ -111,68 +231,288 @@ function App() {
     setShowUpdateBanner(false);
   };
 
-  // --- Firestore Listeners ---
+  // --- Account Bootstrap & Legacy Migration ---
   useEffect(() => {
     if (!user) {
-      setCategories([]);
-      setTransactions([]);
-      setSimulations([]);
+      setAccounts([]);
+      setActiveAccountId(null);
+      setAccountLoading(false);
       return;
     }
 
-    // 1. Categories Listener
-    const catQuery = query(collection(db, 'users', user.uid, 'categories'));
-    const unsubCat = onSnapshot(catQuery, async (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Category));
-      setCategories(data);
+    let cancelled = false;
 
-      // Seed Initial Data if empty - with user metadata check to prevent duplicates
-      if (data.length === 0 && !snapshot.metadata.hasPendingWrites) {
-        // Check if we've already seeded for this user
-        const userMetaRef = doc(db, 'users', user.uid);
-        const userMetaSnap = await getDoc(userMetaRef);
-        const hasSeededCategories = userMetaSnap.exists() && userMetaSnap.data()?.categoriesSeeded;
+    const bootstrapAccounts = async () => {
+      setAccountLoading(true);
 
-        if (!hasSeededCategories) {
-          const batch = writeBatch(db);
+      const userRef = getUserDocRef(db, user.uid);
+      const accountsRef = getAccountsCollectionRef(db, user.uid);
+      const userSnap = await getDoc(userRef);
+      const userMeta = (userSnap.data() || {}) as UserMeta;
+      const accountsSnap = await getDocs(accountsRef);
 
-          // Add initial categories
-          INITIAL_CATEGORIES.forEach(cat => {
-            const ref = doc(collection(db, 'users', user.uid, 'categories'));
-            batch.set(ref, { ...cat, id: ref.id });
-          });
+      let resolvedAccountId = userMeta.activeAccountId;
 
-          // Mark as seeded in user metadata
-          batch.set(userMetaRef, { categoriesSeeded: true, createdAt: new Date().toISOString() }, { merge: true });
+      if (accountsSnap.empty) {
+        const now = new Date().toISOString();
+        const defaultAccountRef = doc(accountsRef);
+        const batch = writeBatch(db);
+        batch.set(defaultAccountRef, createAccountPayload(DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_TYPE, now));
+        batch.set(userRef, {
+          activeAccountId: defaultAccountRef.id,
+          accountMigrationVersion: 1,
+          updatedAt: now,
+          createdAt: userMeta.createdAt || now
+        }, { merge: true });
+        await batch.commit();
+        resolvedAccountId = defaultAccountRef.id;
+      } else if (!resolvedAccountId || !accountsSnap.docs.some((accountDoc) => accountDoc.id === resolvedAccountId)) {
+        resolvedAccountId = accountsSnap.docs[0].id;
+        await setDoc(userRef, {
+          activeAccountId: resolvedAccountId,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
 
-          batch.commit().catch(console.error);
+      if (resolvedAccountId) {
+        const targetCategoriesRef = getCategoriesCollectionRef(db, user.uid, resolvedAccountId);
+        const targetTransactionsRef = getTransactionsCollectionRef(db, user.uid, resolvedAccountId);
+        const targetPlansRef = getPlansCollectionRef(db, user.uid, resolvedAccountId);
+        const accountLegacySimulationsRef = getLegacySimulationsCollectionRef(db, user.uid, resolvedAccountId);
+
+        const [
+          targetCategoriesSnap,
+          targetTransactionsSnap,
+          targetPlansSnap,
+          accountLegacySimulationsSnap,
+          legacyCategoriesSnap,
+          legacyTransactionsSnap,
+          legacySimulationsSnap,
+        ] = await Promise.all([
+          getDocs(targetCategoriesRef),
+          getDocs(targetTransactionsRef),
+          getDocs(targetPlansRef),
+          getDocs(accountLegacySimulationsRef),
+          getDocs(collection(db, 'users', user.uid, 'categories')),
+          getDocs(collection(db, 'users', user.uid, 'transactions')),
+          getDocs(collection(db, 'users', user.uid, 'simulations')),
+        ]);
+
+        const migrationOperations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+
+        if (targetCategoriesSnap.empty) {
+          if (!legacyCategoriesSnap.empty) {
+            legacyCategoriesSnap.docs.forEach((legacyDoc) => {
+              migrationOperations.push((batch) => {
+                batch.set(doc(targetCategoriesRef, legacyDoc.id), legacyDoc.data());
+              });
+            });
+          } else {
+            INITIAL_CATEGORIES.forEach((category) => {
+              migrationOperations.push((batch) => {
+                batch.set(doc(targetCategoriesRef, category.id), category);
+              });
+            });
+          }
         }
+
+        if (targetTransactionsSnap.empty && !legacyTransactionsSnap.empty) {
+          legacyTransactionsSnap.docs.forEach((legacyDoc) => {
+            migrationOperations.push((batch) => {
+              batch.set(doc(targetTransactionsRef, legacyDoc.id), legacyDoc.data());
+            });
+          });
+        }
+
+        const migratedPlanIds = new Set(targetPlansSnap.docs.map((planDoc) => planDoc.id));
+        [accountLegacySimulationsSnap, legacySimulationsSnap].forEach((legacySnapshot) => {
+          legacySnapshot.docs.forEach((legacyDoc) => {
+            if (migratedPlanIds.has(legacyDoc.id)) return;
+            migratedPlanIds.add(legacyDoc.id);
+            migrationOperations.push((batch) => {
+              batch.set(doc(targetPlansRef, legacyDoc.id), legacyDoc.data());
+            });
+          });
+        });
+
+        if (migrationOperations.length > 0) {
+          await commitBatchOperations(migrationOperations);
+        }
+
+        await setDoc(userRef, {
+          activeAccountId: resolvedAccountId,
+          accountMigrationVersion: 1,
+          accountMigrationCompletedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      if (!cancelled) {
+        setActiveAccountId(resolvedAccountId || null);
+        setAccountLoading(false);
+      }
+    };
+
+    bootstrapAccounts().catch((error) => {
+      console.error('Failed to bootstrap accounts:', error);
+      if (!cancelled) {
+        setAccountLoading(false);
+        showNotification('error', 'Gagal Memuat Akun', 'Akun Keuangan belum bisa disiapkan. Silakan refresh halaman.', false);
       }
     });
 
-    // 2. Transactions Listener
-    const txQuery = query(collection(db, 'users', user.uid, 'transactions'));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // --- Account Listeners ---
+  useEffect(() => {
+    if (!user) return;
+
+    const userRef = getUserDocRef(db, user.uid);
+    const accountsRef = query(getAccountsCollectionRef(db, user.uid));
+
+    const unsubUser = onSnapshot(userRef, (snapshot) => {
+      const data = snapshot.data() as UserMeta | undefined;
+      if (data?.activeAccountId) {
+        setActiveAccountId(data.activeAccountId);
+      }
+    });
+
+    const unsubAccounts = onSnapshot(accountsRef, (snapshot) => {
+      const data = snapshot.docs
+        .map((accountDoc) => ({ id: accountDoc.id, ...accountDoc.data() } as FinancialAccount))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      setAccounts(data);
+    });
+
+    return () => {
+      unsubUser();
+      unsubAccounts();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setTelegramDefaultAccountId(null);
+      setTelegramLinked(false);
+      return;
+    }
+
+    const telegramLinkRef = doc(db, 'users', user.uid, 'telegram_link', 'main');
+    const unsubscribe = onSnapshot(telegramLinkRef, (snapshot) => {
+      setTelegramLinked(snapshot.exists());
+      const data = snapshot.data() as TelegramLinkMeta | undefined;
+      setTelegramDefaultAccountId(data?.defaultAccountId || null);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // --- Firestore Listeners ---
+  useEffect(() => {
+    if (!user || !activeAccountId) {
+      setCategories([]);
+      setTransactions([]);
+      setPlans([]);
+      setBudgets([]);
+      setDebts([]);
+      return;
+    }
+
+    const catQuery = query(getCategoriesCollectionRef(db, user.uid, activeAccountId));
+    const unsubCat = onSnapshot(catQuery, (snapshot) => {
+      const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category));
+      setCategories(data);
+    });
+
+    const txQuery = query(getTransactionsCollectionRef(db, user.uid, activeAccountId));
     const unsubTx = onSnapshot(txQuery, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction));
-      // Sort by date desc implicitly handled in UI, but safe to have raw data
+      const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
       setTransactions(data);
     });
 
-    // 3. Simulations Listener
-    const simQuery = query(collection(db, 'users', user.uid, 'simulations'));
-    const unsubSim = onSnapshot(simQuery, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Simulation));
-      setSimulations(data);
+    const planQuery = query(getPlansCollectionRef(db, user.uid, activeAccountId));
+    const unsubPlans = onSnapshot(planQuery, (snapshot) => {
+      const data = snapshot.docs.map((planDoc) => normalizePlan(planDoc.id, planDoc.data() as Partial<Plan>));
+      setPlans(data);
+    });
+
+    const budgetQuery = query(getBudgetsCollectionRef(db, user.uid, activeAccountId));
+    const unsubBudgets = onSnapshot(budgetQuery, (snapshot) => {
+      const data = snapshot.docs.map((budgetDoc) => ({ id: budgetDoc.id, ...(budgetDoc.data() as Partial<Budget>) } as Budget));
+      setBudgets(data);
+    });
+
+    const debtQuery = query(getDebtsCollectionRef(db, user.uid, activeAccountId));
+    const unsubDebts = onSnapshot(debtQuery, (snapshot) => {
+      const data = snapshot.docs.map((debtDoc) => normalizeDebtRecord(debtDoc.id, debtDoc.data() as Partial<DebtRecord>));
+      setDebts(data);
     });
 
     return () => {
       unsubCat();
       unsubTx();
-      unsubSim();
+      unsubPlans();
+      unsubBudgets();
+      unsubDebts();
     };
-  }, [user]);
+  }, [user, activeAccountId]);
 
   // --- CRUD Handlers (Firestore) ---
+
+  const createAccount = async (name: string, type: AccountType) => {
+    if (!user) return;
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      showNotification('warning', 'Nama Akun Wajib Diisi', 'Isi nama Akun Keuangan terlebih dahulu.', true);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const accountsRef = getAccountsCollectionRef(db, user.uid);
+    const accountRef = doc(accountsRef);
+    const userRef = getUserDocRef(db, user.uid);
+    const categoriesRef = getCategoriesCollectionRef(db, user.uid, accountRef.id);
+    const batch = writeBatch(db);
+
+    batch.set(accountRef, createAccountPayload(trimmedName, type, now));
+    INITIAL_CATEGORIES.forEach((category) => {
+      batch.set(doc(categoriesRef, category.id), category);
+    });
+    batch.set(userRef, {
+      activeAccountId: accountRef.id,
+      updatedAt: now
+    }, { merge: true });
+
+    await batch.commit();
+    showNotification('success', 'Akun Ditambahkan', `Akun Keuangan "${trimmedName}" siap digunakan.`, true);
+  };
+
+  const switchAccount = async (accountId: string) => {
+    if (!user || !accountId || accountId === activeAccountId) return;
+
+    await setDoc(getUserDocRef(db, user.uid), {
+      activeAccountId: accountId,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  };
+
+  const updateTelegramDefaultAccount = async (accountId: string) => {
+    if (!user || !accountId) return;
+
+    await setDoc(doc(db, 'users', user.uid, 'telegram_link', 'main'), {
+      defaultAccountId: accountId,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    const selectedAccount = accounts.find((account) => account.id === accountId);
+    if (selectedAccount) {
+      showNotification('success', 'Akun Telegram Diperbarui', `Bot Telegram sekarang memakai akun "${selectedAccount.name}".`, true);
+    }
+  };
 
   const addTransaction = async (
     amount: number,
@@ -181,7 +521,7 @@ function App() {
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' }
   ) => {
-    if (!user) return;
+    if (!user || !activeAccountId) return;
 
     let attachmentData = null;
 
@@ -191,7 +531,7 @@ function App() {
         // Create ref
         const fileExt = attachment.file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const storageRef = ref(storage, `users/${user.uid}/attachments/${fileName}`);
+        const storageRef = ref(storage, `users/${user.uid}/accounts/${activeAccountId}/attachments/${fileName}`);
 
         // Upload
         const snapshot = await uploadBytes(storageRef, attachment.file);
@@ -210,7 +550,7 @@ function App() {
       }
     }
 
-    await addDoc(collection(db, 'users', user.uid, 'transactions'), {
+    await addDoc(getTransactionsCollectionRef(db, user.uid, activeAccountId), {
       amount,
       categoryId,
       date,
@@ -228,13 +568,13 @@ function App() {
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' } | null
   ) => {
-    if (!user) return;
+    if (!user || !activeAccountId) return;
 
-    const txRef = doc(db, 'users', user.uid, 'transactions', id);
+    const txRef = doc(getTransactionsCollectionRef(db, user.uid, activeAccountId), id);
     const txSnap = await getDoc(txRef);
     if (!txSnap.exists()) return;
 
-    const currentData = txSnap.data() as Transaction;
+    const currentData = txSnap.data() as unknown as Transaction;
     let attachmentData = currentData.attachment;
 
     // Handle Attachment Logic
@@ -283,7 +623,7 @@ function App() {
       try {
         const fileExt = attachment.file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const storageRef = ref(storage, `users/${user.uid}/attachments/${fileName}`);
+        const storageRef = ref(storage, `users/${user.uid}/accounts/${activeAccountId}/attachments/${fileName}`);
 
         const snapshot = await uploadBytes(storageRef, attachment.file);
         const url = await getDownloadURL(snapshot.ref);
@@ -313,7 +653,7 @@ function App() {
 
 
   const deleteTransaction = async (id: string) => {
-    if (!user) return;
+    if (!user || !activeAccountId) return;
 
     // Check for attachment to delete from storage
     const tx = transactions.find(t => t.id === id);
@@ -340,7 +680,7 @@ function App() {
       }
     }
 
-    await deleteDoc(doc(db, 'users', user.uid, 'transactions', id));
+    await deleteDoc(doc(getTransactionsCollectionRef(db, user.uid, activeAccountId), id));
   };
 
   const refreshCategoryCache = async () => {
@@ -353,92 +693,256 @@ function App() {
   };
 
   const addCategory = async (cat: Omit<Category, 'id'>): Promise<string | undefined> => {
-    if (!user) return;
-    const docRef = await addDoc(collection(db, 'users', user.uid, 'categories'), cat);
+    if (!user || !activeAccountId) return;
+    const docRef = await addDoc(getCategoriesCollectionRef(db, user.uid, activeAccountId), cat);
     await refreshCategoryCache();
     return docRef.id;
   };
 
   const updateCategory = async (id: string, cat: Omit<Category, 'id'>) => {
-    if (!user) return;
-    const catRef = doc(db, 'users', user.uid, 'categories', id);
+    if (!user || !activeAccountId) return;
+    const catRef = doc(getCategoriesCollectionRef(db, user.uid, activeAccountId), id);
     await updateDoc(catRef, cat);
     await refreshCategoryCache();
   };
 
   const deleteCategory = async (id: string) => {
-    if (!user) return;
+    if (!user || !activeAccountId) return;
     const isUsed = transactions.some(t => t.categoryId === id);
     if (isUsed) {
       showNotification('error', 'Tidak Dapat Dihapus', 'Kategori ini tidak bisa dihapus karena masih digunakan dalam transaksi.', true);
       return;
     }
-    await deleteDoc(doc(db, 'users', user.uid, 'categories', id));
+    await deleteDoc(doc(getCategoriesCollectionRef(db, user.uid, activeAccountId), id));
     await refreshCategoryCache();
   };
 
-  // --- Simulation Handlers (Firestore) ---
-  const createSimulation = async (title: string) => {
-    if (!user) return;
-    await addDoc(collection(db, 'users', user.uid, 'simulations'), {
+  // --- Plan Handlers (Firestore) ---
+  const createPlan = async (title: string) => {
+    if (!user || !activeAccountId) return;
+    await addDoc(getPlansCollectionRef(db, user.uid, activeAccountId), {
       title,
       items: [],
       createdAt: new Date().toISOString()
     });
   };
 
-  const deleteSimulation = async (id: string) => {
-    if (!user) return;
-    // Removed native confirm to avoid UX issues, or assume UI handles confirmation if needed.
-    // However, for safety, let's keep it but make sure logic is sound.
-    // Actually user says it fails. I will remove confirm for now to test if logic works.
+  const deletePlan = async (id: string) => {
+    if (!user || !activeAccountId) return;
     try {
-      await deleteDoc(doc(db, 'users', user.uid, 'simulations', id));
+      await deleteDoc(doc(getPlansCollectionRef(db, user.uid, activeAccountId), id));
     } catch (e) { console.error(e); }
   };
 
-  const addSimulationItem = async (simId: string, item: Omit<SimulationItem, 'id'>) => {
-    if (!user) return;
-    const simRef = doc(db, 'users', user.uid, 'simulations', simId);
-    const simulation = simulations.find(s => s.id === simId);
-    if (simulation) {
-      const newItem = { ...item, id: Date.now().toString() }; // Client side ID generation for array item ok here
-      const updatedItems = [...simulation.items, newItem];
-      await setDoc(simRef, { items: updatedItems }, { merge: true });
+  const addPlanItem = async (planId: string, item: Omit<PlanItem, 'id'>) => {
+    if (!user || !activeAccountId) return;
+    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    const plan = plans.find((entry) => entry.id === planId);
+    if (plan) {
+      const newItem: PlanItem = { ...item, id: Date.now().toString() };
+      const updatedItems = [...plan.items, newItem];
+      await setDoc(planRef, { items: updatedItems }, { merge: true });
     }
   };
 
-  const updateSimulationItem = async (simId: string, itemId: string, updatedItem: Omit<SimulationItem, 'id'>) => {
-    if (!user) return;
-    const simRef = doc(db, 'users', user.uid, 'simulations', simId);
-    const simulation = simulations.find(s => s.id === simId);
-    if (simulation) {
-      const updatedItems = simulation.items.map(i =>
-        i.id === itemId ? { ...updatedItem, id: itemId } : i
+  const updatePlanItem = async (planId: string, itemId: string, updatedItem: Omit<PlanItem, 'id'>) => {
+    if (!user || !activeAccountId) return;
+    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    const plan = plans.find((entry) => entry.id === planId);
+    if (plan) {
+      const updatedItems = plan.items.map((item) =>
+        item.id === itemId ? { ...updatedItem, id: itemId } : item
       );
-      await setDoc(simRef, { items: updatedItems }, { merge: true });
+      await setDoc(planRef, { items: updatedItems }, { merge: true });
     }
   };
 
-  const updateSimulationSettings = async (simId: string, useCurrentMonthBalance: boolean) => {
-    if (!user) return;
-    const simRef = doc(db, 'users', user.uid, 'simulations', simId);
-    await setDoc(simRef, { useCurrentMonthBalance }, { merge: true });
+  const updatePlanSettings = async (planId: string, useCurrentMonthBalance: boolean) => {
+    if (!user || !activeAccountId) return;
+    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    await setDoc(planRef, { useCurrentMonthBalance }, { merge: true });
   };
 
-  const deleteSimulationItem = async (simId: string, itemId: string) => {
-    if (!user) return;
-    const simRef = doc(db, 'users', user.uid, 'simulations', simId);
-    const simulation = simulations.find(s => s.id === simId);
-    if (simulation) {
-      const updatedItems = simulation.items.filter(i => i.id !== itemId);
-      await setDoc(simRef, { items: updatedItems }, { merge: true });
+  const deletePlanItem = async (planId: string, itemId: string) => {
+    if (!user || !activeAccountId) return;
+    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    const plan = plans.find((entry) => entry.id === planId);
+    if (plan) {
+      const updatedItems = plan.items.filter((item) => item.id !== itemId);
+      await setDoc(planRef, { items: updatedItems }, { merge: true });
     }
   };
 
-  const applySimulationItemToReal = (item: SimulationItem, date: string) => {
-    addTransaction(item.amount, item.categoryId, date, `[Dari Simulasi] ${item.name} `);
-    showNotification('success', 'Berhasil!', 'Transaksi berhasil disalin ke buku utama!', true);
+  const updatePlanItemStatus = async (planId: string, itemId: string, status: PlanItemStatus) => {
+    if (!user || !activeAccountId) return;
+    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    const plan = plans.find((entry) => entry.id === planId);
+    if (!plan) return;
+
+    const updatedItems = plan.items.map((item) => (
+      item.id === itemId ? { ...item, status } : item
+    ));
+
+    await setDoc(planRef, { items: updatedItems }, { merge: true });
+  };
+
+  const applyPlanItemToTransaction = async (planId: string, itemId: string, item: PlanItem, date: string) => {
+    await addTransaction(item.amount, item.categoryId, date, `[Dari Rencana] ${item.name}`);
+    await updatePlanItemStatus(planId, itemId, 'DONE');
+    showNotification('success', 'Berhasil!', 'Transaksi berhasil dicatat dari rencana ini.', true);
+  };
+
+  const saveBudget = async (payload: {
+    budgetId?: string;
+    month: string;
+    name: string;
+    categoryIds: string[];
+    limitAmount: number;
+  }) => {
+    if (!user || !activeAccountId) return;
+
+    const budgetId = payload.budgetId || doc(getBudgetsCollectionRef(db, user.uid, activeAccountId)).id;
+    const now = new Date().toISOString();
+    await setDoc(doc(getBudgetsCollectionRef(db, user.uid, activeAccountId), budgetId), {
+      month: payload.month,
+      name: payload.name.trim(),
+      categoryIds: payload.categoryIds,
+      limitAmount: payload.limitAmount,
+      createdAt: normalizedBudgets.find((budget) => budget.id === budgetId)?.createdAt || now,
+      updatedAt: now,
+    });
+    showNotification('success', 'Anggaran Disimpan', `Anggaran "${payload.name.trim()}" untuk ${payload.month} berhasil diperbarui.`, true);
+  };
+
+  const deleteBudget = async (budgetId: string) => {
+    if (!user || !activeAccountId) return;
+    await deleteDoc(doc(getBudgetsCollectionRef(db, user.uid, activeAccountId), budgetId));
+    showNotification('success', 'Anggaran Dihapus', 'Anggaran berhasil dihapus.', true);
+  };
+
+  const copyBudgetsFromPreviousMonth = async (targetMonth: string) => {
+    if (!user || !activeAccountId) return;
+
+    const previousMonth = getPreviousMonthKey(targetMonth);
+    const sourceBudgets = normalizedBudgets.filter((budget) => budget.month === previousMonth);
+    const targetBudgets = normalizedBudgets.filter((budget) => budget.month === targetMonth);
+    const usedCategoryIds = new Set(targetBudgets.flatMap((budget) => budget.categoryIds));
+
+    const copyCandidates = sourceBudgets.filter((budget) => (
+      budget.categoryIds.every((categoryId) => !usedCategoryIds.has(categoryId))
+    ));
+
+    if (copyCandidates.length === 0) {
+      showNotification('info', 'Tidak Ada Anggaran Disalin', `Belum ada anggaran ${previousMonth} yang bisa disalin ke ${targetMonth}.`, true);
+      return;
+    }
+
+    const batch = writeBatch(db);
+    const now = new Date().toISOString();
+    copyCandidates.forEach((budget) => {
+      const budgetRef = doc(getBudgetsCollectionRef(db, user.uid, activeAccountId));
+      batch.set(budgetRef, {
+        month: targetMonth,
+        name: budget.name,
+        categoryIds: budget.categoryIds,
+        limitAmount: budget.limitAmount,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    await batch.commit();
+    showNotification('success', 'Anggaran Disalin', `${copyCandidates.length} anggaran dari ${previousMonth} berhasil disalin.`, true);
+  };
+
+  const saveDebt = async (payload: {
+    debtId?: string;
+    kind: 'DEBT' | 'RECEIVABLE';
+    personName: string;
+    title: string;
+    amount: number;
+    transactionDate: string;
+    dueDate?: string;
+    notes?: string;
+  }) => {
+    if (!user || !activeAccountId) return;
+
+    const debtId = payload.debtId || doc(getDebtsCollectionRef(db, user.uid, activeAccountId)).id;
+    const now = new Date().toISOString();
+    const existingDebt = debts.find((entry) => entry.id === debtId);
+
+    await setDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId), {
+      id: debtId,
+      kind: payload.kind,
+      personName: payload.personName.trim(),
+      title: payload.title.trim(),
+      amount: payload.amount,
+      paidAmount: existingDebt?.paidAmount || 0,
+      remainingAmount: Math.max(payload.amount - (existingDebt?.paidAmount || 0), 0),
+      status: getNormalizedDebtStatus(payload.amount, existingDebt?.paidAmount || 0, existingDebt?.status),
+      transactionDate: payload.transactionDate,
+      dueDate: payload.dueDate || null,
+      notes: payload.notes || null,
+      payments: existingDebt?.payments || [],
+      createdAt: existingDebt?.createdAt || now,
+      updatedAt: now,
+    });
+
+    showNotification(
+      'success',
+      payload.kind === 'DEBT' ? 'Hutang Disimpan' : 'Piutang Disimpan',
+      `"${payload.title.trim()}" berhasil diperbarui.`,
+      true
+    );
+  };
+
+  const deleteDebt = async (debtId: string) => {
+    if (!user || !activeAccountId) return;
+    await deleteDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId));
+    showNotification('success', 'Catatan Dihapus', 'Catatan hutang piutang berhasil dihapus.', true);
+  };
+
+  const recordDebtPayment = async (debtId: string, payload: { amount: number; date: string; note?: string }) => {
+    if (!user || !activeAccountId) return;
+
+    const currentDebt = debts.find((entry) => entry.id === debtId);
+    if (!currentDebt) return;
+
+    const nextPaidAmount = Math.min(currentDebt.amount, currentDebt.paidAmount + payload.amount);
+    const nextRemainingAmount = Math.max(currentDebt.amount - nextPaidAmount, 0);
+    const nextStatus = getNormalizedDebtStatus(currentDebt.amount, nextPaidAmount);
+    const paymentEntry: DebtPayment = {
+      id: `${Date.now()}`,
+      amount: payload.amount,
+      date: payload.date,
+      createdAt: new Date().toISOString(),
+      ...(payload.note ? { note: payload.note } : {}),
+    };
+
+    await updateDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId), {
+      paidAmount: nextPaidAmount,
+      remainingAmount: nextRemainingAmount,
+      status: nextStatus,
+      payments: [paymentEntry, ...(currentDebt.payments || [])],
+      updatedAt: new Date().toISOString(),
+    });
+
+    showNotification('success', 'Pembayaran Disimpan', 'Pembayaran berhasil dicatat.', true);
+  };
+
+  const markDebtAsPaid = async (debtId: string) => {
+    if (!user || !activeAccountId) return;
+
+    const currentDebt = debts.find((entry) => entry.id === debtId);
+    if (!currentDebt) return;
+
+    await updateDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId), {
+      paidAmount: currentDebt.amount,
+      remainingAmount: 0,
+      status: 'PAID',
+      updatedAt: new Date().toISOString(),
+    });
+
+    showNotification('success', 'Status Diperbarui', 'Catatan berhasil ditandai lunas.', true);
   };
 
   const handleLogout = () => {
@@ -447,8 +951,8 @@ function App() {
 
   // Delete all transactions
   const deleteAllTransactions = async () => {
-    if (!user) return;
-    const txQuery = query(collection(db, 'users', user.uid, 'transactions'));
+    if (!user || !activeAccountId) return;
+    const txQuery = query(getTransactionsCollectionRef(db, user.uid, activeAccountId));
     const snapshot = await getDocs(txQuery);
     const batch = writeBatch(db);
     snapshot.docs.forEach((document) => {
@@ -530,6 +1034,37 @@ function App() {
     }
   ];
 
+  const activeAccount = accounts.find((account) => account.id === activeAccountId) || null;
+  const onboardingStorageKey = user && activeAccountId
+    ? `dompetcerdas_onboarding_seen_${user.uid}_${activeAccountId}`
+    : null;
+  const hasStarterData = transactions.length > 0 || plans.length > 0 || budgets.length > 0 || debts.length > 0;
+
+  useEffect(() => {
+    if (!user || !activeAccountId || accountLoading || !onboardingStorageKey) return;
+
+    const hasSeen = localStorage.getItem(onboardingStorageKey) === '1';
+    if (!hasSeen && !hasStarterData) {
+      setShowOnboarding(true);
+    }
+  }, [user, activeAccountId, accountLoading, onboardingStorageKey, hasStarterData]);
+
+  const openOnboarding = () => {
+    setShowOnboarding(true);
+  };
+
+  const closeOnboarding = () => {
+    if (onboardingStorageKey) {
+      localStorage.setItem(onboardingStorageKey, '1');
+    }
+    setShowOnboarding(false);
+  };
+
+  const navigateFromOnboarding = (view: View) => {
+    closeOnboarding();
+    setCurrentView(view);
+  };
+
 
   // --- RENDER ---
 
@@ -548,6 +1083,17 @@ function App() {
 
   if (!user) {
     return <AuthLogin />;
+  }
+
+  if (accountLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
+          <p className="text-sm text-slate-600">Menyiapkan Akun Keuangan...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -608,6 +1154,34 @@ function App() {
               <button onClick={handleLogout} className="text-xs text-red-500 hover:text-red-700 font-medium">Keluar</button>
             </div>
           </div >
+
+          <div
+            className="mt-3 rounded-xl p-3"
+            style={{ backgroundColor: theme.colors.bgHover, border: `1px solid ${theme.colors.border}` }}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.colors.textMuted }}>
+              Akun Aktif
+            </p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
+              {activeAccount?.name || 'Pilih Akun'}
+            </p>
+            <select
+              value={activeAccountId || ''}
+              onChange={(event) => switchAccount(event.target.value)}
+              className="mt-3 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+              style={{
+                backgroundColor: theme.colors.bgCard,
+                borderColor: theme.colors.border,
+                color: theme.colors.textPrimary
+              }}
+            >
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} • {getAccountTypeLabel(account.type)}
+                </option>
+              ))}
+            </select>
+          </div>
         </div >
 
         <nav className="flex-1 p-4 space-y-2">
@@ -632,14 +1206,34 @@ function App() {
             <IconDisplay name="BookOpen" size={18} /> Transaksi
           </button>
           <button
-            onClick={() => setCurrentView('SIMULATION')}
+            onClick={() => setCurrentView('PLANS')}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
             style={{
-              backgroundColor: currentView === 'SIMULATION' ? theme.colors.sidebarActiveBg : 'transparent',
-              color: currentView === 'SIMULATION' ? theme.colors.sidebarActive : theme.colors.sidebarText
+              backgroundColor: currentView === 'PLANS' ? theme.colors.sidebarActiveBg : 'transparent',
+              color: currentView === 'PLANS' ? theme.colors.sidebarActive : theme.colors.sidebarText
             }}
           >
-            <IconDisplay name="Calculator" size={18} /> Simulasi Biaya
+            <IconDisplay name="CalendarDays" size={18} /> Rencana
+          </button>
+          <button
+            onClick={() => setCurrentView('BUDGETS')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: currentView === 'BUDGETS' ? theme.colors.sidebarActiveBg : 'transparent',
+              color: currentView === 'BUDGETS' ? theme.colors.sidebarActive : theme.colors.sidebarText
+            }}
+          >
+            <IconDisplay name="PiggyBank" size={18} /> Anggaran
+          </button>
+          <button
+            onClick={() => setCurrentView('DEBTS')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: currentView === 'DEBTS' ? theme.colors.sidebarActiveBg : 'transparent',
+              color: currentView === 'DEBTS' ? theme.colors.sidebarActive : theme.colors.sidebarText
+            }}
+          >
+            <IconDisplay name="Handshake" size={18} /> Hutang Piutang
           </button>
           <button
             onClick={() => setCurrentView('CATEGORIES')}
@@ -711,18 +1305,41 @@ function App() {
             >
               <IconDisplay name="Zap" size={18} />
             </button>
-            {/* Quick Access: Simulasi Button */}
             <button
-              onClick={() => setCurrentView('SIMULATION')}
+              onClick={() => setCurrentView('SETTINGS')}
+              className="p-2 rounded-full transition-all"
+              style={{
+                backgroundColor: currentView === 'SETTINGS' ? theme.colors.accentLight : 'transparent',
+                color: currentView === 'SETTINGS' ? theme.colors.accent : theme.colors.textMuted
+              }}
+              title="Pengaturan"
+            >
+              <IconDisplay name="Settings" size={18} />
+            </button>
+            {/* Quick Access: Rencana Button */}
+            <button
+              onClick={() => setCurrentView('PLANS')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
               style={{
-                backgroundColor: currentView === 'SIMULATION' ? theme.colors.accent : theme.colors.bgHover,
-                color: currentView === 'SIMULATION' ? '#fff' : theme.colors.textSecondary,
-                border: `1px solid ${currentView === 'SIMULATION' ? theme.colors.accent : theme.colors.border}`
+                backgroundColor: currentView === 'PLANS' ? theme.colors.accent : theme.colors.bgHover,
+                color: currentView === 'PLANS' ? '#fff' : theme.colors.textSecondary,
+                border: `1px solid ${currentView === 'PLANS' ? theme.colors.accent : theme.colors.border}`
               }}
             >
-              <IconDisplay name="Calculator" size={14} />
-              <span>Simulasi</span>
+              <IconDisplay name="CalendarDays" size={14} />
+              <span>Rencana</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('DEBTS')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+              style={{
+                backgroundColor: currentView === 'DEBTS' ? theme.colors.accent : theme.colors.bgHover,
+                color: currentView === 'DEBTS' ? '#fff' : theme.colors.textSecondary,
+                border: `1px solid ${currentView === 'DEBTS' ? theme.colors.accent : theme.colors.border}`
+              }}
+            >
+              <IconDisplay name="Handshake" size={14} />
+              <span>Hutang</span>
             </button>
             <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="User" className="w-8 h-8 rounded-full" style={{ border: `1px solid ${theme.colors.border}` }} />
             <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg" style={{ backgroundColor: theme.colors.expenseBg }}>
@@ -731,14 +1348,53 @@ function App() {
           </div>
         </header >
 
+        <div
+          className="md:hidden px-4 py-2"
+          style={{ backgroundColor: theme.colors.bgCard, borderBottom: `1px solid ${theme.colors.border}` }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.colors.textMuted }}>
+                Akun Aktif
+              </p>
+              <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
+                {activeAccount?.name || 'Pilih Akun'}
+              </p>
+            </div>
+            <select
+              value={activeAccountId || ''}
+              onChange={(event) => switchAccount(event.target.value)}
+              className="rounded-lg border px-3 py-2 text-sm outline-none"
+              style={{
+                backgroundColor: theme.colors.bgPrimary,
+                borderColor: theme.colors.border,
+                color: theme.colors.textPrimary
+              }}
+            >
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} • {getAccountTypeLabel(account.type)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {/* Content Area */}
         < div className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8" >
           <div className="max-w-5xl mx-auto">
-
             {currentView === 'DASHBOARD' && (
               <Dashboard
                 transactions={transactions}
                 categories={categories}
+                budgets={normalizedBudgets}
+                showGettingStarted={!hasStarterData}
+                activeAccountName={activeAccount?.name || 'Akun Keuangan'}
+                telegramLinked={telegramLinked}
+                onGoToTransactions={() => setCurrentView('TRANSACTIONS')}
+                onGoToBudgets={() => setCurrentView('BUDGETS')}
+                onGoToSettings={() => setCurrentView('SETTINGS')}
+                onOpenOnboarding={openOnboarding}
               />
             )}
             {currentView === 'TRANSACTIONS' && (
@@ -751,19 +1407,41 @@ function App() {
                 onShowNotification={showNotification}
               />
             )}
-            {currentView === 'SIMULATION' && (
-              <SimulationManager
-                simulations={simulations}
+            {currentView === 'PLANS' && (
+              <PlanManager
+                plans={plans}
                 categories={categories}
                 currentBalance={currentBalance}
                 currentMonthBalance={currentMonthBalance}
-                onCreateSimulation={createSimulation}
-                onDeleteSimulation={deleteSimulation}
-                onAddSimulationItem={addSimulationItem}
-                onUpdateSimulationItem={updateSimulationItem}
-                onDeleteSimulationItem={deleteSimulationItem}
-                onApplyItemToReal={applySimulationItemToReal}
-                onUpdateSimulationSettings={updateSimulationSettings}
+                onCreatePlan={createPlan}
+                onDeletePlan={deletePlan}
+                onAddPlanItem={addPlanItem}
+                onUpdatePlanItem={updatePlanItem}
+                onDeletePlanItem={deletePlanItem}
+                onApplyPlanItemToTransaction={applyPlanItemToTransaction}
+                onUpdatePlanSettings={updatePlanSettings}
+                onUpdatePlanItemStatus={updatePlanItemStatus}
+              />
+            )}
+
+            {currentView === 'BUDGETS' && (
+              <BudgetManager
+                budgets={normalizedBudgets}
+                transactions={transactions}
+                categories={categories}
+                onSaveBudget={saveBudget}
+                onDeleteBudget={deleteBudget}
+                onCopyBudgetsFromPreviousMonth={copyBudgetsFromPreviousMonth}
+              />
+            )}
+
+            {currentView === 'DEBTS' && (
+              <DebtManager
+                debts={debts}
+                onSaveDebt={saveDebt}
+                onDeleteDebt={deleteDebt}
+                onRecordPayment={recordDebtPayment}
+                onMarkAsPaid={markDebtAsPaid}
               />
             )}
 
@@ -1194,6 +1872,15 @@ function App() {
 
             {currentView === 'SETTINGS' && (
               <Settings
+                accounts={accounts}
+                activeAccountId={activeAccountId}
+                activeAccountName={activeAccount?.name || null}
+                telegramLinked={telegramLinked}
+                telegramDefaultAccountId={telegramDefaultAccountId}
+                onOpenOnboarding={openOnboarding}
+                onUpdateTelegramAccount={updateTelegramDefaultAccount}
+                onCreateAccount={createAccount}
+                onSwitchAccount={switchAccount}
                 onDeleteAllTransactions={deleteAllTransactions}
                 transactionCount={transactions.length}
                 transactions={transactions}
@@ -1203,7 +1890,17 @@ function App() {
           </div>
         </div >
 
-        {/* Mobile Bottom Navigation Bar (5 Items + Center FAB Space) */}
+        <OnboardingModal
+          isOpen={showOnboarding}
+          accountName={activeAccount?.name || 'Akun Keuangan'}
+          telegramLinked={telegramLinked}
+          onClose={closeOnboarding}
+          onGoToTransactions={() => navigateFromOnboarding('TRANSACTIONS')}
+          onGoToBudgets={() => navigateFromOnboarding('BUDGETS')}
+          onGoToSettings={() => navigateFromOnboarding('SETTINGS')}
+        />
+
+        {/* Mobile Bottom Navigation Bar */}
         < nav
           className="md:hidden fixed bottom-0 left-0 right-0 flex justify-around items-center h-16 z-30 px-2 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]"
           style={{ backgroundColor: theme.colors.bgCard, borderTop: `1px solid ${theme.colors.border}` }}
@@ -1229,6 +1926,14 @@ function App() {
           <div className="w-14 flex-shrink-0"></div>
 
           <button
+            onClick={() => setCurrentView('BUDGETS')}
+            className="flex flex-col items-center justify-center flex-1 py-1"
+            style={{ color: currentView === 'BUDGETS' ? theme.colors.accent : theme.colors.textMuted }}
+          >
+            <IconDisplay name="PiggyBank" size={20} />
+            <span className="text-[9px] font-medium mt-0.5">Anggaran</span>
+          </button>
+          <button
             onClick={() => setCurrentView('CATEGORIES')}
             className="flex flex-col items-center justify-center flex-1 py-1"
             style={{ color: currentView === 'CATEGORIES' ? theme.colors.accent : theme.colors.textMuted }}
@@ -1237,12 +1942,12 @@ function App() {
             <span className="text-[9px] font-medium mt-0.5">Kategori</span>
           </button>
           <button
-            onClick={() => setCurrentView('SETTINGS')}
+            onClick={() => setCurrentView('DEBTS')}
             className="flex flex-col items-center justify-center flex-1 py-1"
-            style={{ color: currentView === 'SETTINGS' ? theme.colors.accent : theme.colors.textMuted }}
+            style={{ color: currentView === 'DEBTS' ? theme.colors.accent : theme.colors.textMuted }}
           >
-            <IconDisplay name="Settings" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Pengaturan</span>
+            <IconDisplay name="Handshake" size={20} />
+            <span className="text-[9px] font-medium mt-0.5">Hutang</span>
           </button>
         </nav >
 

@@ -2,22 +2,49 @@ import React, { useState } from 'react';
 import { useTheme, themes } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
 import { Toast } from './ConfirmDialog';
-import { Transaction, Category } from '../types';
+import { Transaction, Category, FinancialAccount, AccountType } from '../types';
 import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
 import { APP_VERSION, APP_BUILD_DATE } from '../constants';
+import { getAccountTypeLabel, sanitizeAccountNameForFilename } from '../utils/accountLabels';
 
 interface SettingsProps {
+    accounts: FinancialAccount[];
+    activeAccountId: string | null;
+    activeAccountName: string | null;
+    telegramLinked: boolean;
+    telegramDefaultAccountId: string | null;
+    onOpenOnboarding: () => void;
+    onUpdateTelegramAccount: (accountId: string) => Promise<void>;
+    onCreateAccount: (name: string, type: AccountType) => Promise<void>;
+    onSwitchAccount: (accountId: string) => Promise<void>;
     onDeleteAllTransactions: () => Promise<void>;
     transactionCount: number;
     transactions: Transaction[];
     categories: Category[];
 }
 
-const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactionCount, transactions, categories }) => {
+const Settings: React.FC<SettingsProps> = ({
+    accounts,
+    activeAccountId,
+    activeAccountName,
+    telegramLinked,
+    telegramDefaultAccountId,
+    onOpenOnboarding,
+    onUpdateTelegramAccount,
+    onCreateAccount,
+    onSwitchAccount,
+    onDeleteAllTransactions,
+    transactionCount,
+    transactions,
+    categories
+}) => {
     const { theme, isDark, toggleTheme } = useTheme();
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [newAccountName, setNewAccountName] = useState('');
+    const [newAccountType, setNewAccountType] = useState<AccountType>('PERSONAL');
+    const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
     // Toast state
     const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({
@@ -77,7 +104,10 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
                 transactions,
                 categories,
                 startDate,
-                endDate
+                endDate,
+                filename: activeAccountName
+                    ? `Transaksi_${sanitizeAccountNameForFilename(activeAccountName)}`
+                    : undefined
             });
 
             setToast({
@@ -101,6 +131,28 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
         }
     };
 
+    const handleCreateAccount = async () => {
+        if (!newAccountName.trim()) {
+            setToast({ show: true, message: 'Isi nama Akun Keuangan terlebih dahulu.', type: 'info' });
+            return;
+        }
+
+        setIsCreatingAccount(true);
+        try {
+            await onCreateAccount(newAccountName, newAccountType);
+            setNewAccountName('');
+            setNewAccountType('PERSONAL');
+        } catch (error) {
+            console.error('Error creating account:', error);
+            setToast({ show: true, message: 'Gagal membuat Akun Keuangan. Silakan coba lagi.', type: 'error' });
+        } finally {
+            setIsCreatingAccount(false);
+        }
+    };
+
+    const activeAccount = accounts.find((account) => account.id === activeAccountId) || null;
+    const telegramAccount = accounts.find((account) => account.id === telegramDefaultAccountId) || null;
+
     return (
         <div className="space-y-6 pb-20 md:pb-0">
             <h2
@@ -109,6 +161,229 @@ const Settings: React.FC<SettingsProps> = ({ onDeleteAllTransactions, transactio
             >
                 Pengaturan
             </h2>
+
+            <div
+                className="rounded-xl border p-6"
+                style={{
+                    backgroundColor: theme.colors.bgCard,
+                    borderColor: theme.colors.border
+                }}
+            >
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3
+                            className="font-semibold text-lg"
+                            style={{ color: theme.colors.textPrimary }}
+                        >
+                            Akun Keuangan
+                        </h3>
+                        <p
+                            className="text-sm mt-1"
+                            style={{ color: theme.colors.textSecondary }}
+                        >
+                            Pisahkan transaksi untuk kebutuhan pribadi, keluarga, bisnis, atau keuangan bersama.
+                        </p>
+                    </div>
+                    <div
+                        className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                        style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
+                    >
+                        Aktif: {activeAccount?.name || '-'}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 mt-5">
+                    <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
+                            Ganti Akun
+                        </label>
+                        <select
+                            value={activeAccountId || ''}
+                            onChange={(event) => onSwitchAccount(event.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border outline-none"
+                            style={{
+                                backgroundColor: theme.colors.bgPrimary,
+                                borderColor: theme.colors.border,
+                                color: theme.colors.textPrimary
+                            }}
+                        >
+                            {accounts.map((account) => (
+                                <option key={account.id} value={account.id}>
+                                    {account.name} • {getAccountTypeLabel(account.type)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div
+                        className="rounded-xl border p-4"
+                        style={{
+                            backgroundColor: theme.colors.bgHover,
+                            borderColor: theme.colors.border
+                        }}
+                    >
+                        <p className="text-xs uppercase font-semibold mb-1" style={{ color: theme.colors.textMuted }}>
+                            Total Akun
+                        </p>
+                        <p className="text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>
+                            {accounts.length}
+                        </p>
+                        {activeAccount && (
+                            <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
+                                Tipe aktif: {getAccountTypeLabel(activeAccount.type)}
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_auto] gap-3 mt-5">
+                    <input
+                        type="text"
+                        value={newAccountName}
+                        onChange={(event) => setNewAccountName(event.target.value)}
+                        placeholder="Nama Akun Keuangan baru"
+                        className="px-4 py-3 rounded-xl border outline-none"
+                        style={{
+                            backgroundColor: theme.colors.bgPrimary,
+                            borderColor: theme.colors.border,
+                            color: theme.colors.textPrimary
+                        }}
+                    />
+                    <select
+                        value={newAccountType}
+                        onChange={(event) => setNewAccountType(event.target.value as AccountType)}
+                        className="px-4 py-3 rounded-xl border outline-none"
+                        style={{
+                            backgroundColor: theme.colors.bgPrimary,
+                            borderColor: theme.colors.border,
+                            color: theme.colors.textPrimary
+                        }}
+                    >
+                        <option value="PERSONAL">{getAccountTypeLabel('PERSONAL')}</option>
+                        <option value="FAMILY">{getAccountTypeLabel('FAMILY')}</option>
+                        <option value="BUSINESS">{getAccountTypeLabel('BUSINESS')}</option>
+                        <option value="SHARED">{getAccountTypeLabel('SHARED')}</option>
+                    </select>
+                    <button
+                        onClick={handleCreateAccount}
+                        disabled={isCreatingAccount}
+                        className="px-5 py-3 rounded-xl text-white font-medium disabled:opacity-60"
+                        style={{ backgroundColor: theme.colors.accent }}
+                    >
+                        {isCreatingAccount ? 'Membuat...' : 'Tambah Akun'}
+                    </button>
+                </div>
+            </div>
+
+            <div
+                className="rounded-xl border p-6"
+                style={{
+                    backgroundColor: theme.colors.bgCard,
+                    borderColor: theme.colors.border
+                }}
+            >
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
+                            Akun Keuangan Telegram
+                        </h3>
+                        <p className="text-sm mt-1" style={{ color: theme.colors.textSecondary }}>
+                            Bot Telegram akan membaca dan mencatat transaksi ke akun ini secara default.
+                        </p>
+                    </div>
+                    <div
+                        className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                        style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
+                    >
+                        {telegramAccount?.name || 'Belum terhubung'}
+                    </div>
+                </div>
+
+                <div className="mt-5">
+                    <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
+                        Pilih akun Telegram
+                    </label>
+                    <select
+                        value={telegramDefaultAccountId || accounts[0]?.id || ''}
+                        onChange={(event) => onUpdateTelegramAccount(event.target.value)}
+                        disabled={!telegramLinked || accounts.length <= 1}
+                        className="w-full px-4 py-3 rounded-xl border outline-none disabled:opacity-60"
+                        style={{
+                            backgroundColor: theme.colors.bgPrimary,
+                            borderColor: theme.colors.border,
+                            color: theme.colors.textPrimary
+                        }}
+                    >
+                        {accounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                                {account.name} • {getAccountTypeLabel(account.type)}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
+                        {!telegramLinked
+                            ? 'Hubungkan Telegram terlebih dahulu agar akun default bot bisa diatur.'
+                            : accounts.length <= 1
+                            ? 'Anda baru punya 1 akun, jadi Telegram akan selalu memakai akun ini.'
+                            : 'Bisa juga diganti langsung dari Telegram dengan command /akun.'}
+                    </p>
+                </div>
+            </div>
+
+            <div
+                className="rounded-xl border p-6"
+                style={{
+                    backgroundColor: theme.colors.bgCard,
+                    borderColor: theme.colors.border
+                }}
+            >
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="max-w-2xl">
+                        <h3 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
+                            Panduan Singkat
+                        </h3>
+                        <p className="text-sm mt-1 leading-6" style={{ color: theme.colors.textSecondary }}>
+                            Cocok untuk user baru atau saat ingin mengingat lagi contoh input yang bisa dipakai di Telegram dan input natural.
+                        </p>
+                    </div>
+                    <button
+                        onClick={onOpenOnboarding}
+                        className="px-5 py-3 rounded-xl font-medium text-white"
+                        style={{ backgroundColor: theme.colors.accent }}
+                    >
+                        Buka Panduan
+                    </button>
+                </div>
+
+                <div className="grid gap-3 mt-5 md:grid-cols-3">
+                    {[
+                        {
+                            title: 'Contoh input transaksi',
+                            value: 'makan siang 25rb',
+                        },
+                        {
+                            title: 'Contoh input banyak transaksi',
+                            value: 'kopi 18rb, parkir 5rb',
+                        },
+                        {
+                            title: 'Contoh input anggaran',
+                            value: 'bulan ini jatah makan 2 juta',
+                        }
+                    ].map((item) => (
+                        <div
+                            key={item.title}
+                            className="rounded-xl border p-4"
+                            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
+                        >
+                            <p className="text-xs uppercase font-semibold tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
+                                {item.title}
+                            </p>
+                            <p className="mt-3 text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
+                                {item.value}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
             {/* Theme Section - Simple Toggle */}
             <div
