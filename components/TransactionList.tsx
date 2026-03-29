@@ -21,6 +21,18 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemAvatar from '@mui/material/ListItemAvatar';
+import Avatar from '@mui/material/Avatar';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import ListSubheader from '@mui/material/ListSubheader';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -383,40 +395,21 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
         {showFilters && (
           <Paper variant="outlined" sx={{ p: 2.5, mb: 2, borderRadius: 3 }}>
             {/* Filter Mode Tabs */}
-            <Box sx={{ display: 'flex', p: 0.5, borderRadius: 2, bgcolor: 'action.hover', mb: 2 }}>
-              {[
-                { mode: 'month' as FilterMode, label: 'Per Bulan', icon: 'Calendar' },
-                { mode: 'range' as FilterMode, label: 'Rentang Tanggal', icon: 'CalendarDays' },
-              ].map((tab) => (
-                <Box
-                  key={tab.mode}
-                  component="button"
-                  onClick={() => setFilterMode(tab.mode)}
-                  sx={{
-                    flex: 1,
-                    py: 1,
-                    px: 1.5,
-                    border: 'none',
-                    borderRadius: 1.5,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 1,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    fontFamily: 'inherit',
-                    transition: 'all 0.15s',
-                    bgcolor: filterMode === tab.mode ? 'background.paper' : 'transparent',
-                    color: filterMode === tab.mode ? 'primary.main' : 'text.secondary',
-                    boxShadow: filterMode === tab.mode ? 1 : 0,
-                  }}
-                >
-                  <IconDisplay name={tab.icon} size={16} />
-                  {tab.label}
-                </Box>
-              ))}
-            </Box>
+            <Tabs 
+              value={filterMode} 
+              onChange={(_, newValue) => setFilterMode(newValue)}
+              variant="fullWidth"
+              sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600 } }}
+            >
+              <Tab 
+                value="month" 
+                label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><IconDisplay name="Calendar" size={16} /> Per Bulan</Box>} 
+              />
+              <Tab 
+                value="range" 
+                label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><IconDisplay name="CalendarDays" size={16} /> Rentang Tanggal</Box>} 
+              />
+            </Tabs>
 
             {/* Month Selector */}
             {filterMode === 'month' && (
@@ -554,43 +547,43 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                 sx={{ flex: 1 }}
               />
 
-              {/* Type Filter */}
-              <Box sx={{ display: 'flex', p: 0.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', flexShrink: 0 }}>
-                {[
-                  { value: 'all' as const, label: 'Semua', icon: null },
-                  { value: 'EXPENSE' as const, label: 'Keluar', icon: 'TrendingDown' },
-                  { value: 'INCOME' as const, label: 'Masuk', icon: 'TrendingUp' },
-                ].map((typeOption) => (
-                  <Box
-                    key={typeOption.value}
-                    component="button"
-                    onClick={() => setSelectedType(typeOption.value)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      px: 1.5,
-                      py: 0.75,
-                      border: 'none',
-                      borderRadius: 1.5,
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      fontFamily: 'inherit',
-                      transition: 'all 0.15s',
-                      bgcolor: selectedType === typeOption.value
-                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expenseBg : typeOption.value === 'INCOME' ? theme.colors.incomeBg : 'action.selected')
-                        : 'transparent',
-                      color: selectedType === typeOption.value
-                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expense : typeOption.value === 'INCOME' ? theme.colors.income : 'primary.main')
-                        : 'text.secondary',
-                    }}
-                  >
-                    {typeOption.icon && <IconDisplay name={typeOption.icon} size={14} />}
-                    {typeOption.label}
-                  </Box>
-                ))}
-              </Box>
+              {/* Type Filter Tabs */}
+              <Tabs
+                value={selectedType}
+                onChange={(_, newValue) => setSelectedType(newValue)}
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{ 
+                  flexShrink: 0, 
+                  minHeight: 40,
+                  bgcolor: 'action.hover',
+                  borderRadius: 2,
+                  p: 0.5,
+                  '& .MuiTabs-indicator': { display: 'none' },
+                  '& .MuiTab-root': { 
+                    minHeight: 32, 
+                    py: 0.5, 
+                    px: 2, 
+                    borderRadius: 1.5,
+                    textTransform: 'none', 
+                    fontWeight: 600,
+                    fontSize: 13,
+                    minWidth: 'auto',
+                    color: 'text.secondary',
+                    '&.Mui-selected': {
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                    }
+                  },
+                  '& .MuiTab-root.Mui-selected[value="EXPENSE"]': { color: theme.colors.expense },
+                  '& .MuiTab-root.Mui-selected[value="INCOME"]': { color: theme.colors.income },
+                  '& .MuiTab-root.Mui-selected[value="all"]': { color: 'primary.main' },
+                }}
+              >
+                <Tab value="all" label="Semua" />
+                <Tab value="EXPENSE" label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><IconDisplay name="TrendingDown" size={14} /> Keluar</Box>} />
+                <Tab value="INCOME" label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><IconDisplay name="TrendingUp" size={14} /> Masuk</Box>} />
+              </Tabs>
 
               {/* Category Filter */}
               <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
@@ -668,164 +661,147 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
 
         {/* Empty State */}
         {filteredTransactions.length === 0 && (
-          <Paper variant="outlined" sx={{ py: 8, borderRadius: 3, textAlign: 'center' }}>
+          <Card variant="outlined" sx={{ py: 8, borderRadius: 4, textAlign: 'center', mb: 2 }}>
             <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
               <IconDisplay name="Search" size={32} style={{ color: 'var(--text-muted)' }} />
             </Box>
-            <Typography fontWeight={600} color="text.secondary">Tidak ada transaksi ditemukan</Typography>
-            <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5, px: 4 }}>
+            <Typography variant="h6" fontWeight={700} color="text.secondary">Tidak ada transaksi ditemukan</Typography>
+            <Typography variant="body2" color="text.disabled" sx={{ mt: 1, px: 4 }}>
               {hasActiveFilters
-                ? 'Coba ubah filter atau kata kunci pencarian'
-                : 'Coba ubah filter tanggal'}
+                ? 'Coba ubah filter atau menghapus kata kunci pencarian'
+                : 'Belum ada transaksi di rentang waktu ini.'}
             </Typography>
-          </Paper>
+          </Card>
         )}
 
         {/* Transactions grouped by date */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {Object.entries(groupedTransactions).map(([date, txs]) => {
-            const transactionsForDate = txs as Transaction[];
-            const { dayDate, dayName, monthYear } = getDateParts(date);
-            const dailyTotal = calculateDailyTotal(transactionsForDate);
+        {filteredTransactions.length > 0 && (
+          <Card variant="outlined" sx={{ borderRadius: 4, overflow: 'hidden', mb: 2 }}>
+            <List disablePadding sx={{ bgcolor: 'background.paper' }}>
+              {Object.entries(groupedTransactions).map(([date, txs], groupIdx) => {
+                const transactionsForDate = txs as Transaction[];
+                const { dayDate, dayName, monthYear } = getDateParts(date);
+                const dailyTotal = calculateDailyTotal(transactionsForDate);
 
-            return (
-              <Paper key={date} variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                {/* Date Header */}
-                <Box
-                  sx={{
-                    px: 2,
-                    py: 1.5,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    bgcolor: 'action.hover',
-                    borderBottom: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Typography sx={{ fontSize: 28, fontWeight: 300, lineHeight: 1, letterSpacing: '-1px' }}>
-                      {dayDate}
-                    </Typography>
-                    <Box>
-                      <Typography variant="body2" fontWeight={700}>{dayName}</Typography>
-                      <Typography variant="caption" color="text.secondary">{monthYear}</Typography>
-                    </Box>
-                  </Box>
-                  <Chip
-                    label={`${dailyTotal > 0 ? '+' : ''}${formatRp(dailyTotal)}`}
-                    size="small"
-                    sx={{
-                      bgcolor: dailyTotal >= 0 ? theme.colors.incomeBg : theme.colors.expenseBg,
-                      color: dailyTotal >= 0 ? theme.colors.income : theme.colors.expense,
-                      fontWeight: 700,
-                      height: 24,
-                      fontSize: 12,
-                    }}
-                  />
-                </Box>
-
-                {/* Transaction rows */}
-                {transactionsForDate.map((t, idx) => {
-                  const cat = categories.find(c => c.id === t.categoryId);
-                  const isIncome = cat?.type === 'INCOME';
-                  const attachmentData = t.attachmentUrl
-                    ? { url: t.attachmentUrl, name: t.attachmentName || 'Lampiran', type: t.attachmentType || 'image' as 'image' | 'pdf' }
-                    : t.attachment
-                    ? { url: t.attachment.url, name: t.attachment.name, type: t.attachment.type }
-                    : null;
-
-                  return (
-                    <React.Fragment key={t.id}>
-                      {idx > 0 && <Divider />}
-                      <Box
-                        sx={{
-                          px: 2,
-                          py: 1.5,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 2,
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          transition: 'all 0.3s ease',
-                          transform: longPressedId === t.id ? 'scale(0.97)' : 'scale(1)',
-                          opacity: longPressedId === t.id ? 0.7 : 1,
-                          bgcolor: longPressedId === t.id ? theme.colors.accentLight : 'transparent',
-                          '&:hover': { bgcolor: 'action.hover' },
-                        }}
-                        onTouchStart={() => handleTouchStart(t)}
-                        onTouchEnd={handleTouchEnd}
-                        onTouchMove={handleTouchEnd}
-                        onMouseDown={() => handleTouchStart(t)}
-                        onMouseUp={handleTouchEnd}
-                        onMouseLeave={handleTouchEnd}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden', flex: 1 }}>
-                          {/* Category icon */}
-                          <Box
-                            sx={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: '50%',
-                              bgcolor: cat?.color || '#9ca3af',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              boxShadow: 1,
-                            }}
-                          >
-                            <IconDisplay name={cat?.icon || 'HelpCircle'} size={18} style={{ color: '#fff' }} />
-                          </Box>
-
-                          {/* Text */}
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                              {cat?.name || 'Kategori Dihapus'}
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                              <Typography variant="caption" color="text.secondary" noWrap>
-                                {t.description || 'Tidak ada catatan'}
-                              </Typography>
-                              {attachmentData && (
-                                <Chip
-                                  size="small"
-                                  icon={<IconDisplay name={attachmentData.type === 'image' ? 'Image' : 'FileText'} size={10} />}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setViewingAttachment(attachmentData);
-                                  }}
-                                  sx={{
-                                    height: 18,
-                                    fontSize: 10,
-                                    cursor: 'pointer',
-                                    color: attachmentData.type === 'image' ? '#10b981' : '#f59e0b',
-                                    bgcolor: attachmentData.type === 'image' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                                    '& .MuiChip-label': { px: 0.75 },
-                                  }}
-                                />
-                              )}
-                            </Box>
-                          </Box>
-                        </Box>
-
-                        {/* Amount */}
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          sx={{ color: isIncome ? theme.colors.income : theme.colors.expense, flexShrink: 0, whiteSpace: 'nowrap' }}
-                        >
-                          {isIncome ? '+' : '-'}{formatRp(t.amount)}
+                return (
+                  <React.Fragment key={date}>
+                    {groupIdx > 0 && <Divider component="li" sx={{ borderBottomWidth: 4, borderColor: 'action.hover' }} />}
+                    <ListSubheader 
+                      component="li"
+                      disableSticky
+                      sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        bgcolor: 'background.paper',
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        px: { xs: 2.5, md: 3 },
+                        py: 2,
+                        lineHeight: 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography sx={{ fontSize: 32, fontWeight: 300, lineHeight: 1, letterSpacing: '-1px', color: 'text.primary' }}>
+                          {dayDate}
                         </Typography>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={700} color="text.primary" lineHeight={1.2}>{dayName}</Typography>
+                          <Typography variant="caption" color="text.secondary" fontWeight={500}>{monthYear}</Typography>
+                        </Box>
                       </Box>
-                    </React.Fragment>
-                  );
-                })}
-              </Paper>
-            );
-          })}
-        </Box>
+                      <Chip
+                        label={`${dailyTotal > 0 ? '+' : ''}${formatRp(dailyTotal)}`}
+                        size="small"
+                        sx={{
+                          bgcolor: dailyTotal >= 0 ? theme.colors.incomeBg : theme.colors.expenseBg,
+                          color: dailyTotal >= 0 ? theme.colors.income : theme.colors.expense,
+                          fontWeight: 700,
+                          height: 28,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </ListSubheader>
+
+                    {transactionsForDate.map((t, idx, arr) => {
+                      const cat = categories.find(c => c.id === t.categoryId);
+                      const isIncome = cat?.type === 'INCOME';
+                      const attachmentData = t.attachmentUrl
+                        ? { url: t.attachmentUrl, name: t.attachmentName || 'Lampiran', type: t.attachmentType || 'image' as 'image' | 'pdf' }
+                        : t.attachment
+                        ? { url: t.attachment.url, name: t.attachment.name, type: t.attachment.type }
+                        : null;
+
+                      return (
+                        <React.Fragment key={t.id}>
+                          <ListItemButton 
+                            sx={{ 
+                              py: 2, 
+                              px: { xs: 2.5, md: 3 },
+                              transition: 'all 0.2s',
+                              transform: longPressedId === t.id ? 'scale(0.98)' : 'none',
+                              opacity: longPressedId === t.id ? 0.7 : 1,
+                              bgcolor: longPressedId === t.id ? theme.colors.accentLight : 'transparent',
+                            }}
+                            onTouchStart={() => handleTouchStart(t)}
+                            onTouchEnd={handleTouchEnd}
+                            onTouchMove={handleTouchEnd}
+                            onMouseDown={() => handleTouchStart(t)}
+                            onMouseUp={handleTouchEnd}
+                            onMouseLeave={handleTouchEnd}
+                          >
+                            <ListItemAvatar>
+                              <Avatar sx={{ bgcolor: cat?.color || theme.colors.bgHover, width: 44, height: 44 }}>
+                                <IconDisplay name={cat?.icon || 'HelpCircle'} size={22} style={{ color: '#fff' }} />
+                              </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText 
+                              primary={<Typography variant="subtitle1" fontWeight={700} noWrap>{cat?.name || 'Kategori Dihapus'}</Typography>}
+                              secondary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                  <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 200 }}>
+                                    {t.description || 'Tidak ada catatan'}
+                                  </Typography>
+                                  {attachmentData && (
+                                    <Chip
+                                      size="small"
+                                      icon={<IconDisplay name={attachmentData.type === 'image' ? 'Image' : 'FileText'} size={12} />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setViewingAttachment(attachmentData);
+                                      }}
+                                      sx={{
+                                        height: 20,
+                                        fontSize: 10,
+                                        cursor: 'pointer',
+                                        color: attachmentData.type === 'image' ? theme.colors.income : theme.colors.accent,
+                                        bgcolor: attachmentData.type === 'image' ? theme.colors.incomeBg : theme.colors.accentLight,
+                                        '& .MuiChip-label': { px: 1 },
+                                      }}
+                                    />
+                                  )}
+                                </Box>
+                              }
+                              sx={{ m: 0, pr: 2 }}
+                            />
+                            <Typography
+                              variant="subtitle1"
+                              fontWeight={700}
+                              sx={{ color: isIncome ? theme.colors.income : theme.colors.textPrimary, flexShrink: 0, whiteSpace: 'nowrap' }}
+                            >
+                              {isIncome ? '+' : '-'}{formatRp(t.amount)}
+                            </Typography>
+                          </ListItemButton>
+                          {idx < arr.length - 1 && <Divider component="li" variant="inset" />}
+                        </React.Fragment>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </List>
+          </Card>
+        )}
       </Box>
 
       {/* Edit Modal */}

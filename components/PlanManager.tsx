@@ -20,8 +20,9 @@ import InputLabel from '@mui/material/InputLabel';
 import InputAdornment from '@mui/material/InputAdornment';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
-
 interface PlanManagerProps {
     plans: Plan[];
     categories: Category[];
@@ -718,29 +719,29 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                 </Box>
 
                 {/* Create plan form */}
-                <Paper
+                <Card
                     variant="outlined"
-                    component="form"
-                    onSubmit={handleCreate}
-                    sx={{ p: 2, borderRadius: 3, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 3 }}
+                    sx={{ p: 2.5, borderRadius: 4, mb: 3 }}
                 >
-                    <TextField
-                        size="small"
-                        fullWidth
-                        placeholder="Judul rencana baru (mis: Liburan Bali)"
-                        value={newPlanTitle}
-                        onChange={(e) => setNewPlanTitle(e.target.value)}
-                        sx={{ flex: 1 }}
-                    />
-                    <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={!newPlanTitle.trim()}
-                        sx={{ borderRadius: 2, fontWeight: 700, px: 4, flexShrink: 0 }}
-                    >
-                        Buat Rencana
-                    </Button>
-                </Paper>
+                    <Box component="form" onSubmit={handleCreate} sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Judul rencana baru (mis: Liburan Bali)"
+                            value={newPlanTitle}
+                            onChange={(e) => setNewPlanTitle(e.target.value)}
+                            sx={{ flex: 1 }}
+                        />
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={!newPlanTitle.trim()}
+                            sx={{ borderRadius: 2, fontWeight: 700, px: 4, flexShrink: 0 }}
+                        >
+                            Buat Rencana
+                        </Button>
+                    </Box>
+                </Card>
 
                 {/* Plans grid */}
                 <Grid container spacing={2}>
@@ -763,60 +764,56 @@ const PlanManager: React.FC<PlanManagerProps> = ({
 
                             return (
                                 <Grid size={{ xs: 12, md: 6 }} key={plan.id}>
-                                    <Paper
+                                    <Card
                                         variant="outlined"
-                                        onClick={() => setActivePlanId(plan.id)}
                                         sx={{
-                                            p: 2.5,
-                                            borderRadius: 3,
-                                            cursor: 'pointer',
+                                            borderRadius: 4,
                                             position: 'relative',
                                             overflow: 'hidden',
-                                            transition: 'box-shadow 0.15s',
+                                            transition: 'box-shadow 0.2s',
                                             '&:hover': { boxShadow: 3 },
                                         }}
                                     >
-                                        {/* Accent bar */}
-                                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', bgcolor: theme.colors.accent }} />
-
-                                        <Box sx={{ pl: 1.5 }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                                                <Box sx={{ flex: 1, pr: 1 }}>
-                                                    <Typography variant="h6" fontWeight={700} gutterBottom sx={{ lineHeight: 1.3 }}>
-                                                        {plan.title}
-                                                    </Typography>
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                                        {useMonthBalance && (
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: theme.colors.accent }}>
-                                                                <IconDisplay name="Calendar" size={12} />
-                                                                <Typography variant="caption" fontWeight={600}>Saldo bulan ini</Typography>
-                                                            </Box>
-                                                        )}
-                                                        <Chip size="small" label={`${plannedItems.length} aktif`} sx={{ height: 20, fontSize: 11 }} />
-                                                        {doneCount > 0 && (
-                                                            <Chip
-                                                                size="small"
-                                                                label={`${doneCount} selesai`}
-                                                                sx={{ height: 20, fontSize: 11, bgcolor: theme.colors.incomeBg, color: theme.colors.income }}
-                                                            />
-                                                        )}
-                                                    </Box>
+                                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', bgcolor: theme.colors.accent, zIndex: 1 }} />
+                                        
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', p: 2, pb: 0, pl: 3 }}>
+                                            <Box sx={{ cursor: 'pointer', flex: 1 }} onClick={() => setActivePlanId(plan.id)}>
+                                                <Typography variant="h6" fontWeight={700} gutterBottom sx={{ lineHeight: 1.3 }}>
+                                                    {plan.title}
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                    {useMonthBalance && (
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: theme.colors.accent }}>
+                                                            <IconDisplay name="Calendar" size={12} />
+                                                            <Typography variant="caption" fontWeight={600}>Saldo bulan ini</Typography>
+                                                        </Box>
+                                                    )}
+                                                    <Chip size="small" label={`${plannedItems.length} aktif`} sx={{ height: 20, fontSize: 11 }} />
+                                                    {doneCount > 0 && (
+                                                        <Chip
+                                                            size="small"
+                                                            label={`${doneCount} selesai`}
+                                                            sx={{ height: 20, fontSize: 11, bgcolor: theme.colors.incomeBg, color: theme.colors.income }}
+                                                        />
+                                                    )}
                                                 </Box>
-                                                <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setDeleteTarget({ type: 'plan', planId: plan.id, title: plan.title });
-                                                    }}
-                                                    title="Hapus rencana"
-                                                >
-                                                    <IconDisplay name="Trash2" size={16} />
-                                                </IconButton>
                                             </Box>
-
-                                            <Divider sx={{ my: 1.5 }} />
-
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDeleteTarget({ type: 'plan', planId: plan.id, title: plan.title });
+                                                }}
+                                                title="Hapus rencana"
+                                                sx={{ ml: 1, zIndex: 2 }}
+                                            >
+                                                <IconDisplay name="Trash2" size={16} />
+                                            </IconButton>
+                                        </Box>
+                                        
+                                        <Box sx={{ p: 2, pt: 1.5, pl: 3, cursor: 'pointer' }} onClick={() => setActivePlanId(plan.id)}>
+                                            <Divider sx={{ mb: 1.5 }} />
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                                                 <Chip size="small" label={`${plan.items.length} item`} sx={{ height: 22 }} />
                                                 <Box sx={{ textAlign: 'right' }}>
@@ -824,12 +821,12 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                         Efek Rencana Aktif
                                                     </Typography>
                                                     <Typography variant="h6" fontWeight={700} sx={{ color: total >= 0 ? theme.colors.income : theme.colors.expense }}>
-                                                        {total > 0 ? '+' : ''}{formatRp(total)}
+                                                        {total >= 0 ? '+' : ''}{formatRp(total)}
                                                     </Typography>
                                                 </Box>
                                             </Box>
                                         </Box>
-                                    </Paper>
+                                    </Card>
                                 </Grid>
                             );
                         })

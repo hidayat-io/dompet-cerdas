@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DialogTitle from '@mui/material/DialogTitle';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
@@ -27,7 +28,7 @@ interface CategoryFormModalProps {
     categories: Category[];
     defaultType?: TransactionType;
     onClose: () => void;
-    onSave: (category: Omit<Category, 'id'>) => void | Promise<void>;
+    onSave: (category: Omit<Category, 'id'>) => void | Promise<any>;
     onUpdate?: (id: string, category: Omit<Category, 'id'>) => void;
 }
 
@@ -38,47 +39,59 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     defaultType = 'EXPENSE',
     onClose,
     onSave,
-    onUpdate
+    onUpdate,
 }) => {
     const { theme } = useTheme();
-    const [newCatName, setNewCatName] = useState('');
+    const [name, setName] = useState('');
     const [newCatType, setNewCatType] = useState<TransactionType>(defaultType);
-    const [newCatIcon, setNewCatIcon] = useState<IconName>('Utensils');
-    const [newCatColor, setNewCatColor] = useState(COLORS[0]);
-    const [warning, setWarning] = useState<SimilarityResult | null>(null);
+    const [icon, setIcon] = useState<IconName>('HelpCircle');
+    const [color, setColor] = useState('#9ca3af');
     const [isSaving, setIsSaving] = useState(false);
+    const [warning, setWarning] = useState<SimilarityResult | null>(null);
 
     useEffect(() => {
-        if (editingCategory) {
-            setNewCatName(editingCategory.name);
-            setNewCatType(editingCategory.type);
-            setNewCatIcon(editingCategory.icon as IconName);
-            setNewCatColor(editingCategory.color);
-        } else {
-            setNewCatName('');
-            setNewCatType(defaultType);
-            setNewCatIcon(defaultType === 'EXPENSE' ? 'ShoppingBag' : 'Wallet');
-            setNewCatColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
+        if (isOpen) {
+            if (editingCategory) {
+                setName(editingCategory.name);
+                setNewCatType(editingCategory.type);
+                setIcon(editingCategory.icon as IconName);
+                setColor(editingCategory.color);
+            } else {
+                setName('');
+                setNewCatType(defaultType);
+                setIcon('HelpCircle');
+                setColor('#9ca3af');
+            }
+            setWarning(null);
+            setIsSaving(false);
         }
-    }, [editingCategory, defaultType, isOpen]);
+    }, [isOpen, editingCategory, defaultType]);
 
     const resetForm = () => {
-        setNewCatName('');
+        setName('');
         setNewCatType(defaultType);
-        setNewCatIcon('Utensils');
-        setNewCatColor(COLORS[0]);
+        setIcon('HelpCircle');
+        setColor('#9ca3af');
         setWarning(null);
         setIsSaving(false);
     };
 
-    const handleSubmit = async (forceSave = false) => {
-        if (!newCatName.trim() || isSaving) return;
+    const handleSubmit = async (e?: React.FormEvent | boolean, bypassWarning = false) => {
+        if (typeof e === 'boolean') {
+            bypassWarning = e;
+            e = undefined;
+        }
+        if (e) (e as React.FormEvent).preventDefault();
+        
+        const trimmedName = name.trim();
+        if (!trimmedName) return;
 
-        if (!forceSave && !editingCategory) {
+        if (!bypassWarning && (!editingCategory || editingCategory.name.toLowerCase() !== trimmedName.toLowerCase())) {
             const categoriesToCheck = editingCategory
-                ? categories.filter(c => c.id !== (editingCategory as Category).id)
+                ? categories.filter(c => c.id !== editingCategory.id)
                 : categories;
-            const validation = checkCategorySimilarity(newCatName, categoriesToCheck);
+            const validation = checkCategorySimilarity(trimmedName, categoriesToCheck);
+            
             if (validation.isSimilar) {
                 setWarning(validation);
                 return;
@@ -86,13 +99,11 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         }
 
         setIsSaving(true);
-        const categoryData = { name: newCatName, type: newCatType, icon: newCatIcon, color: newCatColor };
-
         try {
             if (editingCategory && onUpdate) {
-                onUpdate(editingCategory.id, categoryData);
+                await onUpdate(editingCategory.id, { name: trimmedName, type: newCatType, icon, color });
             } else {
-                await Promise.resolve(onSave(categoryData));
+                await onSave({ name: trimmedName, type: newCatType, icon, color });
             }
             resetForm();
             onClose();
@@ -121,8 +132,7 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
             PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
         >
-            {/* Header */}
-            <Box
+            <DialogTitle
                 sx={{
                     bgcolor: 'primary.main',
                     px: 3,
@@ -132,17 +142,17 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                     justifyContent: 'space-between',
                 }}
             >
-                <Typography variant="h6" fontWeight={600} color="#fff">
+                <Typography variant="h6" fontWeight={700} color="#fff">
                     {editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
                 </Typography>
                 <IconButton
                     onClick={handleClose}
                     size="small"
-                    sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
+                    sx={{ color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
                 >
-                    <IconDisplay name="X" size={18} />
+                    <IconDisplay name="X" size={20} />
                 </IconButton>
-            </Box>
+            </DialogTitle>
 
             {/* Warning Overlay */}
             {warning && (
@@ -203,8 +213,8 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                             label="Nama Kategori"
                             fullWidth
                             required
-                            value={newCatName}
-                            onChange={(e) => setNewCatName(e.target.value)}
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             disabled={isSaving}
                             placeholder="Contoh: Investasi"
                             autoFocus
@@ -242,24 +252,24 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                     }}
                 >
                     <Grid container spacing={0.75}>
-                        {AVAILABLE_ICONS.map(icon => (
-                            <Grid size="auto" key={icon}>
-                                <Tooltip title={icon} placement="top" arrow>
+                        {AVAILABLE_ICONS.map(i => (
+                            <Grid size="auto" key={i}>
+                                <Tooltip title={i} placement="top" arrow>
                                     <IconButton
                                         size="small"
-                                        onClick={() => setNewCatIcon(icon)}
+                                        onClick={() => setIcon(i)}
                                         sx={{
                                             width: 36,
                                             height: 36,
                                             borderRadius: 1.5,
                                             border: '1px solid',
-                                            borderColor: newCatIcon === icon ? 'primary.main' : 'divider',
-                                            bgcolor: newCatIcon === icon ? 'primary.main' : 'background.paper',
-                                            color: newCatIcon === icon ? '#fff' : 'text.disabled',
+                                            borderColor: icon === i ? 'primary.main' : 'divider',
+                                            bgcolor: icon === i ? 'primary.main' : 'background.paper',
+                                            color: icon === i ? '#fff' : 'text.disabled',
                                             '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
                                         }}
                                     >
-                                        <IconDisplay name={icon} size={18} />
+                                        <IconDisplay name={i} size={18} />
                                     </IconButton>
                                 </Tooltip>
                             </Grid>
@@ -270,25 +280,25 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 {/* Color Picker */}
                 <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>Pilih Warna</Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                    {COLORS.map(color => (
-                        <Tooltip key={color} title={color} placement="top" arrow>
+                    {COLORS.map(c => (
+                        <Tooltip key={c} title={c} placement="top" arrow>
                             <Box
                                 component="button"
-                                onClick={() => setNewCatColor(color)}
+                                onClick={() => setColor(c)}
                                 sx={{
                                     width: 28,
                                     height: 28,
                                     borderRadius: '50%',
-                                    bgcolor: color,
+                                    bgcolor: c,
                                     border: '2px solid',
-                                    borderColor: newCatColor === color ? 'text.primary' : 'transparent',
+                                    borderColor: color === c ? 'text.primary' : 'transparent',
                                     cursor: 'pointer',
-                                    transform: newCatColor === color ? 'scale(1.25)' : 'scale(1)',
+                                    transform: color === c ? 'scale(1.25)' : 'scale(1)',
                                     transition: 'transform 0.15s',
                                     '&:hover': { transform: 'scale(1.15)' },
-                                    boxShadow: newCatColor === color ? '0 0 0 2px #fff, 0 0 0 4px ' + color : 'none',
+                                    boxShadow: color === c ? '0 0 0 2px #fff, 0 0 0 4px ' + c : 'none',
                                 }}
-                                title={color}
+                                title={c}
                             />
                         </Tooltip>
                     ))}
@@ -310,11 +320,11 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                     <Typography variant="caption" fontWeight={600} textTransform="uppercase" color="text.disabled">
                         Preview:
                     </Typography>
-                    <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: newCatColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <IconDisplay name={newCatIcon} size={16} style={{ color: '#fff' }} />
+                    <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <IconDisplay name={icon} size={16} style={{ color: '#fff' }} />
                     </Box>
                     <Typography variant="body2" fontWeight={600}>
-                        {newCatName || 'Nama Kategori'}
+                        {name || 'Nama Kategori'}
                     </Typography>
                     <Chip
                         label={newCatType === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
@@ -330,8 +340,8 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 </Button>
                 <Button
                     variant="contained"
-                    disabled={!newCatName.trim() || isSaving}
-                    onClick={() => handleSubmit(false)}
+                    disabled={!name.trim() || isSaving}
+                    onClick={() => handleSubmit(undefined, false)}
                     startIcon={isSaving
                         ? <CircularProgress size={16} sx={{ color: '#fff' }} />
                         : <IconDisplay name={editingCategory ? 'Check' : 'Save'} size={18} style={{ color: '#fff' }} />

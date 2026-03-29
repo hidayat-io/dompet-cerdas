@@ -12,11 +12,24 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Grid from '@mui/material/Grid';
 import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import LinearProgress from '@mui/material/LinearProgress';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import InputAdornment from '@mui/material/InputAdornment';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardActionArea from '@mui/material/CardActionArea';
+import CardHeader from '@mui/material/CardHeader';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemAvatar from '@mui/material/ListItemAvatar';
+import Avatar from '@mui/material/Avatar';
+import Divider from '@mui/material/Divider';
 
 interface BudgetManagerProps {
     budgets: Budget[];
@@ -223,23 +236,23 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
             slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
             PaperProps={{ sx: { borderRadius: 3 } }}
         >
-            <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+            <DialogTitle sx={{ px: 3, pt: 3, pb: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
                 <Box>
                     <Typography variant="h6" fontWeight={700}>
                         {draft.budgetId ? 'Edit Anggaran' : 'Anggaran Baru'}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Pilih kategori yang memang ingin dipantau. Kategori yang sudah dipakai anggaran lain tidak akan muncul di sini.
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 400 }}>
+                        Pilih kategori yang ingin dipantau. Kategori yang sudah dipakai anggaran lain tidak akan muncul di sini.
                     </Typography>
                 </Box>
                 <IconButton size="small" onClick={resetForm} sx={{ flexShrink: 0 }}>
                     <IconDisplay name="X" size={18} />
                 </IconButton>
-            </Box>
+            </DialogTitle>
 
-            <DialogContent sx={{ px: 3, pb: 3, pt: 0 }}>
-                <Box component="form" onSubmit={handleSubmit}>
-                    <Grid container spacing={2} sx={{ mb: 3 }}>
+            <DialogContent sx={{ px: 3, pb: 3, pt: 1 }}>
+                <Box component="form" id="budget-form" onSubmit={handleSubmit}>
+                    <Grid container spacing={2} sx={{ mb: 3, pt: 1 }}>
                         <Grid size={{ xs: 12, md: 7 }}>
                             <TextField
                                 label="Nama Anggaran"
@@ -268,80 +281,82 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                         </Grid>
                     </Grid>
 
-                    <Typography variant="body2" fontWeight={600} sx={{ mb: 1.5 }}>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
                         {draft.budgetId ? 'Kategori dalam Anggaran' : 'Pilih Kategori'}
                     </Typography>
 
                     {availableCategories.length === 0 ? (
-                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, borderStyle: 'dashed', textAlign: 'center', mb: 3 }}>
+                        <Card variant="outlined" sx={{ p: 4, borderRadius: 3, borderStyle: 'dashed', textAlign: 'center', mb: 3 }}>
+                            <IconDisplay name="Info" size={24} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
                             <Typography variant="body2" color="text.secondary">
                                 Semua kategori pengeluaran di bulan ini sudah dipakai anggaran lain.
                             </Typography>
-                        </Paper>
+                        </Card>
                     ) : (
-                        <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                        <Grid container spacing={1.5}>
                             {availableCategories.map((category) => {
                                 const selected = draft.categoryIds.includes(category.id);
                                 return (
                                     <Grid size={{ xs: 6, md: 4 }} key={category.id}>
-                                        <Paper
-                                            variant="outlined"
+                                        <CardActionArea
                                             onClick={() => toggleCategory(category.id)}
                                             sx={{
-                                                p: 2,
                                                 borderRadius: 2,
-                                                cursor: 'pointer',
-                                                transition: 'all 0.15s',
                                                 bgcolor: selected ? theme.colors.accentLight : 'background.paper',
-                                                borderColor: selected ? theme.colors.accent : 'divider',
-                                                '&:hover': { boxShadow: 2 },
                                             }}
                                         >
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box
-                                                    sx={{
-                                                        width: 40,
-                                                        height: 40,
-                                                        borderRadius: '50%',
-                                                        bgcolor: category.color,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        flexShrink: 0,
-                                                    }}
-                                                >
-                                                    <IconDisplay name={category.icon} size={16} style={{ color: '#fff' }} />
+                                            <Card
+                                                variant="outlined"
+                                                sx={{
+                                                    p: 2,
+                                                    borderRadius: 2,
+                                                    bgcolor: 'transparent',
+                                                    borderColor: selected ? theme.colors.accent : 'divider',
+                                                    transition: 'all 0.2s',
+                                                }}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                    <Avatar
+                                                        sx={{
+                                                            width: 40,
+                                                            height: 40,
+                                                            bgcolor: category.color,
+                                                        }}
+                                                    >
+                                                        <IconDisplay name={category.icon} size={16} style={{ color: '#fff' }} />
+                                                    </Avatar>
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        <Typography variant="body2" fontWeight={600} noWrap>{category.name}</Typography>
+                                                        <Typography variant="caption" sx={{ color: selected ? theme.colors.accent : 'text.secondary', fontWeight: 600 }}>
+                                                            {selected ? 'Terpilih' : 'Pilih kategori'}
+                                                        </Typography>
+                                                    </Box>
                                                 </Box>
-                                                <Box sx={{ minWidth: 0 }}>
-                                                    <Typography variant="body2" fontWeight={600} noWrap>{category.name}</Typography>
-                                                    <Typography variant="caption" sx={{ color: selected ? theme.colors.accent : 'text.secondary' }}>
-                                                        {selected ? 'Dipilih' : 'Pilih kategori'}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-                                        </Paper>
+                                            </Card>
+                                        </CardActionArea>
                                     </Grid>
                                 );
                             })}
                         </Grid>
                     )}
-
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
-                        <Button variant="outlined" onClick={resetForm} sx={{ borderRadius: 2 }}>
-                            Batal
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={saving || !isFormValid}
-                            startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
-                            sx={{ borderRadius: 2, minWidth: 140 }}
-                        >
-                            {saving ? 'Menyimpan...' : draft.budgetId ? 'Update Anggaran' : 'Simpan Anggaran'}
-                        </Button>
-                    </Box>
                 </Box>
             </DialogContent>
+            
+            <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
+                <Button variant="outlined" onClick={resetForm} sx={{ borderRadius: 2, fontWeight: 600 }}>
+                    Batal
+                </Button>
+                <Button
+                    type="submit"
+                    form="budget-form"
+                    variant="contained"
+                    disabled={saving || !isFormValid}
+                    startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                    sx={{ borderRadius: 2, minWidth: 140, fontWeight: 600 }}
+                >
+                    {saving ? 'Menyimpan...' : draft.budgetId ? 'Update Anggaran' : 'Simpan Anggaran'}
+                </Button>
+            </DialogActions>
         </Dialog>
     );
 
@@ -380,137 +395,135 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                     Kembali ke Daftar Anggaran
                 </Button>
 
-                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
-                        <Box>
-                            <Typography variant="h5" fontWeight={700}>{activeSummary.budget.name}</Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                Menampilkan transaksi yang masuk ke anggaran ini di {getMonthLabel(selectedMonth)}.
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-                                {activeSummary.categories.map((category) => (
-                                    <Chip
-                                        key={category.id}
-                                        size="small"
-                                        icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: category.color, ml: 1 }} />}
-                                        label={category.name}
-                                        sx={{ height: 24 }}
-                                    />
-                                ))}
+                <Card variant="outlined" sx={{ borderRadius: 4, mb: 3 }}>
+                    <CardHeader
+                        title={<Typography variant="h5" fontWeight={700}>{activeSummary.budget.name}</Typography>}
+                        subheader={
+                            <Box>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    Menampilkan transaksi yang masuk ke anggaran ini di {getMonthLabel(selectedMonth)}.
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                                    {activeSummary.categories.map((category) => (
+                                        <Chip
+                                            key={category.id}
+                                            size="small"
+                                            icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: category.color, ml: 1 }} />}
+                                            label={category.name}
+                                            sx={{ height: 24, fontWeight: 500 }}
+                                        />
+                                    ))}
+                                </Box>
                             </Box>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
-                            <Button variant="outlined" size="small" onClick={() => openEditForm(activeSummary.budget)} sx={{ borderRadius: 2 }}>
-                                Edit
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                color="error"
-                                disabled={deletingBudgetId === activeSummary.budget.id}
-                                onClick={() => setBudgetToDelete(activeSummary.budget)}
-                                sx={{ borderRadius: 2 }}
-                            >
-                                {deletingBudgetId === activeSummary.budget.id ? 'Menghapus...' : 'Hapus'}
-                            </Button>
-                        </Box>
-                    </Box>
+                        }
+                        action={
+                            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, mt: 1, mr: 1 }}>
+                                <Button variant="outlined" size="small" onClick={() => openEditForm(activeSummary.budget)} sx={{ borderRadius: 2, fontWeight: 600 }}>
+                                    Edit
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    color="error"
+                                    disabled={deletingBudgetId === activeSummary.budget.id}
+                                    onClick={() => setBudgetToDelete(activeSummary.budget)}
+                                    sx={{ borderRadius: 2, fontWeight: 600 }}
+                                >
+                                    {deletingBudgetId === activeSummary.budget.id ? 'Loading...' : 'Hapus'}
+                                </Button>
+                            </Box>
+                        }
+                        sx={{ p: 3, pb: 2, alignItems: 'flex-start' }}
+                    />
+                    
+                    <CardContent sx={{ px: 3, pt: 0, pb: 3 }}>
+                        <Grid container spacing={2} sx={{ mb: 3 }}>
+                            {[
+                                { label: 'Batas Anggaran', value: formatRp(activeSummary.budget.limitAmount), color: 'text.primary' as const },
+                                { label: 'Sudah Terpakai', value: formatRp(activeTransactionsTotal), color: theme.colors.expense },
+                                { label: 'Sisa Anggaran', value: formatRp(activeSummary.remaining), color: activeSummary.remaining >= 0 ? theme.colors.income : theme.colors.expense },
+                                { label: 'Jumlah Transaksi', value: String(activeBudgetTransactions.length), color: 'text.primary' as const },
+                            ].map((stat) => (
+                                <Grid size={{ xs: 6, md: 3 }} key={stat.label}>
+                                    <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'action.hover' }}>
+                                        <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary" display="block">
+                                            {stat.label}
+                                        </Typography>
+                                        <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5, color: stat.color }}>
+                                            {stat.value}
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                            ))}
+                        </Grid>
 
-                    <Grid container spacing={2} sx={{ mb: 3 }}>
-                        {[
-                            { label: 'Batas Anggaran', value: formatRp(activeSummary.budget.limitAmount), color: 'text.primary' as const },
-                            { label: 'Sudah Terpakai', value: formatRp(activeTransactionsTotal), color: theme.colors.expense },
-                            { label: 'Sisa Anggaran', value: formatRp(activeSummary.remaining), color: activeSummary.remaining >= 0 ? theme.colors.income : theme.colors.expense },
-                            { label: 'Jumlah Transaksi', value: String(activeBudgetTransactions.length), color: 'text.primary' as const },
-                        ].map((stat) => (
-                            <Grid size={{ xs: 6, md: 3 }} key={stat.label}>
-                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
-                                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary" display="block">
-                                        {stat.label}
-                                    </Typography>
-                                    <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5, color: stat.color }}>
-                                        {stat.value}
-                                    </Typography>
-                                </Paper>
-                            </Grid>
-                        ))}
-                    </Grid>
-
-                    <Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="caption" color="text.secondary">
-                                {Math.min(activeSummary.percentage, 100).toFixed(0)}% terpakai
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                {activeSummary.isOverBudget ? 'Melebihi Anggaran' : 'Masih aman'}
-                            </Typography>
-                        </Box>
-                        <LinearProgress
-                            variant="determinate"
-                            value={Math.min(activeSummary.percentage, 100)}
-                            sx={{
-                                height: 8,
-                                borderRadius: 4,
-                                bgcolor: 'action.hover',
-                                '& .MuiLinearProgress-bar': {
-                                    bgcolor: activeSummary.isOverBudget ? theme.colors.expense : theme.colors.accent,
-                                    borderRadius: 4,
-                                },
-                            }}
-                        />
-                    </Box>
-                </Paper>
-
-                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                         <Box>
-                            <Typography variant="h6" fontWeight={700}>Transaksi dalam Anggaran</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Transaksi yang dihitung ke anggaran ini pada {getMonthLabel(selectedMonth)}.
-                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                                <Typography variant="caption" fontWeight={600} color="text.secondary">
+                                    {Math.min(activeSummary.percentage, 100).toFixed(0)}% terpakai
+                                </Typography>
+                                <Typography variant="caption" fontWeight={600} color="text.secondary">
+                                    {activeSummary.isOverBudget ? 'Melebihi Anggaran' : 'Masih aman'}
+                                </Typography>
+                            </Box>
+                            <LinearProgress
+                                variant="determinate"
+                                value={Math.min(activeSummary.percentage, 100)}
+                                sx={{
+                                    height: 10,
+                                    borderRadius: 5,
+                                    bgcolor: 'action.hover',
+                                    '& .MuiLinearProgress-bar': {
+                                        bgcolor: activeSummary.isOverBudget ? theme.colors.expense : theme.colors.accent,
+                                        borderRadius: 5,
+                                    },
+                                }}
+                            />
                         </Box>
-                        <Chip
-                            label={`${activeBudgetTransactions.length} transaksi`}
-                            size="small"
-                            sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600 }}
-                        />
-                    </Box>
+                    </CardContent>
+                </Card>
+
+                <Card variant="outlined" sx={{ borderRadius: 4 }}>
+                    <CardHeader 
+                        title={<Typography variant="h6" fontWeight={700}>Transaksi dalam Anggaran</Typography>}
+                        subheader={`Transaksi yang dihitung ke anggaran ini pada ${getMonthLabel(selectedMonth)}.`}
+                        action={
+                            <Chip
+                                label={`${activeBudgetTransactions.length} transaksi`}
+                                size="small"
+                                sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, mt: 1, mr: 1 }}
+                            />
+                        }
+                    />
 
                     {activeBudgetTransactions.length === 0 ? (
-                        <Paper variant="outlined" sx={{ p: 5, borderRadius: 2, borderStyle: 'dashed', textAlign: 'center' }}>
-                            <IconDisplay name="Receipt" size={36} style={{ color: 'rgba(0,0,0,0.2)', marginBottom: 12 }} />
-                            <Typography fontWeight={600} color="text.secondary">
+                        <CardContent sx={{ pt: 2, pb: 6, textAlign: 'center' }}>
+                            <IconDisplay name="Receipt" size={48} style={{ color: 'rgba(0,0,0,0.1)', marginBottom: 16 }} />
+                            <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
                                 Belum ada transaksi yang masuk ke anggaran ini.
                             </Typography>
-                            <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+                            <Typography variant="body2" color="text.disabled" sx={{ mt: 1, px: 4 }}>
                                 Tambah transaksi dengan kategori yang termasuk di anggaran ini agar progress-nya terisi.
                             </Typography>
-                        </Paper>
+                        </CardContent>
                     ) : (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            {activeBudgetTransactions.map(({ transaction, category }) => (
-                                <Paper key={transaction.id} variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-                                            <Box
-                                                sx={{
-                                                    width: 44,
-                                                    height: 44,
-                                                    borderRadius: '50%',
-                                                    bgcolor: category?.color || theme.colors.accent,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                <IconDisplay name={category?.icon || 'Receipt'} size={16} style={{ color: '#fff' }} />
-                                            </Box>
-                                            <Box sx={{ minWidth: 0 }}>
-                                                <Typography variant="body2" fontWeight={600} noWrap>
+                        <List disablePadding>
+                            {activeBudgetTransactions.map(({ transaction, category }, idx, arr) => (
+                                <React.Fragment key={transaction.id}>
+                                    <ListItem alignItems="flex-start" sx={{ px: 3, py: 2 }}>
+                                        <ListItemAvatar>
+                                            <Avatar sx={{ bgcolor: category?.color || theme.colors.accent, width: 44, height: 44 }}>
+                                                <IconDisplay name={category?.icon || 'Receipt'} size={22} style={{ color: '#fff' }} />
+                                            </Avatar>
+                                        </ListItemAvatar>
+                                        <ListItemText 
+                                            primary={
+                                                <Typography variant="subtitle2" fontWeight={700} noWrap>
                                                     {transaction.description || 'Tanpa deskripsi'}
                                                 </Typography>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                                            }
+                                            secondary={
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                                                     <Typography variant="caption" color="text.secondary">
                                                         {formatTransactionDate(transaction.date)}
                                                     </Typography>
@@ -519,17 +532,19 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                                                         {category?.name || 'Tanpa Kategori'}
                                                     </Typography>
                                                 </Box>
-                                            </Box>
-                                        </Box>
-                                        <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                            }
+                                            sx={{ my: 0, pr: 2 }}
+                                        />
+                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: theme.colors.expense, flexShrink: 0, whiteSpace: 'nowrap' }}>
                                             {formatRp(transaction.amount)}
                                         </Typography>
-                                    </Box>
-                                </Paper>
+                                    </ListItem>
+                                    {idx < arr.length - 1 && <Divider component="li" variant="inset" />}
+                                </React.Fragment>
                             ))}
-                        </Box>
+                        </List>
                     )}
-                </Paper>
+                </Card>
 
                 {budgetFormModal}
                 {deleteDialog}
@@ -611,7 +626,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                 ))}
             </Grid>
 
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+            <Card variant="outlined" sx={{ p: 3, borderRadius: 4 }}>
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h6" fontWeight={700}>Anggaran {getMonthLabel(selectedMonth)}</Typography>
@@ -626,7 +641,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                             disabled={copying || previousMonthBudgetCount === 0}
                             startIcon={copying ? <CircularProgress size={16} /> : undefined}
                             onClick={handleCopyPreviousMonth}
-                            sx={{ borderRadius: 2 }}
+                            sx={{ borderRadius: 2, fontWeight: 600 }}
                         >
                             {copying ? 'Menyalin...' : `Salin ${getMonthLabel(previousMonth)}`}
                         </Button>
@@ -635,7 +650,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                             variant="contained"
                             startIcon={<IconDisplay name="Plus" size={18} style={{ color: '#fff' }} />}
                             onClick={openCreateForm}
-                            sx={{ borderRadius: 2 }}
+                            sx={{ borderRadius: 2, fontWeight: 600 }}
                         >
                             Buat Anggaran
                         </Button>
@@ -643,118 +658,119 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                 </Box>
 
                 {summaries.length === 0 ? (
-                    <Paper variant="outlined" sx={{ p: 6, borderRadius: 2, borderStyle: 'dashed', textAlign: 'center' }}>
-                        <IconDisplay name="PiggyBank" size={40} style={{ color: 'rgba(0,0,0,0.2)', marginBottom: 12 }} />
-                        <Typography fontWeight={600} color="text.secondary">
+                    <Card variant="outlined" sx={{ p: 6, borderRadius: 3, borderStyle: 'dashed', textAlign: 'center' }}>
+                        <IconDisplay name="PiggyBank" size={40} style={{ color: 'rgba(0,0,0,0.15)', marginBottom: 12 }} />
+                        <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
                             Belum ada anggaran di {getMonthLabel(selectedMonth)}.
                         </Typography>
-                        <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+                        <Typography variant="body2" color="text.disabled" sx={{ mt: 1 }}>
                             Mulai dengan membuat anggaran untuk kategori yang memang ingin dipantau.
                         </Typography>
-                    </Paper>
+                    </Card>
                 ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {summaries.map((summary) => (
-                            <Paper
+                            <Card
                                 key={summary.budget.id}
                                 variant="outlined"
                                 sx={{
-                                    p: 2.5,
                                     borderRadius: 3,
                                     bgcolor: summary.isOverBudget ? theme.colors.expenseBg : 'action.hover',
                                     borderColor: summary.isOverBudget ? `${theme.colors.expense}44` : 'divider',
                                 }}
                             >
-                                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2 }}>
-                                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
-                                            <Typography variant="h6" fontWeight={700}>{summary.budget.name}</Typography>
-                                            <Chip
-                                                size="small"
-                                                label={summary.isOverBudget ? 'Melebihi Anggaran' : `${Math.min(summary.percentage, 100).toFixed(0)}% terpakai`}
-                                                sx={{
-                                                    bgcolor: summary.isOverBudget ? 'background.paper' : theme.colors.accentLight,
-                                                    color: summary.isOverBudget ? theme.colors.expense : theme.colors.accent,
-                                                    fontWeight: 600,
-                                                    height: 22,
-                                                    fontSize: 11,
-                                                }}
-                                            />
-                                        </Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Anggaran {formatRp(summary.budget.limitAmount)} • Terpakai {formatRp(summary.spent)} • Sisa {formatRp(summary.remaining)}
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-                                            {summary.categories.map((category) => (
+                                <CardContent sx={{ p: 2.5 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2 }}>
+                                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+                                                <Typography variant="h6" fontWeight={700}>{summary.budget.name}</Typography>
                                                 <Chip
-                                                    key={category.id}
                                                     size="small"
-                                                    icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: category.color, ml: 1 }} />}
-                                                    label={category.name}
-                                                    sx={{ height: 24, bgcolor: 'background.paper' }}
+                                                    label={summary.isOverBudget ? 'Melebihi Anggaran' : `${Math.min(summary.percentage, 100).toFixed(0)}% terpakai`}
+                                                    sx={{
+                                                        bgcolor: summary.isOverBudget ? 'background.paper' : theme.colors.accentLight,
+                                                        color: summary.isOverBudget ? theme.colors.expense : theme.colors.accent,
+                                                        fontWeight: 600,
+                                                        height: 22,
+                                                        fontSize: 11,
+                                                    }}
                                                 />
-                                            ))}
+                                            </Box>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Anggaran {formatRp(summary.budget.limitAmount)} • Terpakai {formatRp(summary.spent)} • Sisa {formatRp(summary.remaining)}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                                                {summary.categories.map((category) => (
+                                                    <Chip
+                                                        key={category.id}
+                                                        size="small"
+                                                        icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: category.color, ml: 1 }} />}
+                                                        label={category.name}
+                                                        sx={{ height: 24, bgcolor: 'background.paper', fontWeight: 500 }}
+                                                    />
+                                                ))}
+                                            </Box>
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                onClick={() => setActiveBudgetId(summary.budget.id)}
+                                                sx={{ borderRadius: 2, fontSize: 13, fontWeight: 600 }}
+                                            >
+                                                Lihat Detail
+                                            </Button>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={() => openEditForm(summary.budget)}
+                                                sx={{ borderRadius: 2, fontSize: 13, fontWeight: 600 }}
+                                            >
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                color="error"
+                                                disabled={deletingBudgetId === summary.budget.id}
+                                                onClick={() => setBudgetToDelete(summary.budget)}
+                                                sx={{ borderRadius: 2, fontSize: 13, fontWeight: 600 }}
+                                            >
+                                                {deletingBudgetId === summary.budget.id ? 'Loading...' : 'Hapus'}
+                                            </Button>
                                         </Box>
                                     </Box>
 
-                                    <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            onClick={() => setActiveBudgetId(summary.budget.id)}
-                                            sx={{ borderRadius: 2, fontSize: 13 }}
-                                        >
-                                            Lihat Detail
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            onClick={() => openEditForm(summary.budget)}
-                                            sx={{ borderRadius: 2, fontSize: 13 }}
-                                        >
-                                            Edit
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            color="error"
-                                            disabled={deletingBudgetId === summary.budget.id}
-                                            onClick={() => setBudgetToDelete(summary.budget)}
-                                            sx={{ borderRadius: 2, fontSize: 13 }}
-                                        >
-                                            {deletingBudgetId === summary.budget.id ? 'Menghapus...' : 'Hapus'}
-                                        </Button>
+                                    <Box sx={{ mt: 3 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                            <Typography variant="caption" fontWeight={600} color="text.secondary">
+                                                {Math.min(summary.percentage, 100).toFixed(0)}% terpakai
+                                            </Typography>
+                                            <Typography variant="caption" fontWeight={600} color="text.secondary">
+                                                {summary.isOverBudget ? 'Perlu perhatian' : 'Masih aman'}
+                                            </Typography>
+                                        </Box>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={Math.min(summary.percentage, 100)}
+                                            sx={{
+                                                height: 10,
+                                                borderRadius: 5,
+                                                bgcolor: 'background.paper',
+                                                '& .MuiLinearProgress-bar': {
+                                                    bgcolor: summary.isOverBudget ? theme.colors.expense : theme.colors.accent,
+                                                    borderRadius: 5,
+                                                },
+                                            }}
+                                        />
                                     </Box>
-                                </Box>
-
-                                <Box sx={{ mt: 2 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {Math.min(summary.percentage, 100).toFixed(0)}% terpakai
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {summary.isOverBudget ? 'Perlu perhatian' : 'Masih aman'}
-                                        </Typography>
-                                    </Box>
-                                    <LinearProgress
-                                        variant="determinate"
-                                        value={Math.min(summary.percentage, 100)}
-                                        sx={{
-                                            height: 8,
-                                            borderRadius: 4,
-                                            bgcolor: 'background.paper',
-                                            '& .MuiLinearProgress-bar': {
-                                                bgcolor: summary.isOverBudget ? theme.colors.expense : theme.colors.accent,
-                                                borderRadius: 4,
-                                            },
-                                        }}
-                                    />
-                                </Box>
-                            </Paper>
+                                </CardContent>
+                            </Card>
                         ))}
                     </Box>
                 )}
-            </Paper>
+            </Card>
 
             {budgetFormModal}
             {deleteDialog}

@@ -20,11 +20,37 @@ import OnboardingModal from './components/OnboardingModal';
 import AuthLogin from './components/AuthLogin';
 import Settings from './components/Settings';
 import LinkTelegram from './components/LinkTelegram';
-import ReactMarkdown from 'react-markdown';
-import { FinancialAnalysisMode, FinancialAnalysisResult, getFinancialAdvice } from './services/geminiService';
+import AiAdvisor from './components/AiAdvisor';
+
 import IconDisplay from './components/IconDisplay';
 import { useTheme } from './contexts/ThemeContext';
 import NotificationModal, { NotificationType } from './components/NotificationModal';
+
+// MUI Components
+import Box from '@mui/material/Box';
+import Drawer from '@mui/material/Drawer';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Divider from '@mui/material/Divider';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import BottomNavigation from '@mui/material/BottomNavigation';
+import BottomNavigationAction from '@mui/material/BottomNavigationAction';
+import Fab from '@mui/material/Fab';
+import CircularProgress from '@mui/material/CircularProgress';
+import Container from '@mui/material/Container';
+import Snackbar from '@mui/material/Snackbar';
+
 import {
   DEFAULT_ACCOUNT_NAME,
   DEFAULT_ACCOUNT_TYPE,
@@ -149,10 +175,6 @@ function App() {
   const [telegramDefaultAccountId, setTelegramDefaultAccountId] = useState<string | null>(null);
   const [telegramLinked, setTelegramLinked] = useState(false);
 
-  const [aiAnalysis, setAiAnalysis] = useState<FinancialAnalysisResult | null>(null);
-  const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
-  const [isLoadingAi, setIsLoadingAi] = useState(false);
-  const [aiAnalysisMode, setAiAnalysisMode] = useState<FinancialAnalysisMode>('HEALTH');
   const normalizedBudgets = useMemo(
     () => budgets.map((budget) => getNormalizedBudget(budget, categories)),
     [budgets, categories]
@@ -961,23 +983,6 @@ function App() {
     await batch.commit();
   };
 
-  // --- AI Logic ---
-  const handleAiAnalysis = async () => {
-    setIsLoadingAi(true);
-    setAiAnalysis(null);
-    setAiAnalysisError(null);
-
-    try {
-      const result = await getFinancialAdvice(transactions, categories, aiAnalysisMode);
-      setAiAnalysis(result);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Gagal menjalankan Analisis AI.';
-      setAiAnalysisError(message);
-      showNotification('error', 'Analisis Gagal', message, true);
-    } finally {
-      setIsLoadingAi(false);
-    }
-  };
 
   const currentBalance = transactions.reduce((acc, t) => {
     const type = categories.find(c => c.id === t.categoryId)?.type;
@@ -1000,39 +1005,6 @@ function App() {
 
   const formatBalance = (val: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
-
-  const formatShortDate = (date: string) =>
-    new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date));
-
-  const aiModeOptions: Array<{
-    id: FinancialAnalysisMode;
-    label: string;
-    shortLabel: string;
-    description: string;
-    icon: string;
-  }> = [
-    {
-      id: 'HEALTH',
-      label: 'Kesehatan Finansial',
-      shortLabel: 'Kesehatan',
-      description: 'Fokus ke arus kas, keseimbangan pemasukan-pengeluaran, dan stabilitas data keuangan.',
-      icon: 'HeartPulse'
-    },
-    {
-      id: 'SPENDING',
-      label: 'Pola Pengeluaran',
-      shortLabel: 'Pengeluaran',
-      description: 'Fokus ke kategori dominan, frekuensi transaksi, dan pola belanja yang menonjol.',
-      icon: 'BarChart2'
-    },
-    {
-      id: 'SAVINGS',
-      label: 'Saran Hemat',
-      shortLabel: 'Hemat',
-      description: 'Fokus ke peluang efisiensi berdasarkan transaksi dan kategori yang benar-benar ada.',
-      icon: 'PiggyBank'
-    }
-  ];
 
   const activeAccount = accounts.find((account) => account.id === activeAccountId) || null;
   const onboardingStorageKey = user && activeAccountId
@@ -1075,10 +1047,10 @@ function App() {
 
   if (authLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
-      </div>
-    )
+      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   if (!user) {
@@ -1087,302 +1059,330 @@ function App() {
 
   if (accountLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
-          <p className="text-sm text-slate-600">Menyiapkan Akun Keuangan...</p>
-        </div>
-      </div>
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, bgcolor: 'background.default' }}>
+        <CircularProgress />
+        <Typography variant="body2" color="text.secondary">Menyiapkan Akun Keuangan...</Typography>
+      </Box>
     );
   }
 
+  const SIDEBAR_WIDTH = 264;
+
+  const NAV_ITEMS: Array<{ view: View; label: string; icon: string }> = [
+    { view: 'DASHBOARD', label: 'Dashboard', icon: 'Home' },
+    { view: 'TRANSACTIONS', label: 'Transaksi', icon: 'BookOpen' },
+    { view: 'PLANS', label: 'Rencana', icon: 'CalendarDays' },
+    { view: 'BUDGETS', label: 'Anggaran', icon: 'PiggyBank' },
+    { view: 'DEBTS', label: 'Hutang Piutang', icon: 'Handshake' },
+    { view: 'CATEGORIES', label: 'Kategori', icon: 'Briefcase' },
+  ];
+
+  const BOTTOM_NAV_ITEMS: Array<{ view: View; label: string; icon: string }> = [
+    { view: 'DASHBOARD', label: 'Beranda', icon: 'Home' },
+    { view: 'TRANSACTIONS', label: 'Riwayat', icon: 'BookOpen' },
+    { view: 'BUDGETS', label: 'Anggaran', icon: 'PiggyBank' },
+    { view: 'CATEGORIES', label: 'Kategori', icon: 'Briefcase' },
+    { view: 'DEBTS', label: 'Hutang', icon: 'Handshake' },
+  ];
+
+  const bottomNavIndex = BOTTOM_NAV_ITEMS.findIndex((item) => item.view === currentView);
+
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: theme.colors.bgPrimary }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}>
 
       {/* Update Banner */}
       {showUpdateBanner && (
-        <div
-          className="fixed top-0 left-0 right-0 z-50 p-3 flex items-center justify-between gap-3"
-          style={{
-            backgroundColor: theme.colors.accent,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-          }}
+        <Snackbar
+          open={showUpdateBanner}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          sx={{ top: 0, zIndex: 1400 }}
         >
-          <div className="flex items-center gap-2 text-white">
+          <Paper
+            elevation={6}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              px: 2, py: 1.5,
+              borderRadius: 2,
+              bgcolor: theme.colors.accent,
+              color: '#fff',
+            }}
+          >
             <IconDisplay name="RefreshCw" size={18} />
-            <span className="text-sm font-medium">
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
               Versi baru tersedia! (v{APP_VERSION})
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleDismissUpdate}
-              className="px-3 py-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors"
-            >
+            </Typography>
+            <Button size="small" onClick={handleDismissUpdate} sx={{ color: 'rgba(255,255,255,0.8)', minWidth: 'auto', textTransform: 'none' }}>
               Nanti
-            </button>
-            <button
-              onClick={handleUpdate}
-              className="px-3 py-1.5 text-xs font-medium bg-white text-indigo-600 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              Update Sekarang
-            </button>
-          </div>
-        </div>
+            </Button>
+            <Button size="small" variant="contained" onClick={handleUpdate} sx={{ bgcolor: '#fff', color: theme.colors.accent, textTransform: 'none', '&:hover': { bgcolor: '#f5f5f5' } }}>
+              Update
+            </Button>
+          </Paper>
+        </Snackbar>
       )}
 
-      {/* Sidebar Navigation (Desktop) */}
-      <aside
-        className="w-64 hidden md:flex flex-col"
-        style={{ backgroundColor: theme.colors.sidebarBg, borderRight: `1px solid ${theme.colors.border} ` }}
+      {/* Desktop Sidebar */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          width: SIDEBAR_WIDTH,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: SIDEBAR_WIDTH,
+            boxSizing: 'border-box',
+            bgcolor: theme.colors.sidebarBg,
+            borderRight: `1px solid ${theme.colors.border}`,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
       >
-        <div className="p-6 flex items-center gap-3" style={{ borderBottom: `1px solid ${theme.colors.border} ` }}>
-          <div className="p-2 rounded-lg text-white" style={{ backgroundColor: theme.colors.accent }}>
+        {/* App Logo */}
+        <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: `1px solid ${theme.colors.border}` }}>
+          <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: theme.colors.accent, color: '#fff', display: 'flex' }}>
             <IconDisplay name="Wallet" size={24} />
-          </div>
-          <h1 className="text-xl font-bold tracking-tight" style={{ color: theme.colors.textPrimary }}>DompetCerdas <span className="text-xs font-normal opacity-60">v{APP_VERSION}</span></h1>
-        </div>
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em', color: theme.colors.textPrimary }}>
+            DompetCerdas <Typography component="span" variant="caption" sx={{ opacity: 0.6 }}>v{APP_VERSION}</Typography>
+          </Typography>
+        </Box>
 
-        <div className="px-4 py-4">
-          <div
-            className="flex items-center gap-3 p-3 rounded-xl"
-            style={{ backgroundColor: theme.colors.bgHover, border: `1px solid ${theme.colors.border} ` }}
+        {/* User Info */}
+        <Box sx={{ px: 2, py: 2 }}>
+          <Paper
+            elevation={0}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, borderRadius: 3, bgcolor: theme.colors.bgHover, border: `1px solid ${theme.colors.border}` }}
           >
-            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="User" className="w-10 h-10 rounded-full" />
-            <div className="overflow-hidden">
-              <p className="text-sm font-bold truncate" style={{ color: theme.colors.textPrimary }}>{user.displayName}</p>
-              <button onClick={handleLogout} className="text-xs text-red-500 hover:text-red-700 font-medium">Keluar</button>
-            </div>
-          </div >
+            <Avatar src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt={user.displayName || 'User'} sx={{ width: 40, height: 40 }} />
+            <Box sx={{ overflow: 'hidden', flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: theme.colors.textPrimary }}>
+                {user.displayName}
+              </Typography>
+              <Button size="small" onClick={handleLogout} sx={{ p: 0, minWidth: 'auto', color: theme.colors.expense, textTransform: 'none', fontSize: '0.75rem', fontWeight: 500 }}>
+                Keluar
+              </Button>
+            </Box>
+          </Paper>
 
-          <div
-            className="mt-3 rounded-xl p-3"
-            style={{ backgroundColor: theme.colors.bgHover, border: `1px solid ${theme.colors.border}` }}
+          {/* Active Account */}
+          <Paper
+            elevation={0}
+            sx={{ mt: 1.5, p: 1.5, borderRadius: 3, bgcolor: theme.colors.bgHover, border: `1px solid ${theme.colors.border}` }}
           >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.colors.textMuted }}>
+            <Typography variant="overline" sx={{ fontWeight: 600, letterSpacing: '0.16em', color: theme.colors.textMuted, fontSize: '0.65rem' }}>
               Akun Aktif
-            </p>
-            <p className="mt-1 text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: theme.colors.textPrimary }}>
               {activeAccount?.name || 'Pilih Akun'}
-            </p>
-            <select
+            </Typography>
+            <Select
               value={activeAccountId || ''}
-              onChange={(event) => switchAccount(event.target.value)}
-              className="mt-3 w-full rounded-lg border px-3 py-2 text-sm outline-none"
-              style={{
-                backgroundColor: theme.colors.bgCard,
-                borderColor: theme.colors.border,
-                color: theme.colors.textPrimary
+              onChange={(e) => switchAccount(e.target.value as string)}
+              size="small"
+              fullWidth
+              sx={{
+                mt: 1.5,
+                borderRadius: 2,
+                bgcolor: theme.colors.bgCard,
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.colors.border },
               }}
             >
               {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
+                <MenuItem key={account.id} value={account.id}>
                   {account.name} • {getAccountTypeLabel(account.type)}
-                </option>
+                </MenuItem>
               ))}
-            </select>
-          </div>
-        </div >
+            </Select>
+          </Paper>
+        </Box>
 
-        <nav className="flex-1 p-4 space-y-2">
-          <button
-            onClick={() => setCurrentView('DASHBOARD')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: currentView === 'DASHBOARD' ? theme.colors.sidebarActiveBg : 'transparent',
-              color: currentView === 'DASHBOARD' ? theme.colors.sidebarActive : theme.colors.sidebarText
-            }}
-          >
-            <IconDisplay name="Home" size={18} /> Dashboard
-          </button>
-          <button
-            onClick={() => setCurrentView('TRANSACTIONS')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: currentView === 'TRANSACTIONS' ? theme.colors.sidebarActiveBg : 'transparent',
-              color: currentView === 'TRANSACTIONS' ? theme.colors.sidebarActive : theme.colors.sidebarText
-            }}
-          >
-            <IconDisplay name="BookOpen" size={18} /> Transaksi
-          </button>
-          <button
-            onClick={() => setCurrentView('PLANS')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: currentView === 'PLANS' ? theme.colors.sidebarActiveBg : 'transparent',
-              color: currentView === 'PLANS' ? theme.colors.sidebarActive : theme.colors.sidebarText
-            }}
-          >
-            <IconDisplay name="CalendarDays" size={18} /> Rencana
-          </button>
-          <button
-            onClick={() => setCurrentView('BUDGETS')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: currentView === 'BUDGETS' ? theme.colors.sidebarActiveBg : 'transparent',
-              color: currentView === 'BUDGETS' ? theme.colors.sidebarActive : theme.colors.sidebarText
-            }}
-          >
-            <IconDisplay name="PiggyBank" size={18} /> Anggaran
-          </button>
-          <button
-            onClick={() => setCurrentView('DEBTS')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: currentView === 'DEBTS' ? theme.colors.sidebarActiveBg : 'transparent',
-              color: currentView === 'DEBTS' ? theme.colors.sidebarActive : theme.colors.sidebarText
-            }}
-          >
-            <IconDisplay name="Handshake" size={18} /> Hutang Piutang
-          </button>
-          <button
-            onClick={() => setCurrentView('CATEGORIES')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: currentView === 'CATEGORIES' ? theme.colors.sidebarActiveBg : 'transparent',
-              color: currentView === 'CATEGORIES' ? theme.colors.sidebarActive : theme.colors.sidebarText
-            }}
-          >
-            <IconDisplay name="Briefcase" size={18} /> Kategori
-          </button>
-          <div className="pt-4 mt-4" style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-            <button
-              onClick={() => setCurrentView('AI_ADVISOR')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: currentView === 'AI_ADVISOR' ? theme.colors.sidebarActiveBg : 'transparent',
-                color: currentView === 'AI_ADVISOR' ? theme.colors.sidebarActive : theme.colors.sidebarText
+        {/* Navigation */}
+        <List sx={{ flex: 1, px: 1, py: 1 }}>
+          {NAV_ITEMS.map((item) => (
+            <ListItemButton
+              key={item.view}
+              selected={currentView === item.view}
+              onClick={() => setCurrentView(item.view)}
+              sx={{
+                borderRadius: 2,
+                mb: 0.5,
+                '&.Mui-selected': {
+                  bgcolor: theme.colors.sidebarActiveBg,
+                  color: theme.colors.sidebarActive,
+                  '&:hover': { bgcolor: theme.colors.sidebarActiveBg },
+                },
+                color: theme.colors.sidebarText,
               }}
             >
-              <IconDisplay name="Zap" size={18} style={{ color: theme.colors.accent }} /> Analisis AI
-            </button>
-            <button
-              onClick={() => setCurrentView('SETTINGS')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: currentView === 'SETTINGS' ? theme.colors.sidebarActiveBg : 'transparent',
-                color: currentView === 'SETTINGS' ? theme.colors.sidebarActive : theme.colors.sidebarText
-              }}
-            >
-              <IconDisplay name="Settings" size={18} /> Pengaturan
-            </button>
-          </div>
-        </nav>
+              <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
+                <IconDisplay name={item.icon} size={18} />
+              </ListItemIcon>
+              <ListItemText primary={item.label} primaryTypographyProps={{ variant: 'body2', fontWeight: currentView === item.view ? 600 : 500 }} />
+            </ListItemButton>
+          ))}
+          <Divider sx={{ my: 1, borderColor: theme.colors.border }} />
+          <ListItemButton
+            selected={currentView === 'AI_ADVISOR'}
+            onClick={() => setCurrentView('AI_ADVISOR')}
+            sx={{
+              borderRadius: 2,
+              mb: 0.5,
+              '&.Mui-selected': { bgcolor: theme.colors.sidebarActiveBg, color: theme.colors.sidebarActive, '&:hover': { bgcolor: theme.colors.sidebarActiveBg } },
+              color: theme.colors.sidebarText,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36, color: theme.colors.accent }}>
+              <IconDisplay name="Zap" size={18} />
+            </ListItemIcon>
+            <ListItemText primary="Analisis AI" primaryTypographyProps={{ variant: 'body2', fontWeight: currentView === 'AI_ADVISOR' ? 600 : 500 }} />
+          </ListItemButton>
+          <ListItemButton
+            selected={currentView === 'SETTINGS'}
+            onClick={() => setCurrentView('SETTINGS')}
+            sx={{
+              borderRadius: 2,
+              '&.Mui-selected': { bgcolor: theme.colors.sidebarActiveBg, color: theme.colors.sidebarActive, '&:hover': { bgcolor: theme.colors.sidebarActiveBg } },
+              color: theme.colors.sidebarText,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
+              <IconDisplay name="Settings" size={18} />
+            </ListItemIcon>
+            <ListItemText primary="Pengaturan" primaryTypographyProps={{ variant: 'body2', fontWeight: currentView === 'SETTINGS' ? 600 : 500 }} />
+          </ListItemButton>
+        </List>
 
-        <div className="p-4" style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-4 text-white">
-            <p className="text-xs opacity-80 mb-1">Saldo Saat Ini</p>
-            <p className="font-bold text-lg">{formatBalance(currentBalance)}</p>
-          </div>
-        </div>
-      </aside >
+        {/* Balance Card */}
+        <Box sx={{ p: 2, borderTop: `1px solid ${theme.colors.border}` }}>
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 3,
+              p: 2,
+              background: `linear-gradient(135deg, ${theme.colors.accent} 0%, ${theme.name === 'dark' ? '#8B5CF6' : '#7C3AED'} 100%)`,
+              color: '#fff',
+            }}
+          >
+            <Typography variant="caption" sx={{ opacity: 0.8 }}>Saldo Saat Ini</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{formatBalance(currentBalance)}</Typography>
+          </Paper>
+        </Box>
+      </Drawer>
 
-      {/* Main Content */}
-      < main className="flex-1 flex flex-col h-full overflow-hidden relative" >
+      {/* Main Content Area */}
+      <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
 
         {/* Mobile Header */}
-        < header
-          className="p-4 flex justify-between items-center md:hidden sticky top-0 z-20"
-          style={{ backgroundColor: theme.colors.bgCard, borderBottom: `1px solid ${theme.colors.border}` }
-          }
+        <AppBar
+          position="sticky"
+          elevation={0}
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            bgcolor: theme.colors.bgCard,
+            borderBottom: `1px solid ${theme.colors.border}`,
+            color: theme.colors.textPrimary,
+          }}
         >
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded text-white" style={{ backgroundColor: theme.colors.accent }}>
-              <IconDisplay name="Wallet" size={20} />
-            </div>
-            <span className="font-bold" style={{ color: theme.colors.textPrimary }}>DompetCerdas <span className="text-xs font-normal opacity-60">v{APP_VERSION}</span></span>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Quick Access: AI Button */}
-            <button
-              onClick={() => setCurrentView('AI_ADVISOR')}
-              className="p-2 rounded-full transition-all"
-              style={{
-                backgroundColor: currentView === 'AI_ADVISOR' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
-                color: currentView === 'AI_ADVISOR' ? '#8B5CF6' : theme.colors.textMuted
-              }}
-              title="AI Analisis"
-            >
-              <IconDisplay name="Zap" size={18} />
-            </button>
-            <button
-              onClick={() => setCurrentView('SETTINGS')}
-              className="p-2 rounded-full transition-all"
-              style={{
-                backgroundColor: currentView === 'SETTINGS' ? theme.colors.accentLight : 'transparent',
-                color: currentView === 'SETTINGS' ? theme.colors.accent : theme.colors.textMuted
-              }}
-              title="Pengaturan"
-            >
-              <IconDisplay name="Settings" size={18} />
-            </button>
-            {/* Quick Access: Rencana Button */}
-            <button
-              onClick={() => setCurrentView('PLANS')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-              style={{
-                backgroundColor: currentView === 'PLANS' ? theme.colors.accent : theme.colors.bgHover,
-                color: currentView === 'PLANS' ? '#fff' : theme.colors.textSecondary,
-                border: `1px solid ${currentView === 'PLANS' ? theme.colors.accent : theme.colors.border}`
-              }}
-            >
-              <IconDisplay name="CalendarDays" size={14} />
-              <span>Rencana</span>
-            </button>
-            <button
-              onClick={() => setCurrentView('DEBTS')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-              style={{
-                backgroundColor: currentView === 'DEBTS' ? theme.colors.accent : theme.colors.bgHover,
-                color: currentView === 'DEBTS' ? '#fff' : theme.colors.textSecondary,
-                border: `1px solid ${currentView === 'DEBTS' ? theme.colors.accent : theme.colors.border}`
-              }}
-            >
-              <IconDisplay name="Handshake" size={14} />
-              <span>Hutang</span>
-            </button>
-            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="User" className="w-8 h-8 rounded-full" style={{ border: `1px solid ${theme.colors.border}` }} />
-            <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg" style={{ backgroundColor: theme.colors.expenseBg }}>
-              <IconDisplay name="LogOut" size={16} />
-            </button>
-          </div>
-        </header >
+          <Toolbar sx={{ justifyContent: 'space-between', px: 2, minHeight: '56px !important' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ p: 0.75, borderRadius: 1, bgcolor: theme.colors.accent, color: '#fff', display: 'flex' }}>
+                <IconDisplay name="Wallet" size={20} />
+              </Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: theme.colors.textPrimary }}>
+                DompetCerdas <Typography component="span" variant="caption" sx={{ opacity: 0.6 }}>v{APP_VERSION}</Typography>
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <IconButton
+                size="small"
+                onClick={() => setCurrentView('AI_ADVISOR')}
+                sx={{
+                  bgcolor: currentView === 'AI_ADVISOR' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+                  color: currentView === 'AI_ADVISOR' ? '#8B5CF6' : theme.colors.textMuted,
+                }}
+              >
+                <IconDisplay name="Zap" size={18} />
+              </IconButton>
+              <IconButton
+                size="small"
+                onClick={() => setCurrentView('SETTINGS')}
+                sx={{
+                  bgcolor: currentView === 'SETTINGS' ? theme.colors.accentLight : 'transparent',
+                  color: currentView === 'SETTINGS' ? theme.colors.accent : theme.colors.textMuted,
+                }}
+              >
+                <IconDisplay name="Settings" size={18} />
+              </IconButton>
+              <Chip
+                icon={<IconDisplay name="CalendarDays" size={14} />}
+                label="Rencana"
+                size="small"
+                variant={currentView === 'PLANS' ? 'filled' : 'outlined'}
+                onClick={() => setCurrentView('PLANS')}
+                sx={{
+                  bgcolor: currentView === 'PLANS' ? theme.colors.accent : theme.colors.bgHover,
+                  color: currentView === 'PLANS' ? '#fff' : theme.colors.textSecondary,
+                  borderColor: currentView === 'PLANS' ? theme.colors.accent : theme.colors.border,
+                  '& .MuiChip-icon': { color: 'inherit' },
+                }}
+              />
+              <Avatar
+                src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`}
+                alt={user.displayName || 'User'}
+                sx={{ width: 32, height: 32, border: `1px solid ${theme.colors.border}`, ml: 0.5 }}
+              />
+              <IconButton size="small" onClick={handleLogout} sx={{ color: theme.colors.expense, bgcolor: theme.colors.expenseBg }}>
+                <IconDisplay name="LogOut" size={16} />
+              </IconButton>
+            </Box>
+          </Toolbar>
+        </AppBar>
 
-        <div
-          className="md:hidden px-4 py-2"
-          style={{ backgroundColor: theme.colors.bgCard, borderBottom: `1px solid ${theme.colors.border}` }}
+        {/* Mobile Account Selector */}
+        <Box
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1.5,
+            px: 2, py: 1,
+            bgcolor: theme.colors.bgCard,
+            borderBottom: `1px solid ${theme.colors.border}`,
+          }}
         >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: theme.colors.textMuted }}>
-                Akun Aktif
-              </p>
-              <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
-                {activeAccount?.name || 'Pilih Akun'}
-              </p>
-            </div>
-            <select
-              value={activeAccountId || ''}
-              onChange={(event) => switchAccount(event.target.value)}
-              className="rounded-lg border px-3 py-2 text-sm outline-none"
-              style={{
-                backgroundColor: theme.colors.bgPrimary,
-                borderColor: theme.colors.border,
-                color: theme.colors.textPrimary
-              }}
-            >
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} • {getAccountTypeLabel(account.type)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+          <Box>
+            <Typography variant="overline" sx={{ fontWeight: 600, letterSpacing: '0.16em', color: theme.colors.textMuted, fontSize: '0.6rem' }}>
+              Akun Aktif
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: theme.colors.textPrimary }}>
+              {activeAccount?.name || 'Pilih Akun'}
+            </Typography>
+          </Box>
+          <Select
+            value={activeAccountId || ''}
+            onChange={(e) => switchAccount(e.target.value as string)}
+            size="small"
+            sx={{
+              borderRadius: 2,
+              bgcolor: theme.colors.bgPrimary,
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.colors.border },
+              maxWidth: 200,
+            }}
+          >
+            {accounts.map((account) => (
+              <MenuItem key={account.id} value={account.id}>
+                {account.name} • {getAccountTypeLabel(account.type)}
+              </MenuItem>
+            ))}
+          </Select>
+        </Box>
 
         {/* Content Area */}
-        < div className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8" >
-          <div className="max-w-5xl mx-auto">
+        <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 2, md: 4 }, pb: { xs: '120px', md: 4 } }}>
+          <Container maxWidth="lg" disableGutters>
             {currentView === 'DASHBOARD' && (
               <Dashboard
                 transactions={transactions}
@@ -1423,7 +1423,6 @@ function App() {
                 onUpdatePlanItemStatus={updatePlanItemStatus}
               />
             )}
-
             {currentView === 'BUDGETS' && (
               <BudgetManager
                 budgets={normalizedBudgets}
@@ -1434,7 +1433,6 @@ function App() {
                 onCopyBudgetsFromPreviousMonth={copyBudgetsFromPreviousMonth}
               />
             )}
-
             {currentView === 'DEBTS' && (
               <DebtManager
                 debts={debts}
@@ -1444,7 +1442,6 @@ function App() {
                 onMarkAsPaid={markDebtAsPaid}
               />
             )}
-
             {currentView === 'CATEGORIES' && (
               <CategoryManager
                 categories={categories}
@@ -1453,423 +1450,13 @@ function App() {
                 onDeleteCategory={deleteCategory}
               />
             )}
-
             {currentView === 'AI_ADVISOR' && (
-              <div className="space-y-6 animate-fade-in-up">
-                <div
-                  className="relative overflow-hidden rounded-[28px] border p-6 md:p-8"
-                  style={{
-                    background: theme.name === 'dark'
-                      ? 'linear-gradient(135deg, rgba(30,41,59,0.98) 0%, rgba(49,46,129,0.52) 100%)'
-                      : 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(238,242,255,0.95) 100%)',
-                    borderColor: theme.colors.border,
-                    boxShadow: theme.name === 'dark'
-                      ? '0 28px 80px rgba(2, 6, 23, 0.35)'
-                      : '0 24px 60px rgba(79, 70, 229, 0.08)'
-                  }}
-                >
-                  <div
-                    className="absolute right-0 top-0 h-40 w-40 rounded-full blur-3xl"
-                    style={{ backgroundColor: `${theme.colors.accent}22` }}
-                  />
-                  <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                    <div className="max-w-2xl">
-                      <div
-                        className="mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
-                        style={{
-                          backgroundColor: theme.name === 'dark' ? 'rgba(129,140,248,0.18)' : '#EEF2FF',
-                          color: theme.name === 'dark' ? '#C7D2FE' : '#4338CA'
-                        }}
-                      >
-                        <IconDisplay name="Sparkles" size={14} />
-                        Analisis AI
-                      </div>
-                      <h2 className="text-2xl md:text-3xl font-bold tracking-tight" style={{ color: theme.colors.textPrimary }}>
-                        Analisis keuangan yang hanya berbasis transaksi Anda
-                      </h2>
-                      <p className="text-sm md:text-base mt-2 max-w-xl leading-7" style={{ color: theme.colors.textSecondary }}>
-                        Sistem hanya mengirim ringkasan dan sampel transaksi yang paling relevan agar hemat token, lalu AI diminta memberi insight berdasarkan data Anda saja tanpa asumsi di luar transaksi.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleAiAnalysis}
-                      disabled={isLoadingAi || transactions.length === 0}
-                      className="flex items-center justify-center gap-2 rounded-2xl px-6 py-3 font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-60"
-                      style={{
-                        background: `linear-gradient(135deg, ${theme.colors.accent} 0%, ${theme.name === 'dark' ? '#8B5CF6' : '#6366F1'} 100%)`,
-                        boxShadow: theme.name === 'dark'
-                          ? '0 18px 36px rgba(99, 102, 241, 0.28)'
-                          : '0 18px 36px rgba(79, 70, 229, 0.22)'
-                      }}
-                    >
-                      {isLoadingAi ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                          Menganalisis...
-                        </>
-                      ) : (
-                        <>
-                          <IconDisplay name="Zap" size={18} />
-                          Jalankan Analisis
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  {aiModeOptions.map((mode) => {
-                    const isActive = aiAnalysisMode === mode.id;
-                    return (
-                      <button
-                        key={mode.id}
-                        onClick={() => {
-                          setAiAnalysisMode(mode.id);
-                          setAiAnalysis(null);
-                          setAiAnalysisError(null);
-                        }}
-                        className="rounded-[24px] border p-5 text-left transition-all"
-                        style={{
-                          background: isActive
-                            ? (theme.name === 'dark'
-                              ? 'linear-gradient(135deg, rgba(79,70,229,0.30) 0%, rgba(99,102,241,0.18) 100%)'
-                              : 'linear-gradient(135deg, rgba(238,242,255,1) 0%, rgba(224,231,255,0.92) 100%)')
-                            : theme.colors.bgCard,
-                          borderColor: isActive ? theme.colors.accent : theme.colors.border,
-                          boxShadow: isActive
-                            ? (theme.name === 'dark'
-                              ? '0 20px 40px rgba(79, 70, 229, 0.18)'
-                              : '0 20px 40px rgba(99, 102, 241, 0.12)')
-                            : 'none'
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                            style={{
-                              backgroundColor: isActive
-                                ? (theme.name === 'dark' ? 'rgba(99,102,241,0.22)' : '#FFFFFF')
-                                : theme.colors.bgHover,
-                              color: isActive ? theme.colors.accent : theme.colors.textSecondary
-                            }}
-                          >
-                            <IconDisplay name={mode.icon} size={20} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
-                              {mode.label}
-                            </p>
-                            <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>
-                              {mode.shortLabel}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="mt-4 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                          {mode.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {transactions.length === 0 && (
-                  <div
-                    className="rounded-2xl border p-5"
-                    style={{
-                      backgroundColor: theme.name === 'dark' ? 'rgba(120, 53, 15, 0.22)' : '#FFFBEB',
-                      borderColor: theme.name === 'dark' ? 'rgba(245, 158, 11, 0.25)' : '#FDE68A',
-                      color: theme.name === 'dark' ? '#FDE68A' : '#92400E'
-                    }}
-                  >
-                    Belum ada data transaksi. Tambahkan transaksi terlebih dahulu agar Analisis AI bisa memberi insight yang relevan.
-                  </div>
-                )}
-
-                {!aiAnalysis && !isLoadingAi && transactions.length > 0 && (
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {[
-                      {
-                        title: 'Data yang dipakai',
-                        value: `${transactions.length} transaksi`,
-                        description: 'AI hanya melihat data transaksi dan kategori Anda.'
-                      },
-                      {
-                        title: 'Hemat token',
-                        value: 'Ringkasan + sampel',
-                        description: 'Yang dikirim bukan seluruh histori mentah, tapi agregasi dan transaksi penting.'
-                      },
-                      {
-                        title: 'Batas pengetahuan',
-                        value: 'Data Anda saja',
-                        description: 'Analisis dilarang menebak kondisi di luar angka transaksi.'
-                      }
-                    ].map((item) => (
-                      <div
-                        key={item.title}
-                        className="rounded-2xl border p-5"
-                        style={{
-                          backgroundColor: theme.colors.bgCard,
-                          borderColor: theme.colors.border
-                        }}
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
-                          {item.title}
-                        </p>
-                        <p className="mt-3 text-xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                          {item.value}
-                        </p>
-                        <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                          {item.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {isLoadingAi && (
-                  <div
-                    className="rounded-[28px] border p-6 md:p-8"
-                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent"
-                        style={{ borderColor: theme.colors.accent, borderTopColor: 'transparent' }}
-                      />
-                      <div>
-                        <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>Sedang menyusun analisis</p>
-                        <p className="text-sm" style={{ color: theme.colors.textSecondary }}>
-                          AI sedang menyusun mode {aiModeOptions.find((mode) => mode.id === aiAnalysisMode)?.label.toLowerCase()} dari ringkasan transaksi dan sampel transaksi penting Anda.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {aiAnalysisError && !isLoadingAi && (
-                  <div
-                    className="rounded-2xl border p-5"
-                    style={{
-                      backgroundColor: theme.name === 'dark' ? 'rgba(127, 29, 29, 0.24)' : '#FEF2F2',
-                      borderColor: theme.name === 'dark' ? 'rgba(248, 113, 113, 0.25)' : '#FECACA'
-                    }}
-                  >
-                    <p className="font-semibold" style={{ color: theme.name === 'dark' ? '#FCA5A5' : '#B91C1C' }}>
-                      Analisis belum bisa ditampilkan
-                    </p>
-                    <p className="text-sm mt-2" style={{ color: theme.name === 'dark' ? '#FECACA' : '#7F1D1D' }}>
-                      {aiAnalysisError}
-                    </p>
-                  </div>
-                )}
-
-                {aiAnalysis && (
-                  <>
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                      {[
-                        {
-                          title: 'Transaksi dianalisis',
-                          value: `${aiAnalysis.summary.totalTransactionsAnalyzed}/${aiAnalysis.summary.totalTransactions}`,
-                          description: 'Sampel terpilih setelah diringkas untuk efisiensi token.'
-                        },
-                        {
-                          title: 'Total pemasukan',
-                          value: formatBalance(aiAnalysis.summary.incomeTotal),
-                          description: 'Akumulasi transaksi kategori pemasukan.'
-                        },
-                        {
-                          title: 'Total pengeluaran',
-                          value: formatBalance(aiAnalysis.summary.expenseTotal),
-                          description: 'Akumulasi transaksi kategori pengeluaran.'
-                        },
-                        {
-                          title: 'Saldo bersih data',
-                          value: formatBalance(aiAnalysis.summary.netBalance),
-                          description: 'Selisih pemasukan dan pengeluaran pada data yang tersedia.'
-                        },
-                        {
-                          title: 'Mode analisis',
-                          value: aiModeOptions.find((mode) => mode.id === aiAnalysis.mode)?.shortLabel || 'AI',
-                          description: 'Jenis pembacaan data yang sedang aktif saat ini.'
-                        },
-                        {
-                          title: 'Sisa token harian',
-                          value: aiAnalysis.usage
-                            ? `${aiAnalysis.usage.remainingDailyTokens.toLocaleString('id-ID')}/${aiAnalysis.usage.dailyTokenLimit.toLocaleString('id-ID')}`
-                            : '-',
-                          description: 'Kuota biaya Analisis AI per user per hari dari backend.'
-                        }
-                      ].map((item) => (
-                        <div
-                          key={item.title}
-                          className="rounded-2xl border p-5"
-                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                        >
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
-                            {item.title}
-                          </p>
-                          <p className="mt-3 text-xl font-bold leading-tight" style={{ color: theme.colors.textPrimary }}>
-                            {item.value}
-                          </p>
-                          <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                            {item.description}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
-                      <div
-                        className="relative overflow-hidden rounded-[28px] border p-6 md:p-8"
-                        style={{
-                          backgroundColor: theme.colors.bgCard,
-                          borderColor: theme.colors.border
-                        }}
-                      >
-                        <div className="absolute inset-x-0 top-0 h-1.5" style={{
-                          background: `linear-gradient(90deg, ${theme.colors.accent} 0%, ${theme.name === 'dark' ? '#8B5CF6' : '#A5B4FC'} 100%)`
-                        }} />
-                        <div className="prose max-w-none">
-                          <ReactMarkdown
-                            components={{
-                              h2: ({ children }) => (
-                                <h2 className="mt-6 mb-3 text-xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                                  {children}
-                                </h2>
-                              ),
-                              p: ({ children }) => (
-                                <p className="mb-3 text-sm md:text-[15px] leading-7" style={{ color: theme.colors.textSecondary }}>
-                                  {children}
-                                </p>
-                              ),
-                              ul: ({ children }) => (
-                                <ul className="mb-4 space-y-2 pl-5 list-disc" style={{ color: theme.colors.textSecondary }}>
-                                  {children}
-                                </ul>
-                              ),
-                              li: ({ children }) => (
-                                <li className="text-sm md:text-[15px] leading-7">{children}</li>
-                              ),
-                              strong: ({ children }) => (
-                                <strong style={{ color: theme.colors.textPrimary }}>{children}</strong>
-                              ),
-                              code: ({ children }) => (
-                                <code
-                                  className="rounded px-1.5 py-0.5 text-xs"
-                                  style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    color: theme.colors.textPrimary
-                                  }}
-                                >
-                                  {children}
-                                </code>
-                              )
-                            }}
-                          >
-                            {aiAnalysis.markdown}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div
-                          className="rounded-[28px] border p-5"
-                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                        >
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
-                            Dasar Analisis
-                          </p>
-                          <div className="mt-4 space-y-3 text-sm">
-                            <div>
-                              <p style={{ color: theme.colors.textMuted }}>Rentang data</p>
-                              <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                {aiAnalysis.summary.analyzedDateRange
-                                  ? `${formatShortDate(aiAnalysis.summary.analyzedDateRange.start)} - ${formatShortDate(aiAnalysis.summary.analyzedDateRange.end)}`
-                                  : 'Tidak tersedia'}
-                              </p>
-                            </div>
-                            <div>
-                              <p style={{ color: theme.colors.textMuted }}>Komposisi sampel</p>
-                              <p className="font-semibold leading-6" style={{ color: theme.colors.textPrimary }}>
-                                {aiAnalysis.summary.samplesUsed.recent} terbaru, {aiAnalysis.summary.samplesUsed.largestExpense} terbesar, {aiAnalysis.summary.samplesUsed.categoryAnchors} jangkar kategori, {aiAnalysis.summary.samplesUsed.incomeAnchors} pemasukan
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
-                          className="rounded-[28px] border p-5"
-                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                        >
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
-                            Kategori Pengeluaran Utama
-                          </p>
-                          <div className="mt-4 space-y-3">
-                            {aiAnalysis.summary.topCategories.length > 0 ? aiAnalysis.summary.topCategories.map((category) => (
-                              <div key={category.name}>
-                                <div className="flex items-center justify-between gap-3 text-sm">
-                                  <div>
-                                    <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{category.name}</p>
-                                    <p style={{ color: theme.colors.textMuted }}>{category.count} transaksi</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{formatBalance(category.total)}</p>
-                                    <p style={{ color: theme.colors.textMuted }}>{category.percentage}%</p>
-                                  </div>
-                                </div>
-                                <div className="mt-2 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.colors.bgHover }}>
-                                  <div
-                                    className="h-full rounded-full"
-                                    style={{
-                                      width: `${Math.min(category.percentage, 100)}%`,
-                                      background: `linear-gradient(90deg, ${theme.colors.accent} 0%, ${theme.name === 'dark' ? '#A78BFA' : '#818CF8'} 100%)`
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )) : (
-                              <p className="text-sm" style={{ color: theme.colors.textSecondary }}>
-                                Belum ada pengeluaran yang cukup untuk diringkas per kategori.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div
-                          className="rounded-[28px] border p-5"
-                          style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                        >
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
-                            Ringkasan Bulanan
-                          </p>
-                          <div className="mt-4 space-y-3">
-                            {aiAnalysis.summary.monthlySummaries.length > 0 ? aiAnalysis.summary.monthlySummaries.map((month) => (
-                              <div key={month.month} className="rounded-2xl px-4 py-3" style={{ backgroundColor: theme.colors.bgHover }}>
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>{month.month}</p>
-                                  <p className="text-sm" style={{ color: month.net >= 0 ? theme.colors.income : theme.colors.expense }}>
-                                    {formatBalance(month.net)}
-                                  </p>
-                                </div>
-                                <div className="mt-2 flex items-center justify-between gap-3 text-xs" style={{ color: theme.colors.textSecondary }}>
-                                  <span>Pemasukan {formatBalance(month.income)}</span>
-                                  <span>Pengeluaran {formatBalance(month.expense)}</span>
-                                </div>
-                              </div>
-                            )) : (
-                              <p className="text-sm" style={{ color: theme.colors.textSecondary }}>
-                                Ringkasan bulanan belum tersedia.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+              <AiAdvisor
+                transactions={transactions}
+                categories={categories}
+                onShowNotification={showNotification}
+              />
             )}
-
             {currentView === 'SETTINGS' && (
               <Settings
                 accounts={accounts}
@@ -1887,8 +1474,8 @@ function App() {
                 categories={categories}
               />
             )}
-          </div>
-        </div >
+          </Container>
+        </Box>
 
         <OnboardingModal
           isOpen={showOnboarding}
@@ -1900,89 +1487,117 @@ function App() {
           onGoToSettings={() => navigateFromOnboarding('SETTINGS')}
         />
 
-        {/* Mobile Bottom Navigation Bar */}
-        < nav
-          className="md:hidden fixed bottom-0 left-0 right-0 flex justify-around items-center h-16 z-30 px-2 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]"
-          style={{ backgroundColor: theme.colors.bgCard, borderTop: `1px solid ${theme.colors.border}` }}
+        {/* Mobile Bottom Navigation */}
+        <Paper
+          elevation={8}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 30,
+            borderTop: `1px solid ${theme.colors.border}`,
+          }}
         >
-          <button
-            onClick={() => setCurrentView('DASHBOARD')}
-            className="flex flex-col items-center justify-center flex-1 py-1"
-            style={{ color: currentView === 'DASHBOARD' ? theme.colors.accent : theme.colors.textMuted }}
+          <BottomNavigation
+            value={bottomNavIndex >= 0 ? bottomNavIndex : false}
+            onChange={(_, newValue) => {
+              if (newValue >= 0 && newValue < BOTTOM_NAV_ITEMS.length) {
+                setCurrentView(BOTTOM_NAV_ITEMS[newValue].view);
+              }
+            }}
+            showLabels
+            sx={{
+              bgcolor: theme.colors.bgCard,
+              height: 64,
+              '& .MuiBottomNavigationAction-root': {
+                color: theme.colors.textMuted,
+                minWidth: 'auto',
+                py: 1,
+                '&.Mui-selected': {
+                  color: theme.colors.accent,
+                },
+              },
+              '& .MuiBottomNavigationAction-label': {
+                fontSize: '0.6rem',
+                fontWeight: 500,
+                mt: 0.25,
+                '&.Mui-selected': {
+                  fontSize: '0.6rem',
+                  fontWeight: 600,
+                },
+              },
+            }}
           >
-            <IconDisplay name="Home" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Beranda</span>
-          </button>
-          <button
-            onClick={() => setCurrentView('TRANSACTIONS')}
-            className="flex flex-col items-center justify-center flex-1 py-1"
-            style={{ color: currentView === 'TRANSACTIONS' ? theme.colors.accent : theme.colors.textMuted }}
-          >
-            <IconDisplay name="BookOpen" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Riwayat</span>
-          </button>
+            {BOTTOM_NAV_ITEMS.map((item, index) => (
+              <BottomNavigationAction
+                key={item.view}
+                value={index}
+                label={item.label}
+                icon={<IconDisplay name={item.icon} size={20} />}
+              />
+            ))}
+          </BottomNavigation>
+        </Paper>
 
-          {/* Center Space for FAB */}
-          <div className="w-14 flex-shrink-0"></div>
-
-          <button
-            onClick={() => setCurrentView('BUDGETS')}
-            className="flex flex-col items-center justify-center flex-1 py-1"
-            style={{ color: currentView === 'BUDGETS' ? theme.colors.accent : theme.colors.textMuted }}
-          >
-            <IconDisplay name="PiggyBank" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Anggaran</span>
-          </button>
-          <button
-            onClick={() => setCurrentView('CATEGORIES')}
-            className="flex flex-col items-center justify-center flex-1 py-1"
-            style={{ color: currentView === 'CATEGORIES' ? theme.colors.accent : theme.colors.textMuted }}
-          >
-            <IconDisplay name="Briefcase" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Kategori</span>
-          </button>
-          <button
-            onClick={() => setCurrentView('DEBTS')}
-            className="flex flex-col items-center justify-center flex-1 py-1"
-            style={{ color: currentView === 'DEBTS' ? theme.colors.accent : theme.colors.textMuted }}
-          >
-            <IconDisplay name="Handshake" size={20} />
-            <span className="text-[9px] font-medium mt-0.5">Hutang</span>
-          </button>
-        </nav >
-
-        {/* Mobile Center Floating Action Button (FAB) */}
-        < div className="md:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40" >
-          <button
+        {/* Mobile FAB */}
+        {currentView === 'TRANSACTIONS' && (
+          <Fab
+            color="primary"
             onClick={() => setShowAddModal(true)}
-            className="text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center border-4 focus:outline-none active:scale-95 transition-transform"
-            style={{ backgroundColor: theme.colors.accent, borderColor: theme.colors.bgCard }}
+            sx={{
+              display: { xs: 'flex', md: 'none' },
+              position: 'fixed',
+              bottom: 72,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 40,
+              width: 56,
+              height: 56,
+              border: `4px solid ${theme.colors.bgCard}`,
+              bgcolor: theme.colors.accent,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+              '&:hover': { bgcolor: theme.colors.accentHover },
+            }}
           >
-            <IconDisplay name="Plus" size={32} />
-          </button>
-        </div >
+            <IconDisplay name="Plus" size={28} />
+          </Fab>
+        )}
 
-        {/* Desktop Floating Action Button */}
-        < button
-          onClick={() => setShowAddModal(true)}
-          className="hidden md:flex fixed bottom-8 right-8 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 focus:outline-none z-40"
-          style={{ backgroundColor: theme.colors.accent }}
-        >
-          <IconDisplay name="Plus" size={28} />
-        </button >
+        {/* Desktop FAB */}
+        {currentView === 'TRANSACTIONS' && (
+          <Fab
+            color="primary"
+            onClick={() => setShowAddModal(true)}
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              position: 'fixed',
+              bottom: 32,
+              right: 32,
+              zIndex: 40,
+              width: 56,
+              height: 56,
+              bgcolor: theme.colors.accent,
+              boxShadow: '0 8px 24px rgba(79, 70, 229, 0.3)',
+              transition: 'transform 0.2s ease',
+              '&:hover': { bgcolor: theme.colors.accentHover, transform: 'scale(1.05)' },
+            }}
+          >
+            <IconDisplay name="Plus" size={28} />
+          </Fab>
+        )}
 
-        {/* Modal */}
-        {
-          showAddModal && (
-            <TransactionForm
-              categories={categories}
-              onClose={() => setShowAddModal(false)}
-              onAdd={addTransaction}
-              onAddCategory={addCategory}
-              onShowNotification={showNotification}
-            />
-          )
-        }
+        {/* Transaction Modal */}
+        {showAddModal && (
+          <TransactionForm
+            categories={categories}
+            onClose={() => setShowAddModal(false)}
+            onAdd={addTransaction}
+            onAddCategory={addCategory}
+            onShowNotification={showNotification}
+          />
+        )}
 
         {/* Notification Modal */}
         <NotificationModal
@@ -1993,9 +1608,10 @@ function App() {
           onClose={closeNotification}
           autoClose={notification.autoClose}
         />
-      </main >
-    </div >
+      </Box>
+    </Box>
   );
 }
 
 export default App;
+
