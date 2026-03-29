@@ -3,6 +3,24 @@ import { Category, Plan, PlanItem, PlanItemStatus, TransactionType } from '../ty
 import IconDisplay from './IconDisplay';
 import ConfirmDialog from './ConfirmDialog';
 import { useTheme } from '../contexts/ThemeContext';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Grid from '@mui/material/Grid';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Chip from '@mui/material/Chip';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import InputAdornment from '@mui/material/InputAdornment';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Divider from '@mui/material/Divider';
 
 interface PlanManagerProps {
     plans: Plan[];
@@ -49,20 +67,44 @@ const formatRupiahInput = (value: string) => {
 
 const formatDateLabel = (value?: string) => {
     if (!value) return 'Tanggal fleksibel';
-
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-
-    return new Intl.DateTimeFormat('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    }).format(date);
+    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 };
 
 type DeleteTarget =
     | { type: 'plan'; planId: string; title: string }
     | { type: 'item'; planId: string; itemId: string; title: string };
+
+// Reusable type toggle component
+const TypeToggle: React.FC<{ value: TransactionType; onChange: (v: TransactionType) => void; incomeColor: string; expenseColor: string }> = ({ value, onChange, incomeColor, expenseColor }) => (
+    <Box sx={{ display: 'flex', p: 0.5, borderRadius: 2, bgcolor: 'action.hover' }}>
+        {(['EXPENSE', 'INCOME'] as TransactionType[]).map((type) => (
+            <Box
+                key={type}
+                component="button"
+                type="button"
+                onClick={() => onChange(type)}
+                sx={{
+                    flex: 1,
+                    py: 1,
+                    border: 'none',
+                    borderRadius: 1.5,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    fontFamily: 'inherit',
+                    transition: 'all 0.15s',
+                    bgcolor: value === type ? 'background.paper' : 'transparent',
+                    color: value === type ? (type === 'EXPENSE' ? expenseColor : incomeColor) : 'text.secondary',
+                    boxShadow: value === type ? 1 : 0,
+                }}
+            >
+                {type === 'EXPENSE' ? 'Pengeluaran' : 'Pemasukan'}
+            </Box>
+        ))}
+    </Box>
+);
 
 const PlanManager: React.FC<PlanManagerProps> = ({
     plans,
@@ -105,44 +147,27 @@ const PlanManager: React.FC<PlanManagerProps> = ({
 
     useEffect(() => {
         const availableCategories = categories.filter((category) => category.type === newItemType);
-        if (!availableCategories.length) {
-            setNewItemCategory('');
-            return;
-        }
-
+        if (!availableCategories.length) { setNewItemCategory(''); return; }
         const categoryStillValid = availableCategories.some((category) => category.id === newItemCategory);
-        if (!categoryStillValid) {
-            setNewItemCategory(availableCategories[0].id);
-        }
+        if (!categoryStillValid) setNewItemCategory(availableCategories[0].id);
     }, [categories, newItemCategory, newItemType]);
 
     useEffect(() => {
         const availableCategories = categories.filter((category) => category.type === editItemType);
-        if (!availableCategories.length) {
-            setEditItemCategory('');
-            return;
-        }
-
+        if (!availableCategories.length) { setEditItemCategory(''); return; }
         const categoryStillValid = availableCategories.some((category) => category.id === editItemCategory);
-        if (!categoryStillValid) {
-            setEditItemCategory(availableCategories[0].id);
-        }
+        if (!categoryStillValid) setEditItemCategory(availableCategories[0].id);
     }, [categories, editItemCategory, editItemType]);
 
-    const getStatusStyles = (status: PlanItemStatus) => {
-        if (status === 'DONE') {
-            return { backgroundColor: theme.colors.incomeBg, color: theme.colors.income };
-        }
-        if (status === 'CANCELLED') {
-            return { backgroundColor: theme.colors.expenseBg, color: theme.colors.expense };
-        }
-        return { backgroundColor: theme.colors.accentLight, color: theme.colors.accent };
+    const getStatusChipProps = (status: PlanItemStatus) => {
+        if (status === 'DONE') return { bgcolor: theme.colors.incomeBg, color: theme.colors.income };
+        if (status === 'CANCELLED') return { bgcolor: theme.colors.expenseBg, color: theme.colors.expense };
+        return { bgcolor: theme.colors.accentLight, color: theme.colors.accent };
     };
 
     const handleCreate = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newPlanTitle.trim()) return;
-
         onCreatePlan(newPlanTitle.trim());
         setNewPlanTitle('');
     };
@@ -150,7 +175,6 @@ const PlanManager: React.FC<PlanManagerProps> = ({
     const handleAddItem = (e: React.FormEvent) => {
         e.preventDefault();
         if (!activePlanId || !newItemName || !newItemAmount) return;
-
         const amount = parseInt(newItemAmount.replace(/\./g, ''), 10);
         onAddPlanItem(activePlanId, {
             name: newItemName.trim(),
@@ -160,7 +184,6 @@ const PlanManager: React.FC<PlanManagerProps> = ({
             plannedDate: newItemPlannedDate || undefined,
             status: 'PLANNED',
         });
-
         setNewItemName('');
         setNewItemAmount('');
         setNewItemCategory('');
@@ -176,7 +199,6 @@ const PlanManager: React.FC<PlanManagerProps> = ({
 
     const handleConfirmApply = () => {
         if (!activePlanId || !itemToApply || !applyDate) return;
-
         onApplyPlanItemToTransaction(activePlanId, itemToApply.id, itemToApply, applyDate);
         setApplyModalOpen(false);
         setItemToApply(null);
@@ -195,7 +217,6 @@ const PlanManager: React.FC<PlanManagerProps> = ({
     const handleUpdateItem = (e: React.FormEvent) => {
         e.preventDefault();
         if (!activePlanId || !editingItem) return;
-
         const amount = parseInt(editItemAmount.replace(/\./g, ''), 10);
         onUpdatePlanItem(activePlanId, editingItem.id, {
             name: editItemName.trim(),
@@ -205,22 +226,17 @@ const PlanManager: React.FC<PlanManagerProps> = ({
             plannedDate: editItemPlannedDate || undefined,
             status: editItemStatus,
         });
-
         setEditingItem(null);
     };
 
     const handleConfirmDelete = () => {
         if (!deleteTarget) return;
-
         if (deleteTarget.type === 'plan') {
             onDeletePlan(deleteTarget.planId);
-            if (activePlanId === deleteTarget.planId) {
-                setActivePlanId(null);
-            }
+            if (activePlanId === deleteTarget.planId) setActivePlanId(null);
         } else {
             onDeletePlanItem(deleteTarget.planId, deleteTarget.itemId);
         }
-
         setDeleteTarget(null);
     };
 
@@ -231,26 +247,31 @@ const PlanManager: React.FC<PlanManagerProps> = ({
             onConfirm={handleConfirmDelete}
             title={deleteTarget?.type === 'plan' ? 'Hapus Rencana' : 'Hapus Item Rencana'}
             message={deleteTarget ? (
-                <div className="space-y-2">
-                    <p>
+                <Box>
+                    <Typography>
                         {deleteTarget.type === 'plan' ? 'Rencana' : 'Item rencana'} <strong>"{deleteTarget.title}"</strong> akan dihapus.
-                    </p>
-                    <p className="text-sm opacity-80">
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
                         {deleteTarget.type === 'plan'
                             ? 'Semua item di dalam rencana ini juga akan ikut terhapus.'
                             : 'Tindakan ini tidak bisa dibatalkan.'}
-                    </p>
-                </div>
+                    </Typography>
+                </Box>
             ) : ''}
             confirmText="Hapus"
             type="danger"
         />
     );
 
+    // Plan detail view
     if (activePlanId) {
         const plan = plans.find((currentPlan) => currentPlan.id === activePlanId);
         if (!plan) {
-            return <div onClick={() => setActivePlanId(null)}>Rencana tidak ditemukan. Kembali.</div>;
+            return (
+                <Box>
+                    <Button onClick={() => setActivePlanId(null)}>Rencana tidak ditemukan. Kembali.</Button>
+                </Box>
+            );
         }
 
         const useMonthBalance = !!plan.useCurrentMonthBalance;
@@ -259,12 +280,8 @@ const PlanManager: React.FC<PlanManagerProps> = ({
         const completedItems = plan.items.filter((item) => item.status === 'DONE');
         const cancelledItems = plan.items.filter((item) => item.status === 'CANCELLED');
 
-        const planIncome = plannedItems
-            .filter((item) => item.type === 'INCOME')
-            .reduce((acc, item) => acc + item.amount, 0);
-        const planExpense = plannedItems
-            .filter((item) => item.type === 'EXPENSE')
-            .reduce((acc, item) => acc + item.amount, 0);
+        const planIncome = plannedItems.filter((item) => item.type === 'INCOME').reduce((acc, item) => acc + item.amount, 0);
+        const planExpense = plannedItems.filter((item) => item.type === 'EXPENSE').reduce((acc, item) => acc + item.amount, 0);
         const planTotal = planIncome - planExpense;
         const projectedBalance = baseBalance + planTotal;
         const filteredCategories = categories.filter((category) => category.type === newItemType);
@@ -278,88 +295,109 @@ const PlanManager: React.FC<PlanManagerProps> = ({
         });
 
         return (
-            <div className="space-y-6 animate-fade-in-up pb-20">
-                <button
+            <Box sx={{ pb: { xs: 10, md: 0 } }}>
+                <Button
+                    startIcon={<IconDisplay name="ArrowLeft" size={16} />}
                     onClick={() => setActivePlanId(null)}
-                    className="flex items-center transition-colors"
-                    style={{ color: theme.colors.textMuted }}
+                    sx={{ mb: 3, color: 'text.secondary' }}
                 >
-                    <IconDisplay name="ArrowRight" className="transform rotate-180 mr-1" size={16} /> Kembali ke Daftar
-                </button>
+                    Kembali ke Daftar
+                </Button>
 
-                <div
-                    className="rounded-2xl p-6 shadow-sm border"
-                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                >
-                    <h2 className="text-2xl font-bold mb-1" style={{ color: theme.colors.textPrimary }}>{plan.title}</h2>
-                    <p className="text-sm mb-4" style={{ color: theme.colors.textMuted }}>
+                {/* Plan summary card */}
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 2 }}>
+                    <Typography variant="h5" fontWeight={700} gutterBottom>{plan.title}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                         Rencana ini tidak mengubah saldo utama sampai item dijadikan transaksi.
-                    </p>
+                    </Typography>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div
-                            className="p-4 rounded-xl border"
-                            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                        >
-                            <p className="text-xs uppercase font-medium" style={{ color: theme.colors.textMuted }}>Efek Rencana Aktif</p>
-                            <p className="text-lg font-bold" style={{ color: planTotal >= 0 ? theme.colors.income : theme.colors.expense }}>
-                                {planTotal > 0 ? '+' : ''}{formatRp(planTotal)}
-                            </p>
-                        </div>
-                        <div
-                            className="p-4 rounded-xl border opacity-70"
-                            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                        >
-                            <p className="text-xs uppercase font-medium" style={{ color: theme.colors.textMuted }}>Saldo Sekarang</p>
-                            <p className="text-lg font-bold" style={{ color: theme.colors.textPrimary }}>{formatRp(currentBalance)}</p>
-                        </div>
-                        <div
-                            className="p-4 rounded-xl border"
-                            style={{ backgroundColor: theme.colors.accentLight, borderColor: theme.colors.accent }}
-                        >
-                            <p className="text-xs uppercase font-bold" style={{ color: theme.colors.accent }}>Saldo Proyeksi</p>
-                            <p className="text-lg font-bold" style={{ color: theme.colors.accent }}>{formatRp(projectedBalance)}</p>
-                        </div>
-                        <div
-                            className="p-4 rounded-xl border"
-                            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                        >
-                            <p className="text-xs uppercase font-medium" style={{ color: theme.colors.textMuted }}>Status Item</p>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                                <span className="px-2.5 py-1 rounded-full" style={getStatusStyles('PLANNED')}>
-                                    {plannedItems.length} aktif
-                                </span>
-                                <span className="px-2.5 py-1 rounded-full" style={getStatusStyles('DONE')}>
-                                    {completedItems.length} selesai
-                                </span>
-                                <span className="px-2.5 py-1 rounded-full" style={getStatusStyles('CANCELLED')}>
-                                    {cancelledItems.length} batal
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                        {[
+                            {
+                                label: 'Efek Rencana Aktif',
+                                value: `${planTotal > 0 ? '+' : ''}${formatRp(planTotal)}`,
+                                color: planTotal >= 0 ? theme.colors.income : theme.colors.expense,
+                                highlight: false,
+                            },
+                            {
+                                label: 'Saldo Sekarang',
+                                value: formatRp(currentBalance),
+                                color: 'text.primary' as const,
+                                highlight: false,
+                            },
+                            {
+                                label: 'Saldo Proyeksi',
+                                value: formatRp(projectedBalance),
+                                color: theme.colors.accent,
+                                highlight: true,
+                            },
+                        ].map((stat) => (
+                            <Grid size={{ xs: 12, md: 4 }} key={stat.label}>
+                                <Paper
+                                    variant="outlined"
+                                    sx={{
+                                        p: 2,
+                                        borderRadius: 2,
+                                        bgcolor: stat.highlight ? theme.colors.accentLight : 'action.hover',
+                                        borderColor: stat.highlight ? theme.colors.accent : 'divider',
+                                    }}
+                                >
+                                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ color: stat.highlight ? theme.colors.accent : 'text.secondary' }}>
+                                        {stat.label}
+                                    </Typography>
+                                    <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5, color: stat.color }}>
+                                        {stat.value}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                        ))}
 
-                    <label
-                        className="flex items-center justify-between gap-4 p-4 rounded-xl border cursor-pointer hover:bg-opacity-70 transition-all mt-4"
-                        style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                    >
-                        <div>
-                            <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>Hitung dari saldo bulan ini</p>
-                            <p className="text-xs" style={{ color: theme.colors.textMuted }}>
-                                Proyeksi rencana dihitung dari saldo bulan berjalan ({formatRp(currentMonthBalance)})
-                            </p>
-                        </div>
-                        <input
-                            type="checkbox"
-                            checked={useMonthBalance}
-                            onChange={(e) => onUpdatePlanSettings(plan.id, e.target.checked)}
-                            className="w-5 h-5"
-                            style={{ accentColor: theme.colors.accent }}
-                        />
-                    </label>
-                </div>
+                        <Grid size={{ xs: 12, md: 4 }}>
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                                <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary">
+                                    Status Item
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                                    {[
+                                        { status: 'PLANNED' as PlanItemStatus, count: plannedItems.length, label: 'aktif' },
+                                        { status: 'DONE' as PlanItemStatus, count: completedItems.length, label: 'selesai' },
+                                        { status: 'CANCELLED' as PlanItemStatus, count: cancelledItems.length, label: 'batal' },
+                                    ].map(({ status, count, label }) => (
+                                        <Chip
+                                            key={status}
+                                            size="small"
+                                            label={`${count} ${label}`}
+                                            sx={{ ...getStatusChipProps(status), fontWeight: 600, height: 22, fontSize: 11 }}
+                                        />
+                                    ))}
+                                </Box>
+                            </Paper>
+                        </Grid>
+                    </Grid>
 
-                <button
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={useMonthBalance}
+                                onChange={(e) => onUpdatePlanSettings(plan.id, e.target.checked)}
+                                size="small"
+                            />
+                        }
+                        label={
+                            <Box>
+                                <Typography variant="body2" fontWeight={600}>Hitung dari saldo bulan ini</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Proyeksi rencana dihitung dari saldo bulan berjalan ({formatRp(currentMonthBalance)})
+                                </Typography>
+                            </Box>
+                        }
+                        sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'action.hover', width: '100%', mx: 0, alignItems: 'flex-start' }}
+                    />
+                </Paper>
+
+                {/* Add item button */}
+                <Box
+                    component="button"
                     onClick={() => {
                         setNewItemName('');
                         setNewItemAmount('');
@@ -368,505 +406,352 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                         setNewItemPlannedDate('');
                         setShowAddModal(true);
                     }}
-                    className="w-full p-4 rounded-xl border-2 border-dashed transition-all hover:border-solid flex items-center justify-center gap-2 font-medium"
-                    style={{
+                    sx={{
+                        width: '100%',
+                        p: 2,
+                        mb: 2,
+                        border: '2px dashed',
                         borderColor: theme.colors.accent,
+                        borderRadius: 3,
+                        bgcolor: theme.colors.accentLight,
                         color: theme.colors.accent,
-                        backgroundColor: theme.colors.accentLight,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                        fontWeight: 600,
+                        fontSize: 15,
+                        fontFamily: 'inherit',
+                        transition: 'all 0.15s',
+                        '&:hover': { borderStyle: 'solid', boxShadow: 2 },
                     }}
                 >
                     <IconDisplay name="Plus" size={20} />
                     Tambah Item Rencana
-                </button>
+                </Box>
 
-                <div className="space-y-3">
+                {/* Items list */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {sortedItems.length === 0 ? (
-                        <div className="text-center py-10" style={{ color: theme.colors.textMuted }}>
-                            <IconDisplay name="CalendarDays" size={40} className="mx-auto mb-2 opacity-20" />
-                            <p>Belum ada item di rencana ini.</p>
-                        </div>
+                        <Box sx={{ textAlign: 'center', py: 6 }}>
+                            <IconDisplay name="CalendarDays" size={40} style={{ color: 'rgba(0,0,0,0.15)', marginBottom: 8 }} />
+                            <Typography color="text.secondary">Belum ada item di rencana ini.</Typography>
+                        </Box>
                     ) : (
                         sortedItems.map((item) => {
                             const category = categories.find((entry) => entry.id === item.categoryId);
+                            const chipSx = getStatusChipProps(item.status);
 
                             return (
-                                <div
+                                <Paper
                                     key={item.id}
-                                    className="p-4 rounded-xl border group"
-                                    style={{
-                                        backgroundColor: theme.colors.bgCard,
-                                        borderColor: theme.colors.border,
-                                        opacity: item.status === 'CANCELLED' ? 0.7 : 1,
-                                    }}
+                                    variant="outlined"
+                                    sx={{ p: 2, borderRadius: 2, opacity: item.status === 'CANCELLED' ? 0.7 : 1 }}
                                 >
-                                    <div className="flex items-start justify-between gap-4 mb-3">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div
-                                                className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${category ? '' : 'bg-gray-300'}`}
-                                                style={{ backgroundColor: category?.color }}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 1 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 40,
+                                                    height: 40,
+                                                    borderRadius: '50%',
+                                                    bgcolor: category?.color || '#9ca3af',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                }}
                                             >
-                                                <IconDisplay name={category?.icon || 'HelpCircle'} size={18} />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="flex items-center flex-wrap gap-2">
-                                                    <p className="font-semibold truncate" style={{ color: theme.colors.textPrimary }}>
+                                                <IconDisplay name={category?.icon || 'HelpCircle'} size={18} style={{ color: '#fff' }} />
+                                            </Box>
+                                            <Box sx={{ minWidth: 0 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                    <Typography variant="body2" fontWeight={600} noWrap>
                                                         {category?.name || 'Tanpa Kategori'}
-                                                    </p>
-                                                    <span
-                                                        className="px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                                                        style={getStatusStyles(item.status)}
-                                                    >
-                                                        {STATUS_LABELS[item.status]}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs" style={{ color: theme.colors.textMuted }}>{item.name}</p>
-                                                <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ color: theme.colors.textMuted }}>
-                                                    <IconDisplay name="Calendar" size={12} />
-                                                    <span>{formatDateLabel(item.plannedDate)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                    </Typography>
+                                                    <Chip
+                                                        size="small"
+                                                        label={STATUS_LABELS[item.status]}
+                                                        sx={{ ...chipSx, height: 20, fontSize: 11, fontWeight: 600 }}
+                                                    />
+                                                </Box>
+                                                <Typography variant="caption" color="text.secondary">{item.name}</Typography>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                                                    <IconDisplay name="Calendar" size={11} />
+                                                    <Typography variant="caption" color="text.disabled">{formatDateLabel(item.plannedDate)}</Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
 
-                                        <div className="flex items-center gap-1 shrink-0">
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
                                             {item.status === 'PLANNED' && (
                                                 <>
-                                                    <button
+                                                    <Button
+                                                        size="small"
+                                                        variant="contained"
                                                         onClick={() => openApplyModal(item)}
-                                                        className="p-2 rounded-lg text-xs font-medium flex items-center gap-1"
-                                                        title="Jadikan Transaksi"
-                                                        style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
+                                                        startIcon={<IconDisplay name="Save" size={14} style={{ color: '#fff' }} />}
+                                                        sx={{ borderRadius: 2, fontSize: 12, display: { xs: 'none', sm: 'flex' } }}
+                                                    >
+                                                        Jadikan Transaksi
+                                                    </Button>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => openApplyModal(item)}
+                                                        sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, display: { xs: 'flex', sm: 'none' } }}
                                                     >
                                                         <IconDisplay name="Save" size={14} />
-                                                        <span className="hidden sm:inline">Jadikan Transaksi</span>
-                                                    </button>
-                                                    <button
+                                                    </IconButton>
+                                                    <IconButton
+                                                        size="small"
                                                         onClick={() => onUpdatePlanItemStatus(plan.id, item.id, 'CANCELLED')}
-                                                        className="p-2 rounded-lg transition-colors"
                                                         title="Batalkan item ini"
-                                                        style={{ backgroundColor: theme.colors.expenseBg, color: theme.colors.expense }}
+                                                        sx={{ bgcolor: theme.colors.expenseBg, color: theme.colors.expense }}
                                                     >
                                                         <IconDisplay name="XCircle" size={14} />
-                                                    </button>
+                                                    </IconButton>
                                                 </>
                                             )}
                                             {item.status !== 'PLANNED' && (
-                                                <button
+                                                <IconButton
+                                                    size="small"
                                                     onClick={() => onUpdatePlanItemStatus(plan.id, item.id, 'PLANNED')}
-                                                    className="p-2 rounded-lg transition-colors"
                                                     title="Aktifkan lagi"
-                                                    style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
                                                 >
                                                     <IconDisplay name="RefreshCw" size={14} />
-                                                </button>
+                                                </IconButton>
                                             )}
-                                            <button
-                                                onClick={() => handleEditClick(item)}
-                                                className="p-2 rounded-lg transition-colors"
-                                                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                                                title="Edit item"
-                                            >
+                                            <IconButton size="small" onClick={() => handleEditClick(item)} title="Edit item">
                                                 <IconDisplay name="Edit" size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => setDeleteTarget({
-                                                    type: 'item',
-                                                    planId: plan.id,
-                                                    itemId: item.id,
-                                                    title: item.name,
-                                                })}
-                                                className="p-2 rounded-lg transition-colors text-red-500 hover:bg-red-50"
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => setDeleteTarget({ type: 'item', planId: plan.id, itemId: item.id, title: item.name })}
                                                 title="Hapus item"
                                             >
-                                                <IconDisplay name="Trash2" size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="pl-[52px]">
-                                        <span className="font-bold text-lg" style={{ color: item.type === 'INCOME' ? theme.colors.income : theme.colors.expense }}>
+                                                <IconDisplay name="Trash2" size={14} />
+                                            </IconButton>
+                                        </Box>
+                                    </Box>
+
+                                    <Box sx={{ pl: 7 }}>
+                                        <Typography variant="h6" fontWeight={700} sx={{ color: item.type === 'INCOME' ? theme.colors.income : theme.colors.expense }}>
                                             {item.type === 'INCOME' ? '+' : '-'}{formatRp(item.amount)}
-                                        </span>
-                                    </div>
-                                </div>
+                                        </Typography>
+                                    </Box>
+                                </Paper>
                             );
                         })
                     )}
-                </div>
+                </Box>
 
-                {applyModalOpen && itemToApply && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                        <div
-                            className="rounded-2xl shadow-xl w-full max-w-sm p-6 animate-fade-in-up"
-                            style={{ backgroundColor: theme.colors.bgCard }}
-                        >
-                            <h3 className="text-lg font-bold mb-2" style={{ color: theme.colors.textPrimary }}>Jadikan Transaksi</h3>
-                            <p className="text-sm mb-4" style={{ color: theme.colors.textMuted }}>
-                                Item <strong>{itemToApply.name}</strong> ({formatRp(itemToApply.amount)}) akan dicatat sebagai transaksi nyata. Pilih tanggalnya:
-                            </p>
-                            <input
-                                type="date"
-                                value={applyDate}
-                                onChange={(e) => setApplyDate(e.target.value)}
-                                className="w-full px-4 py-2 border rounded-lg mb-4 outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary,
-                                }}
+                {/* Apply to transaction modal */}
+                <Dialog
+                    open={applyModalOpen && !!itemToApply}
+                    onClose={() => setApplyModalOpen(false)}
+                    maxWidth="xs"
+                    fullWidth
+                    slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+                    PaperProps={{ sx: { borderRadius: 3 } }}
+                >
+                    <Box sx={{ px: 3, pt: 3, pb: 1 }}>
+                        <Typography variant="h6" fontWeight={700} gutterBottom>Jadikan Transaksi</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Item <strong>{itemToApply?.name}</strong> ({itemToApply ? formatRp(itemToApply.amount) : ''}) akan dicatat sebagai transaksi nyata. Pilih tanggalnya:
+                        </Typography>
+                    </Box>
+                    <DialogContent sx={{ px: 3, pb: 3, pt: 0 }}>
+                        <TextField
+                            type="date"
+                            fullWidth
+                            size="small"
+                            value={applyDate}
+                            onChange={(e) => setApplyDate(e.target.value)}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                            sx={{ mb: 2 }}
+                        />
+                        <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end' }}>
+                            <Button variant="outlined" onClick={() => setApplyModalOpen(false)} sx={{ borderRadius: 2 }}>Batal</Button>
+                            <Button variant="contained" onClick={handleConfirmApply} sx={{ borderRadius: 2 }}>Simpan</Button>
+                        </Box>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Edit item modal */}
+                <Dialog
+                    open={!!editingItem}
+                    onClose={() => setEditingItem(null)}
+                    maxWidth="sm"
+                    fullWidth
+                    slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+                    PaperProps={{ sx: { borderRadius: 3 } }}
+                >
+                    <Box sx={{ px: 3, pt: 3, pb: 1 }}>
+                        <Typography variant="h6" fontWeight={700}>Edit Item Rencana</Typography>
+                    </Box>
+                    <DialogContent sx={{ px: 3, pb: 3, pt: 1 }}>
+                        <Box component="form" onSubmit={handleUpdateItem} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <TypeToggle value={editItemType} onChange={setEditItemType} incomeColor={theme.colors.income} expenseColor={theme.colors.expense} />
+                            <TextField label="Nama Item" size="small" fullWidth value={editItemName} onChange={(e) => setEditItemName(e.target.value)} required />
+                            <TextField
+                                label="Jumlah"
+                                size="small"
+                                fullWidth
+                                inputMode="numeric"
+                                value={editItemAmount}
+                                onChange={(e) => setEditItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
+                                required
+                                slotProps={{ input: { startAdornment: <InputAdornment position="start">Rp</InputAdornment> } }}
                             />
-                            <div className="flex gap-2 justify-end">
-                                <button
-                                    onClick={() => setApplyModalOpen(false)}
-                                    className="px-4 py-2 rounded-lg text-sm font-medium"
-                                    style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    onClick={handleConfirmApply}
-                                    className="px-4 py-2 text-white rounded-lg text-sm font-medium"
-                                    style={{ backgroundColor: theme.colors.accent }}
-                                >
-                                    Simpan
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                            <FormControl size="small" fullWidth required>
+                                <InputLabel>Kategori</InputLabel>
+                                <Select label="Kategori" value={editItemCategory} onChange={(e) => setEditItemCategory(e.target.value)}>
+                                    {categories.filter((c) => c.type === editItemType).map((c) => (
+                                        <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <TextField
+                                label="Tanggal Rencana"
+                                type="date"
+                                size="small"
+                                fullWidth
+                                value={editItemPlannedDate}
+                                onChange={(e) => setEditItemPlannedDate(e.target.value)}
+                                slotProps={{ inputLabel: { shrink: true } }}
+                            />
+                            <FormControl size="small" fullWidth>
+                                <InputLabel>Status</InputLabel>
+                                <Select label="Status" value={editItemStatus} onChange={(e) => setEditItemStatus(e.target.value as PlanItemStatus)}>
+                                    <MenuItem value="PLANNED">Direncanakan</MenuItem>
+                                    <MenuItem value="DONE">Sudah Dicatat</MenuItem>
+                                    <MenuItem value="CANCELLED">Dibatalkan</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', pt: 1 }}>
+                                <Button variant="outlined" onClick={() => setEditingItem(null)} sx={{ borderRadius: 2 }}>Batal</Button>
+                                <Button type="submit" variant="contained" sx={{ borderRadius: 2 }}>Simpan Perubahan</Button>
+                            </Box>
+                        </Box>
+                    </DialogContent>
+                </Dialog>
 
-                {editingItem && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                        <div
-                            className="rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in-up"
-                            style={{ backgroundColor: theme.colors.bgCard }}
-                        >
-                            <h3 className="text-lg font-bold mb-4" style={{ color: theme.colors.textPrimary }}>Edit Item Rencana</h3>
-                            <form onSubmit={handleUpdateItem} className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Tipe</label>
-                                    <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgHover }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditItemType('EXPENSE')}
-                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
-                                            style={{
-                                                backgroundColor: editItemType === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
-                                                color: editItemType === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted,
-                                                boxShadow: editItemType === 'EXPENSE' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                            }}
-                                        >
-                                            Pengeluaran
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditItemType('INCOME')}
-                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
-                                            style={{
-                                                backgroundColor: editItemType === 'INCOME' ? theme.colors.bgCard : 'transparent',
-                                                color: editItemType === 'INCOME' ? theme.colors.income : theme.colors.textMuted,
-                                                boxShadow: editItemType === 'INCOME' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                            }}
-                                        >
-                                            Pemasukan
-                                        </button>
-                                    </div>
-                                </div>
+                {/* Add item modal */}
+                <Dialog
+                    open={showAddModal}
+                    onClose={() => setShowAddModal(false)}
+                    maxWidth="sm"
+                    fullWidth
+                    slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+                    PaperProps={{ sx: { borderRadius: 3 } }}
+                >
+                    <Box sx={{ px: 3, pt: 3, pb: 1 }}>
+                        <Typography variant="h6" fontWeight={700}>Tambah Item Rencana</Typography>
+                    </Box>
+                    <DialogContent sx={{ px: 3, pb: 3, pt: 1 }}>
+                        <Box component="form" onSubmit={handleAddItem} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <TypeToggle value={newItemType} onChange={setNewItemType} incomeColor={theme.colors.income} expenseColor={theme.colors.expense} />
+                            <TextField
+                                label="Nama Item"
+                                size="small"
+                                fullWidth
+                                placeholder="mis: Tiket liburan"
+                                value={newItemName}
+                                onChange={(e) => setNewItemName(e.target.value)}
+                                required
+                            />
+                            <TextField
+                                label="Jumlah"
+                                size="small"
+                                fullWidth
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={newItemAmount}
+                                onChange={(e) => setNewItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
+                                required
+                                slotProps={{ input: { startAdornment: <InputAdornment position="start">Rp</InputAdornment> } }}
+                            />
+                            <FormControl size="small" fullWidth required>
+                                <InputLabel>Kategori</InputLabel>
+                                <Select label="Kategori" value={newItemCategory} onChange={(e) => setNewItemCategory(e.target.value)}>
+                                    <MenuItem value="">Pilih Kategori...</MenuItem>
+                                    {filteredCategories.map((c) => (
+                                        <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <TextField
+                                label="Tanggal Rencana"
+                                type="date"
+                                size="small"
+                                fullWidth
+                                value={newItemPlannedDate}
+                                onChange={(e) => setNewItemPlannedDate(e.target.value)}
+                                slotProps={{ inputLabel: { shrink: true } }}
+                            />
+                            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', pt: 1 }}>
+                                <Button variant="outlined" onClick={() => setShowAddModal(false)} sx={{ borderRadius: 2 }}>Batal</Button>
+                                <Button type="submit" variant="contained" sx={{ borderRadius: 2 }}>Tambah Item</Button>
+                            </Box>
+                        </Box>
+                    </DialogContent>
+                </Dialog>
 
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Nama Item</label>
-                                    <input
-                                        type="text"
-                                        value={editItemName}
-                                        onChange={(e) => setEditItemName(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                        style={{
-                                            backgroundColor: theme.colors.bgHover,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.textPrimary,
-                                        }}
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Jumlah</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2 text-sm" style={{ color: theme.colors.textMuted }}>Rp</span>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={editItemAmount}
-                                            onChange={(e) => setEditItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
-                                            className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm font-semibold outline-none"
-                                            style={{
-                                                backgroundColor: theme.colors.bgHover,
-                                                borderColor: theme.colors.border,
-                                                color: theme.colors.textPrimary,
-                                            }}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Kategori</label>
-                                    <select
-                                        value={editItemCategory}
-                                        onChange={(e) => setEditItemCategory(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                        style={{
-                                            backgroundColor: theme.colors.bgHover,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.textPrimary,
-                                        }}
-                                        required
-                                    >
-                                        {categories.filter((category) => category.type === editItemType).map((category) => (
-                                            <option key={category.id} value={category.id}>{category.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Tanggal Rencana</label>
-                                    <input
-                                        type="date"
-                                        value={editItemPlannedDate}
-                                        onChange={(e) => setEditItemPlannedDate(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                        style={{
-                                            backgroundColor: theme.colors.bgHover,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.textPrimary,
-                                        }}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Status</label>
-                                    <select
-                                        value={editItemStatus}
-                                        onChange={(e) => setEditItemStatus(e.target.value as PlanItemStatus)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                        style={{
-                                            backgroundColor: theme.colors.bgHover,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.textPrimary,
-                                        }}
-                                    >
-                                        <option value="PLANNED">Direncanakan</option>
-                                        <option value="DONE">Sudah Dicatat</option>
-                                        <option value="CANCELLED">Dibatalkan</option>
-                                    </select>
-                                </div>
-
-                                <div className="flex gap-2 justify-end pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingItem(null)}
-                                        className="px-4 py-2 rounded-lg text-sm font-medium"
-                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                                    >
-                                        Batal
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-4 py-2 text-white rounded-lg text-sm font-medium"
-                                        style={{ backgroundColor: theme.colors.accent }}
-                                    >
-                                        Simpan Perubahan
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {showAddModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                        <div
-                            className="rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in-up"
-                            style={{ backgroundColor: theme.colors.bgCard }}
-                        >
-                            <h3 className="text-lg font-bold mb-4" style={{ color: theme.colors.textPrimary }}>Tambah Item Rencana</h3>
-                            <form onSubmit={handleAddItem} className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Tipe</label>
-                                    <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgHover }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewItemType('EXPENSE')}
-                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
-                                            style={{
-                                                backgroundColor: newItemType === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
-                                                color: newItemType === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted,
-                                                boxShadow: newItemType === 'EXPENSE' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                            }}
-                                        >
-                                            Pengeluaran
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewItemType('INCOME')}
-                                            className="flex-1 px-4 py-2 rounded-md text-xs font-bold"
-                                            style={{
-                                                backgroundColor: newItemType === 'INCOME' ? theme.colors.bgCard : 'transparent',
-                                                color: newItemType === 'INCOME' ? theme.colors.income : theme.colors.textMuted,
-                                                boxShadow: newItemType === 'INCOME' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                            }}
-                                        >
-                                            Pemasukan
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Nama Item</label>
-                                    <input
-                                        type="text"
-                                        placeholder="mis: Tiket liburan"
-                                        value={newItemName}
-                                        onChange={(e) => setNewItemName(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                        style={{
-                                            backgroundColor: theme.colors.bgHover,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.textPrimary,
-                                        }}
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Jumlah</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2 text-sm" style={{ color: theme.colors.textMuted }}>Rp</span>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            placeholder="0"
-                                            value={newItemAmount}
-                                            onChange={(e) => setNewItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
-                                            className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm font-semibold outline-none"
-                                            style={{
-                                                backgroundColor: theme.colors.bgHover,
-                                                borderColor: theme.colors.border,
-                                                color: theme.colors.textPrimary,
-                                            }}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Kategori</label>
-                                    <select
-                                        value={newItemCategory}
-                                        onChange={(e) => setNewItemCategory(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                        style={{
-                                            backgroundColor: theme.colors.bgHover,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.textPrimary,
-                                        }}
-                                        required
-                                    >
-                                        <option value="">Pilih Kategori...</option>
-                                        {filteredCategories.map((category) => (
-                                            <option key={category.id} value={category.id}>{category.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-medium mb-2 block" style={{ color: theme.colors.textMuted }}>Tanggal Rencana</label>
-                                    <input
-                                        type="date"
-                                        value={newItemPlannedDate}
-                                        onChange={(e) => setNewItemPlannedDate(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none"
-                                        style={{
-                                            backgroundColor: theme.colors.bgHover,
-                                            borderColor: theme.colors.border,
-                                            color: theme.colors.textPrimary,
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="flex gap-2 justify-end pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAddModal(false)}
-                                        className="px-4 py-2 rounded-lg text-sm font-medium"
-                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                                    >
-                                        Batal
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-4 py-2 text-white rounded-lg text-sm font-medium"
-                                        style={{ backgroundColor: theme.colors.accent }}
-                                    >
-                                        Tambah Item
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
                 {deleteDialog}
-            </div>
+            </Box>
         );
     }
 
+    // Plans list view
     return (
         <>
-            <div className="space-y-6 pb-20 animate-fade-in-up">
-                <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>Rencana</h2>
-                    <p className="text-sm" style={{ color: theme.colors.textMuted }}>
-                        Siapkan pemasukan dan pengeluaran berikutnya tanpa langsung mengubah saldo.
-                    </p>
-                </div>
-                </div>
+            <Box sx={{ pb: { xs: 10, md: 0 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                    <Box>
+                        <Typography variant="h5" fontWeight={700}>Rencana</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Siapkan pemasukan dan pengeluaran berikutnya tanpa langsung mengubah saldo.
+                        </Typography>
+                    </Box>
+                </Box>
 
-                <form
+                {/* Create plan form */}
+                <Paper
+                    variant="outlined"
+                    component="form"
                     onSubmit={handleCreate}
-                    className="p-4 rounded-xl border shadow-sm flex flex-col md:flex-row gap-3"
-                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+                    sx={{ p: 2, borderRadius: 3, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 3 }}
                 >
-                    <input
-                        type="text"
+                    <TextField
+                        size="small"
+                        fullWidth
                         placeholder="Judul rencana baru (mis: Liburan Bali)"
-                        className="flex-1 px-4 py-2.5 border rounded-lg outline-none"
                         value={newPlanTitle}
                         onChange={(e) => setNewPlanTitle(e.target.value)}
-                        style={{
-                            backgroundColor: theme.colors.bgHover,
-                            borderColor: theme.colors.border,
-                            color: theme.colors.textPrimary,
-                        }}
+                        sx={{ flex: 1 }}
                     />
-                    <button
+                    <Button
                         type="submit"
-                        className="text-white px-6 py-2.5 rounded-lg font-bold shadow-md transition-all disabled:opacity-50"
-                        style={{ backgroundColor: theme.colors.accent }}
+                        variant="contained"
                         disabled={!newPlanTitle.trim()}
+                        sx={{ borderRadius: 2, fontWeight: 700, px: 4, flexShrink: 0 }}
                     >
                         Buat Rencana
-                    </button>
-                </form>
+                    </Button>
+                </Paper>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Plans grid */}
+                <Grid container spacing={2}>
                     {plans.length === 0 ? (
-                        <div
-                            className="col-span-full text-center py-12 rounded-2xl border border-dashed"
-                            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                        >
-                            <IconDisplay name="CalendarDays" size={48} className="mx-auto mb-3" style={{ color: theme.colors.textMuted }} />
-                            <p className="font-medium" style={{ color: theme.colors.textSecondary }}>Belum ada rencana.</p>
-                            <p className="text-sm" style={{ color: theme.colors.textMuted }}>Buat rencana keuanganmu sekarang.</p>
-                        </div>
+                        <Grid size={{ xs: 12 }}>
+                            <Paper variant="outlined" sx={{ p: 6, borderRadius: 3, borderStyle: 'dashed', textAlign: 'center' }}>
+                                <IconDisplay name="CalendarDays" size={48} style={{ color: 'rgba(0,0,0,0.15)', marginBottom: 12 }} />
+                                <Typography fontWeight={600} color="text.secondary">Belum ada rencana.</Typography>
+                                <Typography variant="body2" color="text.disabled">Buat rencana keuanganmu sekarang.</Typography>
+                            </Paper>
+                        </Grid>
                     ) : (
                         plans.map((plan) => {
                             const plannedItems = plan.items.filter((item) => item.status === 'PLANNED');
@@ -877,70 +762,80 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                             const useMonthBalance = !!plan.useCurrentMonthBalance;
 
                             return (
-                                <div
-                                    key={plan.id}
-                                    onClick={() => setActivePlanId(plan.id)}
-                                    className="p-5 rounded-2xl border shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
-                                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                                >
-                                    <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: theme.colors.accent }} />
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className="flex-1 pr-8">
-                                            <h3 className="font-bold text-lg mb-1" style={{ color: theme.colors.textPrimary }}>{plan.title}</h3>
-                                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium">
-                                                {useMonthBalance && (
-                                                    <div className="flex items-center gap-1.5" style={{ color: theme.colors.accent }}>
-                                                        <IconDisplay name="Calendar" size={12} />
-                                                        <span>Saldo bulan ini</span>
-                                                    </div>
-                                                )}
-                                                <span
-                                                    className="px-2 py-1 rounded-full"
-                                                    style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textMuted }}
+                                <Grid size={{ xs: 12, md: 6 }} key={plan.id}>
+                                    <Paper
+                                        variant="outlined"
+                                        onClick={() => setActivePlanId(plan.id)}
+                                        sx={{
+                                            p: 2.5,
+                                            borderRadius: 3,
+                                            cursor: 'pointer',
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            transition: 'box-shadow 0.15s',
+                                            '&:hover': { boxShadow: 3 },
+                                        }}
+                                    >
+                                        {/* Accent bar */}
+                                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', bgcolor: theme.colors.accent }} />
+
+                                        <Box sx={{ pl: 1.5 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                                <Box sx={{ flex: 1, pr: 1 }}>
+                                                    <Typography variant="h6" fontWeight={700} gutterBottom sx={{ lineHeight: 1.3 }}>
+                                                        {plan.title}
+                                                    </Typography>
+                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                        {useMonthBalance && (
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: theme.colors.accent }}>
+                                                                <IconDisplay name="Calendar" size={12} />
+                                                                <Typography variant="caption" fontWeight={600}>Saldo bulan ini</Typography>
+                                                            </Box>
+                                                        )}
+                                                        <Chip size="small" label={`${plannedItems.length} aktif`} sx={{ height: 20, fontSize: 11 }} />
+                                                        {doneCount > 0 && (
+                                                            <Chip
+                                                                size="small"
+                                                                label={`${doneCount} selesai`}
+                                                                sx={{ height: 20, fontSize: 11, bgcolor: theme.colors.incomeBg, color: theme.colors.income }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                </Box>
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setDeleteTarget({ type: 'plan', planId: plan.id, title: plan.title });
+                                                    }}
+                                                    title="Hapus rencana"
                                                 >
-                                                    {plannedItems.length} aktif
-                                                </span>
-                                                {doneCount > 0 && (
-                                                    <span
-                                                        className="px-2 py-1 rounded-full"
-                                                        style={{ backgroundColor: theme.colors.incomeBg, color: theme.colors.income }}
-                                                    >
-                                                        {doneCount} selesai
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setDeleteTarget({ type: 'plan', planId: plan.id, title: plan.title });
-                                            }}
-                                            className="text-gray-300 hover:text-red-500 p-1 absolute top-4 right-4 z-10 hover:scale-110 transition-transform"
-                                            title="Hapus rencana"
-                                        >
-                                            <IconDisplay name="Trash2" size={18} />
-                                        </button>
-                                    </div>
-                                    <div className="flex justify-between items-end mt-4">
-                                        <span
-                                            className="text-xs px-2 py-1 rounded-md"
-                                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textMuted }}
-                                        >
-                                            {plan.items.length} item
-                                        </span>
-                                        <div className="text-right">
-                                            <p className="text-xs uppercase" style={{ color: theme.colors.textMuted }}>Efek Rencana Aktif</p>
-                                            <p className="font-bold text-lg" style={{ color: total >= 0 ? theme.colors.income : theme.colors.expense }}>
-                                                {total > 0 ? '+' : ''}{formatRp(total)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                                                    <IconDisplay name="Trash2" size={16} />
+                                                </IconButton>
+                                            </Box>
+
+                                            <Divider sx={{ my: 1.5 }} />
+
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                                <Chip size="small" label={`${plan.items.length} item`} sx={{ height: 22 }} />
+                                                <Box sx={{ textAlign: 'right' }}>
+                                                    <Typography variant="caption" textTransform="uppercase" color="text.secondary">
+                                                        Efek Rencana Aktif
+                                                    </Typography>
+                                                    <Typography variant="h6" fontWeight={700} sx={{ color: total >= 0 ? theme.colors.income : theme.colors.expense }}>
+                                                        {total > 0 ? '+' : ''}{formatRp(total)}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
                             );
                         })
                     )}
-                </div>
-            </div>
+                </Grid>
+            </Box>
             {deleteDialog}
         </>
     );

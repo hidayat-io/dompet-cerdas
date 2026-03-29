@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.6.0
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.7.0
 
-**Status**: ✅ Fully Documented  
-**Last Updated**: March 28, 2026  
-**Version**: 2.6.0  
+**Status**: ✅ Fully Documented
+**Last Updated**: March 29, 2026
+**Version**: 2.7.0
 **Live URL**: https://dompas.indoomega.my.id
 
 ---
@@ -15,6 +15,7 @@
 - 🧠 **AI Integration**: Google Gemini untuk OCR receipt dan analisis keuangan
 
 **Key Features**:
+- ✅ UI konsisten berbasis **Material UI** — semua komponen pakai MUI, dark/light mode via MUI ThemeProvider
 - ✅ Multi-`Akun Keuangan` untuk memisahkan data pribadi, keluarga, bisnis, atau bersama
 - ✅ Dashboard dengan pie chart breakdown
 - ✅ Receipt scanning via Telegram (Vision API)
@@ -76,7 +77,7 @@ dompet_cerdas/
 │   ├── NotificationModal.tsx       # Centered notifications
 │   ├── Toast.tsx                   # Toast notifications
 │   ├── LinkTelegram.tsx            # Telegram account linking page
-│   └── IconDisplay.tsx             # Dynamic Lucide icon renderer
+│   └── IconDisplay.tsx             # Dynamic Material icon renderer
 │
 ├── contexts/
 │   └── ThemeContext.tsx            # Light/dark theme provider
@@ -145,7 +146,8 @@ dompet_cerdas/
 | **Frontend** | React | 19.x | UI framework |
 | **Build** | Vite | 6.x | Build tool & dev server |
 | **Language** | TypeScript | 5.8 | Type safety |
-| **UI Library** | Lucide React | 0.561.x | 150+ icons |
+| **UI Library** | Material UI (MUI) | 6.x | Component library, theming, sx prop |
+| **Icons** | @mui/icons-material | 6.x | 150+ Material icons |
 | **Charts** | Recharts | 3.x | Expense pie chart |
 | **Auth** | Firebase Auth | 12.x | Google sign-in |
 | **Database** | Firestore | 12.x | Real-time NoSQL DB |
@@ -197,7 +199,7 @@ dompet_cerdas/
 ### 5️⃣ Master Kategori (Categories)
 - **CRUD**: Add, edit, delete categories
 - **Separated Views**: Income vs Expense categories
-- **Icon Selection**: 150+ Lucide icons
+- **Icon Selection**: 150+ Material icons (`@mui/icons-material`)
 - **Color Picker**: 8 preset colors
 - **Type Classification**: Income or Expense
 - **Reusable Modal**: Consistent UX across app
@@ -504,6 +506,8 @@ Berikut ringkasan implementasi phase yang sudah selesai:
    Modul tracking hutang/piutang dengan redesign UX lebih sederhana.
 10. **Phase 9 - Polish, Onboarding, and Adoption**
     Onboarding user baru, helper dashboard, dan panduan singkat di Settings.
+11. **Phase 10 - Material UI Migration**
+    Seluruh komponen dimigrasikan ke MUI (`@mui/material`, `@mui/icons-material`). Tailwind className dan inline styles diganti dengan `sx` prop dan MUI components. `lucide-react` dihapus dari dependencies. ThemeContext dibungkus MUI ThemeProvider.
 
 ### Telegram Webhook Setup
 
@@ -620,7 +624,7 @@ AI Advisor: 30s cooldown, 10/hour, 50/day per user
 ## 📊 Performance & Optimization
 
 ### Build Output
-- ~1.4MB JS bundle
+- ~1.75MB JS bundle (termasuk MUI + ExcelJS)
 - Committed `dist/` folder for low-RAM server deployment
 - Vite cache for fast development rebuilds
 
@@ -729,7 +733,7 @@ firebase functions:log
 |------|----------|
 | Add new feature | `App.tsx` for state, `components/` for UI |
 | Change theme colors | `contexts/ThemeContext.tsx` |
-| Add new icon | `types.ts` IconName, `constants.ts` AVAILABLE_ICONS |
+| Add new icon | Tambah nama icon di `constants.ts` AVAILABLE_ICONS (string nama `@mui/icons-material`) |
 | Modify database queries | `App.tsx` or service files in `services/` |
 | Update AI advisor | `functions/src/services/advisorService.ts` |
 | Change NLU logic | `functions/src/services/nluService.ts` |
@@ -776,7 +780,7 @@ firebase functions:log
 ## 🚨 Known Issues
 
 1. **Firestore Index**: Collection group query memerlukan index (auto-created, 5-15 min to build)
-2. **Large Bundle**: ~1.4MB JS bundle (consider code splitting)
+2. **Large Bundle**: ~1.75MB JS bundle (MUI + ExcelJS; consider code splitting)
 3. **Single Currency**: Only IDR (Indonesian Rupiah)
 4. **Limited Offline**: Basic asset caching, full PWA planned
 
@@ -830,6 +834,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.7.0** | Mar 29, 2026 | Migrasi UI ke Material UI — semua komponen MUI, icons ke `@mui/icons-material`, hapus `lucide-react` |
 | **v2.6.0** | Mar 28, 2026 | Akun Keuangan, Rencana, Anggaran, Telegram multi-input + voice, Hutang Piutang, onboarding |
 | **v2.2.2** | Feb 2, 2026 | Document upload support, caption parsing, compression |
 | **v2.2.1** | Jan 30, 2026 | Gemini model fix, list categories, smarter NLU |
@@ -852,6 +857,6 @@ firebase functions:log
 
 ---
 
-**Last Updated**: March 28, 2026  
-**Status**: ✅ Internal Testing Ready  
+**Last Updated**: March 29, 2026
+**Status**: ✅ Internal Testing Ready
 **Support**: Check documentation or Firebase console logs

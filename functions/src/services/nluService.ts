@@ -45,6 +45,7 @@ export interface ParsedIntent {
         description?: string;
         category_hint?: string;
         category_filter?: string;
+        type_filter?: 'INCOME' | 'EXPENSE';
         limit?: number;
         sort_by?: 'date' | 'amount'; // 'date' = terakhir (recent), 'amount' = tertinggi (highest)
     };
@@ -99,6 +100,11 @@ const ADVICE_KEYWORDS = [
     'tanpa suffering'
 ];
 
+const TRANSACTION_QUERY_PATTERN = /transaksi|transaski|transsaksi|tranaksi|trans\b/i;
+const DETAIL_QUERY_PATTERN = /detail|rincian|apa\s+aja|apa\s+saja|list|tampilkan|lihat|show|tunjukkan/i;
+const RANKING_QUERY_PATTERN = /\b(top|last|latest|terakhir|tertinggi|terbesar|terbanyak|highest|biggest|largest)\b/i;
+const LIMIT_QUERY_PATTERN = /\b(top|last|latest)\s+\d+\b|(?:^|\s)\d+\s+(?:transaksi|transaski|transsaksi|tranaksi|trans|item|data|pengeluaran)\b/i;
+
 function containsQueryKeywords(message: string): boolean {
     const lower = message.toLowerCase();
     return QUERY_KEYWORDS.some((keyword) => lower.includes(keyword));
@@ -107,6 +113,41 @@ function containsQueryKeywords(message: string): boolean {
 function containsAdviceKeywords(message: string): boolean {
     const lower = message.toLowerCase();
     return ADVICE_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
+function isThisMonthPhrase(message: string): boolean {
+    return /bulan\s+ini|bln\s+ini|bulan\s+ni|this\s+month|thins\s+month/i.test(message);
+}
+
+export function shouldPreferAIIntentParsing(message: string, simpleIntent: ParsedIntent): boolean {
+    const lower = message.toLowerCase().trim();
+    const hasDetailSignals = DETAIL_QUERY_PATTERN.test(lower) || TRANSACTION_QUERY_PATTERN.test(lower);
+    const hasRankingSignals = RANKING_QUERY_PATTERN.test(lower) || LIMIT_QUERY_PATTERN.test(lower);
+    const hasExpenseOrIncomeWord = /\bpengeluaran|pemasukan\b/i.test(lower);
+    const hasTypoTransactionWord = /\b(transaski|transsaksi|tranaksi)\b/i.test(lower);
+
+    if (hasTypoTransactionWord) {
+        return true;
+    }
+
+    if (simpleIntent.intent === 'query_expenses' || simpleIntent.intent === 'query_income') {
+        if (hasRankingSignals || hasDetailSignals) {
+            return true;
+        }
+    }
+
+    if (simpleIntent.intent === 'category_breakdown' && hasRankingSignals) {
+        return true;
+    }
+
+    if (simpleIntent.intent === 'query_details') {
+        const isCanonicalRecentQuery = /^(last\s+\d+\s+trans|\d+\s+(transaksi|trans)\s+terakhir|top\s+\d+\s+transaksi(?:\s+bulan\s+ini)?)$/i.test(lower);
+        if (!isCanonicalRecentQuery && (hasRankingSignals || hasExpenseOrIncomeWord)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function detectSimpleIntent(message: string): ParsedIntent | null {
@@ -170,7 +211,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
         else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
         else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-        else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+        else if (isThisMonthPhrase(lower)) time_range = 'this_month';
         else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
 
         if (time_range) {
@@ -207,7 +248,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
         else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
         else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-        else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+        else if (isThisMonthPhrase(lower)) time_range = 'this_month';
         else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
 
         return {
@@ -218,7 +259,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
     }
 
     // Transaction details / list queries (check BEFORE expense/income queries for "detail pengeluaran")
-    if (/transaksi|trans\b|detail|rincian|apa\s+aja|apa\s+saja|list|tampilkan|lihat|show|tunjukkan/i.test(lower)) {
+    if (TRANSACTION_QUERY_PATTERN.test(lower) || /detail|rincian|apa\s+aja|apa\s+saja|list|tampilkan|lihat|show|tunjukkan/i.test(lower)) {
         let time_range: TimeRange | undefined;
 
         // Check for "N hari terakhir" pattern first (e.g., "detail pengeluaran 7 hari terakhir") - maps to last_week
@@ -227,11 +268,18 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         } else if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
         else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
         else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-        else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+        else if (isThisMonthPhrase(lower)) time_range = 'this_month';
         else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
 
         // Extract category filter if present
         let category_filter: string | undefined;
+        let type_filter: 'INCOME' | 'EXPENSE' | undefined;
+
+        if (/\bpemasukan|income\b/i.test(lower)) {
+            type_filter = 'INCOME';
+        } else if (/\bpengeluaran|expense|expenses\b/i.test(lower)) {
+            type_filter = 'EXPENSE';
+        }
 
         // Pattern 1: "kategori X" (explicit)
         const categoryMatch = lower.match(/kategori\s+(\w+)/i);
@@ -265,7 +313,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         let sort_by: 'date' | 'amount' | undefined;
 
         // Pattern for "tertinggi/terbesar" (highest by amount)
-        const highestMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|trans|pengeluaran)?\s*(?:tertinggi|terbesar|terbanyak)/i);
+        const highestMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|transaski|transsaksi|tranaksi|trans|pengeluaran|pemasukan)?\s*(?:tertinggi|terbesar|terbanyak|highest|biggest|largest)/i);
         if (highestMatch) {
             limit = parseInt(highestMatch[1], 10);
             sort_by = 'amount';
@@ -282,7 +330,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
 
         // Pattern for "terakhir" (recent by date) - only if not already matched
         if (!limit) {
-            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|trans|item|data)?\s*terakhir|last\s+(\d+)/i);
+            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|transaski|transsaksi|tranaksi|trans|item|data|pengeluaran|pemasukan)?\s*terakhir|last\s+(\d+)/i);
             if (recentMatch) {
                 const numStr = recentMatch.slice(1).find(v => v !== undefined);
                 if (numStr) {
@@ -298,9 +346,69 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
             parameters: {
                 time_range: specific_date ? undefined : (limit ? time_range : (time_range || 'this_week')),
                 category_filter,
+                type_filter,
                 limit,
                 sort_by,
                 specific_date
+            }
+        };
+    }
+
+    const hasTypedRankingPattern =
+        /\btop\s+\d+\b/i.test(lower) ||
+        /(?:^|\s)\d+\s+(?:pemasukan|pengeluaran|income|expense|expenses)\s+(?:terakhir|tertinggi|terbesar|terbanyak)\b/i.test(lower) ||
+        (/\b(?:pemasukan|pengeluaran|income|expense|expenses)\b/i.test(lower) &&
+            /\b(?:tertinggi|terbesar|terbanyak|highest|biggest|largest)\b/i.test(lower) &&
+            /\b\d+\b/.test(lower));
+
+    if (/\b(pemasukan|pengeluaran|income|expense|expenses)\b/i.test(lower) && hasTypedRankingPattern) {
+        let time_range: TimeRange | undefined;
+        if (/\d+\s+hari\s+ter[a-z]+/i.test(lower)) {
+            time_range = 'last_week';
+        } else if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
+        else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
+        else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
+        else if (isThisMonthPhrase(lower)) time_range = 'this_month';
+        else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
+
+        const type_filter: 'INCOME' | 'EXPENSE' = /\b(pemasukan|income)\b/i.test(lower) ? 'INCOME' : 'EXPENSE';
+
+        let limit: number | undefined;
+        let sort_by: 'date' | 'amount' | undefined;
+
+        const highestMatch = lower.match(/(?:^|\s)(\d+)\s+(?:pemasukan|pengeluaran|income|expense|expenses)?\s*(?:tertinggi|terbesar|terbanyak|highest|biggest|largest)/i);
+        if (highestMatch) {
+            limit = parseInt(highestMatch[1], 10);
+            sort_by = 'amount';
+        }
+
+        if (!limit) {
+            const topMatch = lower.match(/top\s+(\d+)/i);
+            if (topMatch) {
+                limit = parseInt(topMatch[1], 10);
+                sort_by = 'amount';
+            }
+        }
+
+        if (!limit) {
+            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:pemasukan|pengeluaran|income|expense|expenses)?\s*terakhir|last\s+(\d+)/i);
+            if (recentMatch) {
+                const numStr = recentMatch.slice(1).find(v => v !== undefined);
+                if (numStr) {
+                    limit = parseInt(numStr, 10);
+                    sort_by = 'date';
+                }
+            }
+        }
+
+        return {
+            intent: 'query_details',
+            confidence: 'high',
+            parameters: {
+                time_range: time_range,
+                type_filter,
+                limit,
+                sort_by,
             }
         };
     }
@@ -323,7 +431,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
             } else if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
             else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
             else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-            else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+            else if (isThisMonthPhrase(lower)) time_range = 'this_month';
             else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
 
             return {
@@ -348,7 +456,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
             if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
             else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
             else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-            else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+            else if (isThisMonthPhrase(lower)) time_range = 'this_month';
             else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
 
             return {
@@ -562,11 +670,15 @@ export async function parseIntent(message: string): Promise<ParsedIntent> {
 
         // Try simple rule-based intent detection for standard queries
         const simpleIntent = detectSimpleIntent(message);
-        if (simpleIntent) {
+        const shouldRefineWithAI = simpleIntent
+            ? shouldPreferAIIntentParsing(message, simpleIntent)
+            : false;
+
+        if (simpleIntent && !shouldRefineWithAI) {
             return simpleIntent;
         }
 
-        const manualParsed = extractManualTransaction(message);
+        const manualParsed = !simpleIntent ? extractManualTransaction(message) : null;
         if (manualParsed && !containsQueryKeywords(message)) {
             return {
                 intent: 'add_transaction',
@@ -599,6 +711,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
     "description": "string" (hanya untuk add_transaction),
     "category_hint": "string" (optional, tebak kategori dari deskripsi),
     "category_filter": "string" (jika user menyebut kategori spesifik untuk filter, contoh: 'Bill', 'Food', 'Shopping'),
+    "type_filter": "INCOME | EXPENSE" (jika user minta detail/list khusus pemasukan atau pengeluaran),
     "limit": number (jika user menyebut jumlah item yang diminta, contoh: "5 transaksi terakhir" => 5)
   },
   "clarification_needed": "string atau null jika tidak jelas"
@@ -610,6 +723,8 @@ Rules:
 3. Intent "query_balance" = tanya saldo/balance sekarang (berapa saldo/sisa uang/balance)
 4. Intent "query_details" = minta detail/list transaksi (apa aja/detailkan/list/rincian/5 transaksi terakhir/transaksi tgl 27)
    - Jika menyebut kategori spesifik ("detailkan kategori Bill"), isi category_filter
+   - Jika user minta khusus pemasukan, isi type_filter = "INCOME"
+   - Jika user minta khusus pengeluaran, isi type_filter = "EXPENSE"
    - Jika menyebut jumlah item ("5 transaksi terakhir", "top 10 pengeluaran", "last 3"), isi parameter "limit" dengan angka tersebut.
    - **Jika menyebut tanggal spesifik ("tgl 27", "27 jan", "tanggal 5 kemarin"), isi parameter "specific_date" (YYYY-MM-DD).**
 5. Intent "add_transaction" = tambah/catat transaksi manual
@@ -666,6 +781,8 @@ Contoh:
 "detailkan transaksi 7 hari terakhir" → intent: query_details, time_range: last_week, confidence: high
 "detailkan kategori Bill bulan ini" → intent: query_details, time_range: this_month, category_filter: "Bill", confidence: high
 "rincian Food minggu ini" → intent: query_details, time_range: this_week, category_filter: "Food", confidence: high
+"tampilkan 10 pemasukan terakhir" → intent: query_details, limit: 10, sort_by: "date", type_filter: "INCOME", confidence: high
+"top 10 pengeluaran bulan ini" → intent: query_details, limit: 10, sort_by: "amount", time_range: "this_month", type_filter: "EXPENSE", confidence: high
 "kategori paling boros bulan ini" → intent: category_breakdown, time_range: this_month, confidence: high
 "bulan ini transaksi paling boros apa" → intent: category_breakdown, time_range: this_month, confidence: high
 "apa aja pengeluaran hari ini?" → intent: query_details, time_range: today, confidence: high
@@ -678,6 +795,8 @@ Contoh:
 "Gaji Feb: 35 juta" → intent: add_transaction, amount: 35000000, description: "Gaji Feb", confidence: high
 "last 5 trans" → intent: query_details, limit: 5, confidence: high
 "5 transaksi terakhir" → intent: query_details, limit: 5, confidence: high
+"top 10 pengeluaran bulan ini" → intent: query_details, limit: 10, sort_by: "amount", time_range: "this_month", confidence: high
+"top 10 transaski bulan ini" → intent: query_details, limit: 10, sort_by: "amount", time_range: "this_month", confidence: high
 "gimana keuanganku bulan ini?" → intent: financial_advice, time_range: this_month, confidence: high
 "analisa pengeluaran aku" → intent: financial_advice, time_range: this_month, confidence: high
 "tips hemat bulan depan?" → intent: savings_strategy, time_range: this_month, confidence: high
@@ -719,6 +838,10 @@ Contoh:
         if (params.time_range && !validRanges.has(params.time_range)) {
             delete params.time_range;
         }
+        const validTypeFilters = new Set(['INCOME', 'EXPENSE']);
+        if (params.type_filter && !validTypeFilters.has(params.type_filter)) {
+            delete params.type_filter;
+        }
         // Normalize custom_month format YYYY-MM
         if (params.custom_month && !/^\d{4}-\d{2}$/.test(params.custom_month)) {
             delete params.custom_month;
@@ -748,7 +871,11 @@ Contoh:
     } catch (error) {
         console.error('Error parsing intent:', error);
 
-        // Fallback to unknown intent
+        const simpleFallback = detectSimpleIntent(message);
+        if (simpleFallback) {
+            return simpleFallback;
+        }
+
         return {
             intent: 'unknown',
             confidence: 'low',

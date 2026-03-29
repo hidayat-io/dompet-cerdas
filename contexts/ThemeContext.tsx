@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 
 // Simple theme types - just light and dark
 export type ThemeName = 'light' | 'dark';
@@ -120,6 +122,60 @@ export const themes: Record<ThemeName, Theme> = {
     }
 };
 
+// Build MUI theme from custom colors
+function buildMuiTheme(t: Theme) {
+    return createTheme({
+        palette: {
+            mode: t.name,
+            primary: {
+                main: t.colors.accent,
+                dark: t.colors.accentHover,
+                light: t.colors.accentLight,
+                contrastText: t.colors.accentText,
+            },
+            info: {
+                main: t.colors.income,
+            },
+            error: {
+                main: t.colors.expense,
+            },
+            background: {
+                default: t.colors.bgPrimary,
+                paper: t.colors.bgCard,
+            },
+            text: {
+                primary: t.colors.textPrimary,
+                secondary: t.colors.textSecondary,
+                disabled: t.colors.textMuted,
+            },
+            divider: t.colors.border,
+        },
+        typography: {
+            fontFamily: "'Inter', sans-serif",
+        },
+        shape: {
+            borderRadius: 12,
+        },
+        components: {
+            MuiButton: {
+                styleOverrides: {
+                    root: {
+                        textTransform: 'none',
+                        fontWeight: 600,
+                    },
+                },
+            },
+            MuiPaper: {
+                styleOverrides: {
+                    root: {
+                        backgroundImage: 'none',
+                    },
+                },
+            },
+        },
+    });
+}
+
 // Context type
 interface ThemeContextType {
     theme: Theme;
@@ -182,9 +238,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         }
     }, [theme, isDark]);
 
+    const muiTheme = buildMuiTheme(theme);
+
     return (
         <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme }}>
-            {children}
+            <MuiThemeProvider theme={muiTheme}>
+                <CssBaseline />
+                {children}
+            </MuiThemeProvider>
         </ThemeContext.Provider>
     );
 };

@@ -5,8 +5,8 @@
 
 import { CategoryData, TransactionDetail } from './queryService';
 
-export function escapeMarkdown(text: string): string {
-    return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+export function escapeMarkdown(text: string | number | null | undefined): string {
+    return String(text ?? '').replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
 }
 
 export function withAccountHeader(message: string, accountName?: string): string {

@@ -6,6 +6,22 @@ import { Transaction, Category, FinancialAccount, AccountType } from '../types';
 import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
 import { APP_VERSION, APP_BUILD_DATE } from '../constants';
 import { getAccountTypeLabel, sanitizeAccountNameForFilename } from '../utils/accountLabels';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Grid from '@mui/material/Grid';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Switch from '@mui/material/Switch';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
 
 interface SettingsProps {
     accounts: FinancialAccount[];
@@ -46,30 +62,17 @@ const Settings: React.FC<SettingsProps> = ({
     const [newAccountType, setNewAccountType] = useState<AccountType>('PERSONAL');
     const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
-    // Toast state
     const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({
-        show: false,
-        message: '',
-        type: 'success'
+        show: false, message: '', type: 'success'
     });
 
-    // Export Excel states
     const [isExporting, setIsExporting] = useState(false);
     const [exportRange, setExportRange] = useState<'current' | 'custom' | 'all'>('current');
-    const [customStartDate, setCustomStartDate] = useState(() => {
-        const { startDate } = getCurrentMonthRange();
-        return startDate;
-    });
-    const [customEndDate, setCustomEndDate] = useState(() => {
-        const { endDate } = getCurrentMonthRange();
-        return endDate;
-    });
+    const [customStartDate, setCustomStartDate] = useState(() => getCurrentMonthRange().startDate);
+    const [customEndDate, setCustomEndDate] = useState(() => getCurrentMonthRange().endDate);
 
     const handleDeleteAll = async () => {
-        if (deleteConfirmText !== 'HAPUS SEMUA') {
-            return;
-        }
-
+        if (deleteConfirmText !== 'HAPUS SEMUA') return;
         setIsDeleting(true);
         try {
             await onDeleteAllTransactions();
@@ -89,7 +92,6 @@ const Settings: React.FC<SettingsProps> = ({
         try {
             let startDate: string | undefined;
             let endDate: string | undefined;
-
             if (exportRange === 'current') {
                 const range = getCurrentMonthRange();
                 startDate = range.startDate;
@@ -98,8 +100,6 @@ const Settings: React.FC<SettingsProps> = ({
                 startDate = customStartDate;
                 endDate = customEndDate;
             }
-            // 'all' = no date filter
-
             const result = await exportToExcel({
                 transactions,
                 categories,
@@ -109,23 +109,11 @@ const Settings: React.FC<SettingsProps> = ({
                     ? `Transaksi_${sanitizeAccountNameForFilename(activeAccountName)}`
                     : undefined
             });
-
-            setToast({
-                show: true,
-                message: `✅ Berhasil export ${result.recordCount} transaksi ke Excel!`,
-                type: 'success'
-            });
+            setToast({ show: true, message: `✅ Berhasil export ${result.recordCount} transaksi ke Excel!`, type: 'success' });
         } catch (error) {
             console.error('Error exporting to Excel:', error);
-
-            // Check if it's a file size error
             const errorMessage = error instanceof Error ? error.message : 'Gagal export ke Excel. Silakan coba lagi.';
-
-            setToast({
-                show: true,
-                message: `❌ ${errorMessage}`,
-                type: 'error'
-            });
+            setToast({ show: true, message: `❌ ${errorMessage}`, type: 'error' });
         } finally {
             setIsExporting(false);
         }
@@ -136,7 +124,6 @@ const Settings: React.FC<SettingsProps> = ({
             setToast({ show: true, message: 'Isi nama Akun Keuangan terlebih dahulu.', type: 'info' });
             return;
         }
-
         setIsCreatingAccount(true);
         try {
             await onCreateAccount(newAccountName, newAccountType);
@@ -150,705 +137,447 @@ const Settings: React.FC<SettingsProps> = ({
         }
     };
 
-    const activeAccount = accounts.find((account) => account.id === activeAccountId) || null;
-    const telegramAccount = accounts.find((account) => account.id === telegramDefaultAccountId) || null;
+    const activeAccount = accounts.find((a) => a.id === activeAccountId) || null;
+    const telegramAccount = accounts.find((a) => a.id === telegramDefaultAccountId) || null;
 
     return (
-        <div className="space-y-6 pb-20 md:pb-0">
-            <h2
-                className="text-2xl font-bold"
-                style={{ color: theme.colors.textPrimary }}
-            >
-                Pengaturan
-            </h2>
+        <Box sx={{ pb: { xs: 10, md: 0 } }}>
+            <Typography variant="h5" fontWeight={700} sx={{ mb: 3 }}>Pengaturan</Typography>
 
-            <div
-                className="rounded-xl border p-6"
-                style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: theme.colors.border
-                }}
-            >
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h3
-                            className="font-semibold text-lg"
-                            style={{ color: theme.colors.textPrimary }}
-                        >
-                            Akun Keuangan
-                        </h3>
-                        <p
-                            className="text-sm mt-1"
-                            style={{ color: theme.colors.textSecondary }}
-                        >
+            {/* Financial Accounts */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Akun Keuangan</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             Pisahkan transaksi untuk kebutuhan pribadi, keluarga, bisnis, atau keuangan bersama.
-                        </p>
-                    </div>
-                    <div
-                        className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                        style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
-                    >
-                        Aktif: {activeAccount?.name || '-'}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 mt-5">
-                    <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
-                            Ganti Akun
-                        </label>
-                        <select
-                            value={activeAccountId || ''}
-                            onChange={(event) => onSwitchAccount(event.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border outline-none"
-                            style={{
-                                backgroundColor: theme.colors.bgPrimary,
-                                borderColor: theme.colors.border,
-                                color: theme.colors.textPrimary
-                            }}
-                        >
-                            {accounts.map((account) => (
-                                <option key={account.id} value={account.id}>
-                                    {account.name} • {getAccountTypeLabel(account.type)}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div
-                        className="rounded-xl border p-4"
-                        style={{
-                            backgroundColor: theme.colors.bgHover,
-                            borderColor: theme.colors.border
-                        }}
-                    >
-                        <p className="text-xs uppercase font-semibold mb-1" style={{ color: theme.colors.textMuted }}>
-                            Total Akun
-                        </p>
-                        <p className="text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                            {accounts.length}
-                        </p>
-                        {activeAccount && (
-                            <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
-                                Tipe aktif: {getAccountTypeLabel(activeAccount.type)}
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_auto] gap-3 mt-5">
-                    <input
-                        type="text"
-                        value={newAccountName}
-                        onChange={(event) => setNewAccountName(event.target.value)}
-                        placeholder="Nama Akun Keuangan baru"
-                        className="px-4 py-3 rounded-xl border outline-none"
-                        style={{
-                            backgroundColor: theme.colors.bgPrimary,
-                            borderColor: theme.colors.border,
-                            color: theme.colors.textPrimary
-                        }}
+                        </Typography>
+                    </Box>
+                    <Chip
+                        label={`Aktif: ${activeAccount?.name || '-'}`}
+                        size="small"
+                        sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, flexShrink: 0 }}
                     />
-                    <select
-                        value={newAccountType}
-                        onChange={(event) => setNewAccountType(event.target.value as AccountType)}
-                        className="px-4 py-3 rounded-xl border outline-none"
-                        style={{
-                            backgroundColor: theme.colors.bgPrimary,
-                            borderColor: theme.colors.border,
-                            color: theme.colors.textPrimary
-                        }}
-                    >
-                        <option value="PERSONAL">{getAccountTypeLabel('PERSONAL')}</option>
-                        <option value="FAMILY">{getAccountTypeLabel('FAMILY')}</option>
-                        <option value="BUSINESS">{getAccountTypeLabel('BUSINESS')}</option>
-                        <option value="SHARED">{getAccountTypeLabel('SHARED')}</option>
-                    </select>
-                    <button
-                        onClick={handleCreateAccount}
-                        disabled={isCreatingAccount}
-                        className="px-5 py-3 rounded-xl text-white font-medium disabled:opacity-60"
-                        style={{ backgroundColor: theme.colors.accent }}
-                    >
-                        {isCreatingAccount ? 'Membuat...' : 'Tambah Akun'}
-                    </button>
-                </div>
-            </div>
+                </Box>
 
-            <div
-                className="rounded-xl border p-6"
-                style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: theme.colors.border
-                }}
-            >
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h3 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
-                            Akun Keuangan Telegram
-                        </h3>
-                        <p className="text-sm mt-1" style={{ color: theme.colors.textSecondary }}>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid size={{ xs: 12, md: 9 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel>Ganti Akun</InputLabel>
+                            <Select
+                                label="Ganti Akun"
+                                value={activeAccountId || ''}
+                                onChange={(e) => onSwitchAccount(e.target.value)}
+                            >
+                                {accounts.map((account) => (
+                                    <MenuItem key={account.id} value={account.id}>
+                                        {account.name} • {getAccountTypeLabel(account.type)}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                            <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary">
+                                Total Akun
+                            </Typography>
+                            <Typography variant="h4" fontWeight={700}>{accounts.length}</Typography>
+                            {activeAccount && (
+                                <Typography variant="caption" color="text.secondary">
+                                    Tipe aktif: {getAccountTypeLabel(activeAccount.type)}
+                                </Typography>
+                            )}
+                        </Paper>
+                    </Grid>
+                </Grid>
+
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 5 }}>
+                        <TextField
+                            label="Nama Akun Keuangan baru"
+                            size="small"
+                            fullWidth
+                            value={newAccountName}
+                            onChange={(e) => setNewAccountName(e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel>Tipe</InputLabel>
+                            <Select
+                                label="Tipe"
+                                value={newAccountType}
+                                onChange={(e) => setNewAccountType(e.target.value as AccountType)}
+                            >
+                                {(['PERSONAL', 'FAMILY', 'BUSINESS', 'SHARED'] as AccountType[]).map((type) => (
+                                    <MenuItem key={type} value={type}>{getAccountTypeLabel(type)}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            disabled={isCreatingAccount}
+                            onClick={handleCreateAccount}
+                            startIcon={isCreatingAccount ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                            sx={{ borderRadius: 2, height: 40 }}
+                        >
+                            {isCreatingAccount ? 'Membuat...' : 'Tambah Akun'}
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Paper>
+
+            {/* Telegram Account */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Akun Keuangan Telegram</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             Bot Telegram akan membaca dan mencatat transaksi ke akun ini secara default.
-                        </p>
-                    </div>
-                    <div
-                        className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                        style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
-                    >
-                        {telegramAccount?.name || 'Belum terhubung'}
-                    </div>
-                </div>
+                        </Typography>
+                    </Box>
+                    <Chip
+                        label={telegramAccount?.name || 'Belum terhubung'}
+                        size="small"
+                        sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, flexShrink: 0 }}
+                    />
+                </Box>
 
-                <div className="mt-5">
-                    <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
-                        Pilih akun Telegram
-                    </label>
-                    <select
+                <FormControl fullWidth size="small" disabled={!telegramLinked || accounts.length <= 1}>
+                    <InputLabel>Pilih akun Telegram</InputLabel>
+                    <Select
+                        label="Pilih akun Telegram"
                         value={telegramDefaultAccountId || accounts[0]?.id || ''}
-                        onChange={(event) => onUpdateTelegramAccount(event.target.value)}
-                        disabled={!telegramLinked || accounts.length <= 1}
-                        className="w-full px-4 py-3 rounded-xl border outline-none disabled:opacity-60"
-                        style={{
-                            backgroundColor: theme.colors.bgPrimary,
-                            borderColor: theme.colors.border,
-                            color: theme.colors.textPrimary
-                        }}
+                        onChange={(e) => onUpdateTelegramAccount(e.target.value)}
                     >
                         {accounts.map((account) => (
-                            <option key={account.id} value={account.id}>
+                            <MenuItem key={account.id} value={account.id}>
                                 {account.name} • {getAccountTypeLabel(account.type)}
-                            </option>
+                            </MenuItem>
                         ))}
-                    </select>
-                    <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
-                        {!telegramLinked
-                            ? 'Hubungkan Telegram terlebih dahulu agar akun default bot bisa diatur.'
-                            : accounts.length <= 1
-                            ? 'Anda baru punya 1 akun, jadi Telegram akan selalu memakai akun ini.'
-                            : 'Bisa juga diganti langsung dari Telegram dengan command /akun.'}
-                    </p>
-                </div>
-            </div>
+                    </Select>
+                </FormControl>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    {!telegramLinked
+                        ? 'Hubungkan Telegram terlebih dahulu agar akun default bot bisa diatur.'
+                        : accounts.length <= 1
+                        ? 'Anda baru punya 1 akun, jadi Telegram akan selalu memakai akun ini.'
+                        : 'Bisa juga diganti langsung dari Telegram dengan command /akun.'}
+                </Typography>
+            </Paper>
 
-            <div
-                className="rounded-xl border p-6"
-                style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: theme.colors.border
-                }}
-            >
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="max-w-2xl">
-                        <h3 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
-                            Panduan Singkat
-                        </h3>
-                        <p className="text-sm mt-1 leading-6" style={{ color: theme.colors.textSecondary }}>
+            {/* Quick Guide */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Panduan Singkat</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             Cocok untuk user baru atau saat ingin mengingat lagi contoh input yang bisa dipakai di Telegram dan input natural.
-                        </p>
-                    </div>
-                    <button
-                        onClick={onOpenOnboarding}
-                        className="px-5 py-3 rounded-xl font-medium text-white"
-                        style={{ backgroundColor: theme.colors.accent }}
-                    >
+                        </Typography>
+                    </Box>
+                    <Button variant="contained" onClick={onOpenOnboarding} sx={{ borderRadius: 2, flexShrink: 0 }}>
                         Buka Panduan
-                    </button>
-                </div>
+                    </Button>
+                </Box>
 
-                <div className="grid gap-3 mt-5 md:grid-cols-3">
+                <Grid container spacing={2}>
                     {[
-                        {
-                            title: 'Contoh input transaksi',
-                            value: 'makan siang 25rb',
-                        },
-                        {
-                            title: 'Contoh input banyak transaksi',
-                            value: 'kopi 18rb, parkir 5rb',
-                        },
-                        {
-                            title: 'Contoh input anggaran',
-                            value: 'bulan ini jatah makan 2 juta',
-                        }
+                        { title: 'Contoh input transaksi', value: 'makan siang 25rb' },
+                        { title: 'Contoh input banyak transaksi', value: 'kopi 18rb, parkir 5rb' },
+                        { title: 'Contoh input anggaran', value: 'bulan ini jatah makan 2 juta' },
                     ].map((item) => (
-                        <div
-                            key={item.title}
-                            className="rounded-xl border p-4"
-                            style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                        >
-                            <p className="text-xs uppercase font-semibold tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
-                                {item.title}
-                            </p>
-                            <p className="mt-3 text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                {item.value}
-                            </p>
-                        </div>
+                        <Grid size={{ xs: 12, md: 4 }} key={item.title}>
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                                <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.12em' }} color="text.secondary">
+                                    {item.title}
+                                </Typography>
+                                <Typography variant="body2" fontWeight={600} sx={{ mt: 1.5 }}>
+                                    {item.value}
+                                </Typography>
+                            </Paper>
+                        </Grid>
                     ))}
-                </div>
-            </div>
+                </Grid>
+            </Paper>
 
-            {/* Theme Section - Simple Toggle */}
-            <div
-                className="rounded-xl border p-6"
-                style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: theme.colors.border
-                }}
-            >
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div
-                            className="p-3 rounded-xl"
-                            style={{ backgroundColor: theme.colors.accentLight }}
-                        >
-                            <IconDisplay
-                                name={isDark ? "Moon" : "Sun"}
-                                size={24}
-                                style={{ color: theme.colors.accent }}
-                            />
-                        </div>
-                        <div>
-                            <h3
-                                className="font-semibold text-lg"
-                                style={{ color: theme.colors.textPrimary }}
-                            >
-                                Mode {isDark ? 'Gelap' : 'Terang'}
-                            </h3>
-                            <p
-                                className="text-sm"
-                                style={{ color: theme.colors.textSecondary }}
-                            >
+            {/* Theme */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: theme.colors.accentLight }}>
+                            <IconDisplay name={isDark ? 'Moon' : 'Sun'} size={24} style={{ color: theme.colors.accent }} />
+                        </Box>
+                        <Box>
+                            <Typography variant="h6" fontWeight={700}>Mode {isDark ? 'Gelap' : 'Terang'}</Typography>
+                            <Typography variant="body2" color="text.secondary">
                                 {isDark ? 'Tampilan gelap untuk mata yang nyaman' : 'Tampilan terang untuk penggunaan sehari-hari'}
-                            </p>
-                        </div>
-                    </div>
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <Switch checked={isDark} onChange={toggleTheme} color="primary" />
+                </Box>
 
-                    {/* Toggle Switch */}
-                    <button
-                        onClick={toggleTheme}
-                        className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
-                        style={{
-                            backgroundColor: isDark ? theme.colors.accent : theme.colors.bgMuted
-                        }}
-                    >
-                        <span className="sr-only">Ganti tema</span>
-                        <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${isDark ? 'translate-x-8' : 'translate-x-1'
-                                }`}
-                        />
-                    </button>
-                </div>
-
-                {/* Theme Preview Cards */}
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                    {/* Light Theme Card */}
-                    <button
-                        onClick={() => !isDark || toggleTheme()}
-                        className={`p-4 rounded-xl border-2 transition-all hover:scale-[1.02] ${!isDark ? 'ring-2 ring-offset-2' : ''
-                            }`}
-                        style={{
-                            backgroundColor: themes.light.colors.bgCard,
-                            borderColor: !isDark ? theme.colors.accent : themes.light.colors.border,
-                            ...((!isDark) && { ringColor: theme.colors.accent })
-                        }}
-                    >
-                        <div className="flex items-center gap-3 mb-3">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center"
-                                style={{ backgroundColor: themes.light.colors.accentLight }}
-                            >
-                                <IconDisplay name="Sun" size={20} style={{ color: '#f59e0b' }} />
-                            </div>
-                            <span
-                                className="font-medium"
-                                style={{ color: themes.light.colors.textPrimary }}
-                            >
-                                Terang
-                            </span>
-                        </div>
-                        <div className="flex gap-1">
-                            <div className="h-2 flex-1 rounded-full" style={{ backgroundColor: themes.light.colors.bgPrimary, border: '1px solid #e5e7eb' }}></div>
-                            <div className="h-2 flex-1 rounded-full" style={{ backgroundColor: themes.light.colors.accent }}></div>
-                            <div className="h-2 flex-1 rounded-full" style={{ backgroundColor: themes.light.colors.income }}></div>
-                        </div>
-                        {!isDark && (
-                            <div
-                                className="mt-3 text-xs font-medium py-1 px-2 rounded-full text-center"
-                                style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
-                            >
-                                ✓ Aktif
-                            </div>
-                        )}
-                    </button>
-
-                    {/* Dark Theme Card */}
-                    <button
-                        onClick={() => isDark || toggleTheme()}
-                        className={`p-4 rounded-xl border-2 transition-all hover:scale-[1.02] ${isDark ? 'ring-2 ring-offset-2' : ''
-                            }`}
-                        style={{
-                            backgroundColor: themes.dark.colors.bgCard,
-                            borderColor: isDark ? theme.colors.accent : themes.dark.colors.border,
-                            ...((isDark) && { ringColor: theme.colors.accent })
-                        }}
-                    >
-                        <div className="flex items-center gap-3 mb-3">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center"
-                                style={{ backgroundColor: themes.dark.colors.accentLight }}
-                            >
-                                <IconDisplay name="Moon" size={20} style={{ color: '#a78bfa' }} />
-                            </div>
-                            <span
-                                className="font-medium"
-                                style={{ color: themes.dark.colors.textPrimary }}
-                            >
-                                Gelap
-                            </span>
-                        </div>
-                        <div className="flex gap-1">
-                            <div className="h-2 flex-1 rounded-full" style={{ backgroundColor: themes.dark.colors.bgPrimary }}></div>
-                            <div className="h-2 flex-1 rounded-full" style={{ backgroundColor: themes.dark.colors.accent }}></div>
-                            <div className="h-2 flex-1 rounded-full" style={{ backgroundColor: themes.dark.colors.income }}></div>
-                        </div>
-                        {isDark && (
-                            <div
-                                className="mt-3 text-xs font-medium py-1 px-2 rounded-full text-center"
-                                style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
-                            >
-                                ✓ Aktif
-                            </div>
-                        )}
-                    </button>
-                </div>
-            </div>
-
-            {/* Export Excel Section */}
-            <div
-                className="rounded-xl border p-6"
-                style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: theme.colors.border
-                }}
-            >
-                <div className="flex items-center gap-3 mb-4">
-                    <div
-                        className="p-3 rounded-xl"
-                        style={{ backgroundColor: theme.colors.incomeBg }}
-                    >
-                        <IconDisplay
-                            name="FileText"
-                            size={24}
-                            style={{ color: theme.colors.income }}
-                        />
-                    </div>
-                    <div>
-                        <h3
-                            className="font-semibold text-lg"
-                            style={{ color: theme.colors.textPrimary }}
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 6 }}>
+                        <Paper
+                            variant="outlined"
+                            onClick={() => isDark && toggleTheme()}
+                            sx={{
+                                p: 2, borderRadius: 2, cursor: 'pointer',
+                                bgcolor: themes.light.colors.bgCard,
+                                borderColor: !isDark ? theme.colors.accent : themes.light.colors.border,
+                                borderWidth: !isDark ? 2 : 1,
+                                transition: 'all 0.15s',
+                                '&:hover': { boxShadow: 2 },
+                            }}
                         >
-                            Ekspor ke Excel
-                        </h3>
-                        <p
-                            className="text-sm"
-                            style={{ color: theme.colors.textSecondary }}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: themes.light.colors.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <IconDisplay name="Sun" size={20} style={{ color: '#f59e0b' }} />
+                                </Box>
+                                <Typography fontWeight={600} sx={{ color: themes.light.colors.textPrimary }}>Terang</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                {[themes.light.colors.bgPrimary, themes.light.colors.accent, themes.light.colors.income].map((c, i) => (
+                                    <Box key={i} sx={{ height: 8, flex: 1, borderRadius: 2, bgcolor: c, border: i === 0 ? '1px solid #e5e7eb' : 'none' }} />
+                                ))}
+                            </Box>
+                            {!isDark && (
+                                <Chip label="✓ Aktif" size="small" sx={{ mt: 1.5, bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, width: '100%' }} />
+                            )}
+                        </Paper>
+                    </Grid>
+                    <Grid size={{ xs: 6 }}>
+                        <Paper
+                            variant="outlined"
+                            onClick={() => !isDark && toggleTheme()}
+                            sx={{
+                                p: 2, borderRadius: 2, cursor: 'pointer',
+                                bgcolor: themes.dark.colors.bgCard,
+                                borderColor: isDark ? theme.colors.accent : themes.dark.colors.border,
+                                borderWidth: isDark ? 2 : 1,
+                                transition: 'all 0.15s',
+                                '&:hover': { boxShadow: 2 },
+                            }}
                         >
-                            Download laporan transaksi dalam format Excel (.xlsx)
-                        </p>
-                    </div>
-                </div>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: themes.dark.colors.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <IconDisplay name="Moon" size={20} style={{ color: '#a78bfa' }} />
+                                </Box>
+                                <Typography fontWeight={600} sx={{ color: themes.dark.colors.textPrimary }}>Gelap</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                {[themes.dark.colors.bgPrimary, themes.dark.colors.accent, themes.dark.colors.income].map((c, i) => (
+                                    <Box key={i} sx={{ height: 8, flex: 1, borderRadius: 2, bgcolor: c }} />
+                                ))}
+                            </Box>
+                            {isDark && (
+                                <Chip label="✓ Aktif" size="small" sx={{ mt: 1.5, bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, width: '100%' }} />
+                            )}
+                        </Paper>
+                    </Grid>
+                </Grid>
+            </Paper>
 
-                {/* Export Options */}
-                <div className="space-y-4">
-                    {/* Range Selection */}
-                    <div>
-                        <label
-                            className="block text-sm font-medium mb-2"
-                            style={{ color: theme.colors.textSecondary }}
-                        >
-                            Pilih Periode:
-                        </label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {/* Current Month */}
-                            <button
-                                onClick={() => setExportRange('current')}
-                                className={`p-3 rounded-lg border-2 transition-all ${exportRange === 'current' ? 'ring-2 ring-offset-2' : ''
-                                    }`}
-                                style={{
-                                    backgroundColor: exportRange === 'current' ? theme.colors.accentLight : theme.colors.bgHover,
-                                    borderColor: exportRange === 'current' ? theme.colors.accent : theme.colors.border,
-                                    color: theme.colors.textPrimary
+            {/* Export Excel */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: theme.colors.incomeBg }}>
+                        <IconDisplay name="FileText" size={24} style={{ color: theme.colors.income }} />
+                    </Box>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Ekspor ke Excel</Typography>
+                        <Typography variant="body2" color="text.secondary">Download laporan transaksi dalam format Excel (.xlsx)</Typography>
+                    </Box>
+                </Box>
+
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1.5 }}>Pilih Periode:</Typography>
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                    {[
+                        { key: 'current' as const, icon: 'Calendar', title: 'Bulan Ini', sub: formatDateRange(getCurrentMonthRange().startDate, getCurrentMonthRange().endDate) },
+                        { key: 'custom' as const, icon: 'CalendarDays', title: 'Rentang Custom', sub: 'Pilih tanggal sendiri' },
+                        { key: 'all' as const, icon: 'Database', title: 'Semua Data', sub: `${transactions.length} transaksi` },
+                    ].map((opt) => (
+                        <Grid size={{ xs: 12, md: 4 }} key={opt.key}>
+                            <Paper
+                                variant="outlined"
+                                onClick={() => setExportRange(opt.key)}
+                                sx={{
+                                    p: 1.5, borderRadius: 2, cursor: 'pointer',
+                                    bgcolor: exportRange === opt.key ? theme.colors.accentLight : 'action.hover',
+                                    borderColor: exportRange === opt.key ? theme.colors.accent : 'divider',
+                                    borderWidth: exportRange === opt.key ? 2 : 1,
+                                    transition: 'all 0.15s',
                                 }}
                             >
-                                <div className="flex items-center gap-2">
-                                    <IconDisplay name="Calendar" size={18} style={{ color: exportRange === 'current' ? theme.colors.accent : theme.colors.textMuted }} />
-                                    <div className="text-left">
-                                        <p className="text-sm font-medium">Bulan Ini</p>
-                                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>
-                                            {formatDateRange(getCurrentMonthRange().startDate, getCurrentMonthRange().endDate)}
-                                        </p>
-                                    </div>
-                                </div>
-                            </button>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <IconDisplay name={opt.icon} size={18} style={{ color: exportRange === opt.key ? theme.colors.accent : undefined }} />
+                                    <Box>
+                                        <Typography variant="body2" fontWeight={600}>{opt.title}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{opt.sub}</Typography>
+                                    </Box>
+                                </Box>
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
 
-                            {/* Custom Range */}
-                            <button
-                                onClick={() => setExportRange('custom')}
-                                className={`p-3 rounded-lg border-2 transition-all ${exportRange === 'custom' ? 'ring-2 ring-offset-2' : ''
-                                    }`}
-                                style={{
-                                    backgroundColor: exportRange === 'custom' ? theme.colors.accentLight : theme.colors.bgHover,
-                                    borderColor: exportRange === 'custom' ? theme.colors.accent : theme.colors.border,
-                                    color: theme.colors.textPrimary
-                                }}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <IconDisplay name="CalendarDays" size={18} style={{ color: exportRange === 'custom' ? theme.colors.accent : theme.colors.textMuted }} />
-                                    <div className="text-left">
-                                        <p className="text-sm font-medium">Rentang Custom</p>
-                                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>Pilih tanggal sendiri</p>
-                                    </div>
-                                </div>
-                            </button>
-
-                            {/* All Transactions */}
-                            <button
-                                onClick={() => setExportRange('all')}
-                                className={`p-3 rounded-lg border-2 transition-all ${exportRange === 'all' ? 'ring-2 ring-offset-2' : ''
-                                    }`}
-                                style={{
-                                    backgroundColor: exportRange === 'all' ? theme.colors.accentLight : theme.colors.bgHover,
-                                    borderColor: exportRange === 'all' ? theme.colors.accent : theme.colors.border,
-                                    color: theme.colors.textPrimary
-                                }}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <IconDisplay name="Database" size={18} style={{ color: exportRange === 'all' ? theme.colors.accent : theme.colors.textMuted }} />
-                                    <div className="text-left">
-                                        <p className="text-sm font-medium">Semua Data</p>
-                                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>{transactions.length} transaksi</p>
-                                    </div>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Custom Date Range Inputs */}
-                    {exportRange === 'custom' && (
-                        <div className="grid grid-cols-2 gap-3 p-4 rounded-lg border" style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}>
-                            <div>
-                                <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.textMuted }}>Dari Tanggal</label>
-                                <input
+                {exportRange === 'custom' && (
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', mb: 2 }}>
+                        <Grid container spacing={2}>
+                            <Grid size={{ xs: 6 }}>
+                                <TextField
+                                    label="Dari Tanggal"
                                     type="date"
+                                    size="small"
+                                    fullWidth
                                     value={customStartDate}
                                     onChange={(e) => setCustomStartDate(e.target.value)}
-                                    className="w-full px-3 py-2 border rounded-lg outline-none text-sm"
-                                    style={{
-                                        backgroundColor: theme.colors.bgCard,
-                                        borderColor: theme.colors.border,
-                                        color: theme.colors.textPrimary
-                                    }}
+                                    slotProps={{ inputLabel: { shrink: true } }}
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.textMuted }}>Sampai Tanggal</label>
-                                <input
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                                <TextField
+                                    label="Sampai Tanggal"
                                     type="date"
+                                    size="small"
+                                    fullWidth
                                     value={customEndDate}
                                     onChange={(e) => setCustomEndDate(e.target.value)}
-                                    className="w-full px-3 py-2 border rounded-lg outline-none text-sm"
-                                    style={{
-                                        backgroundColor: theme.colors.bgCard,
-                                        borderColor: theme.colors.border,
-                                        color: theme.colors.textPrimary
-                                    }}
+                                    slotProps={{ inputLabel: { shrink: true } }}
                                 />
-                            </div>
-                        </div>
-                    )}
+                            </Grid>
+                        </Grid>
+                    </Paper>
+                )}
 
-                    {/* Export Button */}
-                    <button
-                        onClick={handleExportExcel}
-                        disabled={isExporting || transactions.length === 0}
-                        className={`w-full py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${transactions.length === 0 || isExporting
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'hover:scale-[1.02]'
-                            }`}
-                        style={{
-                            backgroundColor: transactions.length > 0 && !isExporting ? theme.colors.income : undefined,
-                            color: transactions.length > 0 && !isExporting ? 'white' : undefined
-                        }}
-                    >
-                        {isExporting ? (
-                            <>
-                                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                                Mengexport...
-                            </>
-                        ) : (
-                            <>
-                                <IconDisplay name="Download" size={20} />
-                                Ekspor ke Excel
-                            </>
-                        )}
-                    </button>
-
-                    {transactions.length === 0 && (
-                        <p className="text-xs text-center" style={{ color: theme.colors.textMuted }}>
-                            Tidak ada transaksi untuk diexport
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {/* Danger Zone - Delete All Transactions */}
-            <div
-                className="rounded-xl border p-6"
-                style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: isDark ? '#991b1b' : '#fecaca'
-                }}
-            >
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: isDark ? '#7f1d1d' : '#fee2e2' }}>
-                        <IconDisplay name="AlertCircle" size={20} className="text-red-500" />
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-red-500">
-                            Zona Berbahaya
-                        </h3>
-                        <p
-                            className="text-sm"
-                            style={{ color: theme.colors.textSecondary }}
-                        >
-                            Tindakan di bawah ini tidak dapat dibatalkan
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    className="p-4 rounded-lg border"
-                    style={{
-                        backgroundColor: theme.colors.bgHover,
-                        borderColor: theme.colors.border
+                <Button
+                    fullWidth
+                    variant="contained"
+                    disabled={isExporting || transactions.length === 0}
+                    onClick={handleExportExcel}
+                    startIcon={isExporting
+                        ? <CircularProgress size={18} sx={{ color: '#fff' }} />
+                        : <IconDisplay name="Download" size={20} style={{ color: '#fff' }} />
+                    }
+                    sx={{
+                        borderRadius: 2,
+                        bgcolor: theme.colors.income,
+                        '&:hover': { bgcolor: theme.colors.income, filter: 'brightness(0.9)' },
+                        '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
                     }}
                 >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <p
-                                className="font-medium"
-                                style={{ color: theme.colors.textPrimary }}
-                            >
-                                Hapus Semua Transaksi
-                            </p>
-                            <p
-                                className="text-sm"
-                                style={{ color: theme.colors.textSecondary }}
-                            >
+                    {isExporting ? 'Mengexport...' : 'Ekspor ke Excel'}
+                </Button>
+                {transactions.length === 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
+                        Tidak ada transaksi untuk diexport
+                    </Typography>
+                )}
+            </Paper>
+
+            {/* Danger Zone */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3, borderColor: isDark ? '#991b1b' : '#fecaca' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                    <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: isDark ? '#7f1d1d' : '#fee2e2' }}>
+                        <IconDisplay name="AlertCircle" size={20} style={{ color: '#ef4444' }} />
+                    </Box>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700} sx={{ color: '#ef4444' }}>Zona Berbahaya</Typography>
+                        <Typography variant="body2" color="text.secondary">Tindakan di bawah ini tidak dapat dibatalkan</Typography>
+                    </Box>
+                </Box>
+
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2 }}>
+                        <Box>
+                            <Typography variant="body1" fontWeight={600}>Hapus Semua Transaksi</Typography>
+                            <Typography variant="body2" color="text.secondary">
                                 {transactionCount > 0
                                     ? `Anda memiliki ${transactionCount} transaksi yang akan dihapus permanen.`
                                     : 'Tidak ada transaksi untuk dihapus.'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setShowDeleteConfirm(true)}
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="contained"
+                            color="error"
                             disabled={transactionCount === 0}
-                            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 flex-shrink-0 ${transactionCount === 0
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-red-600 text-white hover:bg-red-700'
-                                }`}
+                            startIcon={<IconDisplay name="Trash2" size={16} style={{ color: '#fff' }} />}
+                            onClick={() => setShowDeleteConfirm(true)}
+                            sx={{ borderRadius: 2, flexShrink: 0 }}
                         >
-                            <IconDisplay name="Trash2" size={16} />
                             Hapus Semua
-                        </button>
-                    </div>
-                </div>
-            </div>
+                        </Button>
+                    </Box>
+                </Paper>
+            </Paper>
 
             {/* Delete Confirmation Modal */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div
-                        className="rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
-                        style={{ backgroundColor: theme.colors.bgCard }}
-                    >
-                        <div className="bg-red-600 p-4 flex items-center gap-3">
-                            <div className="p-2 bg-white bg-opacity-20 rounded-lg">
-                                <IconDisplay name="AlertCircle" size={24} className="text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold text-lg">Konfirmasi Penghapusan</h3>
-                                <p className="text-red-100 text-sm">Tindakan ini tidak dapat dibatalkan</p>
-                            </div>
-                        </div>
+            <Dialog
+                open={showDeleteConfirm}
+                onClose={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                maxWidth="sm"
+                fullWidth
+                slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+                PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
+            >
+                <Box sx={{ bgcolor: '#dc2626', px: 3, py: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 1.5 }}>
+                        <IconDisplay name="AlertCircle" size={24} style={{ color: '#fff' }} />
+                    </Box>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700} sx={{ color: '#fff' }}>Konfirmasi Penghapusan</Typography>
+                        <Typography variant="body2" sx={{ color: '#fca5a5' }}>Tindakan ini tidak dapat dibatalkan</Typography>
+                    </Box>
+                </Box>
+                <DialogContent sx={{ px: 3, py: 3 }}>
+                    <Typography sx={{ mb: 2 }}>
+                        Anda akan menghapus <strong>{transactionCount} transaksi</strong> secara permanen.
+                        Data yang dihapus tidak dapat dikembalikan.
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Ketik <strong style={{ color: '#ef4444' }}>HAPUS SEMUA</strong> untuk konfirmasi:
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="HAPUS SEMUA"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        sx={{ mb: 3 }}
+                    />
+                    <Box sx={{ display: 'flex', gap: 1.5 }}>
+                        <Button
+                            fullWidth
+                            variant="outlined"
+                            onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                            sx={{ borderRadius: 2 }}
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            color="error"
+                            disabled={deleteConfirmText !== 'HAPUS SEMUA' || isDeleting}
+                            onClick={handleDeleteAll}
+                            startIcon={isDeleting
+                                ? <CircularProgress size={16} sx={{ color: '#fff' }} />
+                                : <IconDisplay name="Trash2" size={16} style={{ color: '#fff' }} />
+                            }
+                            sx={{ borderRadius: 2 }}
+                        >
+                            {isDeleting ? 'Menghapus...' : 'Hapus Semua'}
+                        </Button>
+                    </Box>
+                </DialogContent>
+            </Dialog>
 
-                        <div className="p-6 space-y-4">
-                            <p style={{ color: theme.colors.textPrimary }}>
-                                Anda akan menghapus <strong>{transactionCount} transaksi</strong> secara permanen.
-                                Data yang dihapus tidak dapat dikembalikan.
-                            </p>
-
-                            <div>
-                                <label
-                                    className="block text-sm font-medium mb-2"
-                                    style={{ color: theme.colors.textSecondary }}
-                                >
-                                    Ketik <strong className="text-red-500">HAPUS SEMUA</strong> untuk konfirmasi:
-                                </label>
-                                <input
-                                    type="text"
-                                    value={deleteConfirmText}
-                                    onChange={(e) => setDeleteConfirmText(e.target.value)}
-                                    placeholder="HAPUS SEMUA"
-                                    className="w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-shadow"
-                                    style={{
-                                        backgroundColor: theme.colors.bgHover,
-                                        borderColor: theme.colors.border,
-                                        color: theme.colors.textPrimary,
-                                        border: '1px solid'
-                                    }}
-                                />
-                            </div>
-
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    onClick={() => {
-                                        setShowDeleteConfirm(false);
-                                        setDeleteConfirmText('');
-                                    }}
-                                    className="flex-1 py-2 px-4 rounded-lg font-medium transition-all"
-                                    style={{
-                                        backgroundColor: theme.colors.bgHover,
-                                        color: theme.colors.textPrimary
-                                    }}
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    onClick={handleDeleteAll}
-                                    disabled={deleteConfirmText !== 'HAPUS SEMUA' || isDeleting}
-                                    className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${deleteConfirmText === 'HAPUS SEMUA' && !isDeleting
-                                        ? 'bg-red-600 text-white hover:bg-red-700'
-                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        }`}
-                                >
-                                    {isDeleting ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                            Menghapus...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <IconDisplay name="Trash2" size={16} />
-                                            Hapus Semua
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Toast Notification */}
+            {/* Toast */}
             <Toast
                 isOpen={toast.show}
                 onClose={() => setToast({ ...toast, show: false })}
@@ -856,16 +585,13 @@ const Settings: React.FC<SettingsProps> = ({
                 type={toast.type}
             />
 
-            {/* Version Info */}
-            <div className="text-center py-6 mt-8 border-t" style={{ borderColor: theme.colors.border }}>
-                <p className="text-sm" style={{ color: theme.colors.textMuted }}>
-                    Dompet Cerdas v{APP_VERSION}
-                </p>
-                <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>
-                    Build: {APP_BUILD_DATE}
-                </p>
-            </div>
-        </div>
+            {/* Version */}
+            <Divider sx={{ mt: 4, mb: 2 }} />
+            <Box sx={{ textAlign: 'center', pb: 2 }}>
+                <Typography variant="body2" color="text.disabled">Dompet Cerdas v{APP_VERSION}</Typography>
+                <Typography variant="caption" color="text.disabled" display="block">Build: {APP_BUILD_DATE}</Typography>
+            </Box>
+        </Box>
     );
 };
 

@@ -1,7 +1,7 @@
 {
   "name": "dompetcerdas---expense-tracker",
   "private": true,
-  "version": "2.6.0",
+  "version": "2.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,10 +11,13 @@
     "deploy:hosting:safe": "npm run build && firebase deploy --only hosting --project expensetracker-test-1 --non-interactive && npm run smoke:hosting -- https://expensetracker-test-1.web.app / /link-telegram"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@google/genai": "^1.34.0",
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
     "exceljs": "^4.4.0",
     "firebase": "^12.7.0",
-    "lucide-react": "^0.561.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",

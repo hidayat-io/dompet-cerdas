@@ -4,6 +4,23 @@ import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import TransactionForm from './TransactionForm';
 import { NotificationType } from './NotificationModal';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Chip from '@mui/material/Chip';
+import TextField from '@mui/material/TextField';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import InputAdornment from '@mui/material/InputAdornment';
+import Grid from '@mui/material/Grid';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -21,104 +38,67 @@ interface TransactionListProps {
   onShowNotification?: (type: NotificationType, title: string, message: string, autoClose?: boolean) => void;
 }
 
-// Modal for viewing attachment (moved up for cleaner structure)
+// Modal for viewing attachment
 const AttachmentModal: React.FC<{
   url: string;
   name: string;
   type: 'image' | 'pdf';
   onClose: () => void;
 }> = ({ url, name, type, onClose }) => {
-  const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
 
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="rounded-xl shadow-2xl max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
-        style={{ backgroundColor: theme.colors.bgCard }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="px-4 py-3 flex justify-between items-center border-b"
-          style={{
-            backgroundColor: theme.colors.bgHover,
-            borderColor: theme.colors.border
-          }}
-        >
-          <span className="font-medium truncate" style={{ color: theme.colors.textPrimary }}>{name}</span>
-          <div className="flex items-center gap-2">
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-lg transition-colors"
-              style={{ color: theme.colors.accent }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.accentLight;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-              title="Buka di tab baru"
-            >
-              <IconDisplay name="Share" size={18} />
-            </a>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg transition-colors"
-              style={{ color: theme.colors.textMuted }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.bgMuted;
-                e.currentTarget.style.color = theme.colors.textPrimary;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = theme.colors.textMuted;
-              }}
-            >
-              <IconDisplay name="X" size={18} />
-            </button>
-          </div>
-        </div>
-        <div
-          className="overflow-auto flex-1 p-4 flex items-center justify-center relative"
-          style={{ backgroundColor: theme.colors.bgPrimary }}
-        >
-          {/* Loading Indicator */}
-          {isLoading && (
-            <div className="flex flex-col items-center gap-3 z-10">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent" style={{ borderColor: theme.colors.accent, borderTopColor: 'transparent' }}></div>
-              <p className="text-sm font-medium" style={{ color: theme.colors.textMuted }}>Memuat lampiran...</p>
-            </div>
-          )}
+    <Dialog open onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}>
+      {/* Header */}
+      <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
+        <Typography variant="body2" fontWeight={600} noWrap sx={{ flex: 1, mr: 1 }}>
+          {name}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <IconButton
+            component="a"
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            size="small"
+            title="Buka di tab baru"
+            sx={{ color: 'primary.main' }}
+          >
+            <IconDisplay name="Share" size={18} />
+          </IconButton>
+          <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>
+            <IconDisplay name="X" size={18} />
+          </IconButton>
+        </Box>
+      </Box>
 
-          {type === 'image' ? (
-            <img
-              src={url}
-              alt={name}
-              className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
-              onLoad={() => setIsLoading(false)}
-              onError={() => setIsLoading(false)}
-              style={{ display: isLoading ? 'none' : 'block' }}
-            />
-          ) : (
-            <iframe
-              src={url}
-              title={name}
-              className="w-full h-[70vh] rounded-lg border"
-              style={{
-                borderColor: theme.colors.border,
-                display: isLoading ? 'none' : 'block'
-              }}
-              onLoad={() => setIsLoading(false)}
-            />
-          )}
-        </div>
-      </div>
-    </div>
+      <DialogContent sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400, bgcolor: 'background.default' }}>
+        {isLoading && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <CircularProgress />
+            <Typography variant="body2" color="text.secondary">Memuat lampiran...</Typography>
+          </Box>
+        )}
+        {type === 'image' ? (
+          <Box
+            component="img"
+            src={url}
+            alt={name}
+            onLoad={() => setIsLoading(false)}
+            onError={() => setIsLoading(false)}
+            sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 2, boxShadow: 3, display: isLoading ? 'none' : 'block' }}
+          />
+        ) : (
+          <Box
+            component="iframe"
+            src={url}
+            title={name}
+            onLoad={() => setIsLoading(false)}
+            sx={{ width: '100%', height: '70vh', border: '1px solid', borderColor: 'divider', borderRadius: 2, display: isLoading ? 'none' : 'block' }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -198,7 +178,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
-  const categorySelectRef = useRef<HTMLSelectElement | null>(null);
 
   const yearOptions = useMemo(() => generateYearOptions(), []);
 
@@ -206,12 +185,11 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
   };
 
-  // Filter transactions based on selected filter
+  // Filter transactions
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
       const txDate = new Date(t.date);
 
-      // Date filter
       let dateMatch = false;
       if (filterMode === 'month') {
         dateMatch = txDate.getFullYear() === selectedYear && txDate.getMonth() === selectedMonthIndex;
@@ -223,18 +201,13 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       }
       if (!dateMatch) return false;
 
-      // Category filter
-      if (selectedCategoryId !== 'all' && t.categoryId !== selectedCategoryId) {
-        return false;
-      }
+      if (selectedCategoryId !== 'all' && t.categoryId !== selectedCategoryId) return false;
 
-      // Type filter (Income/Expense)
       if (selectedType !== 'all') {
         const cat = categories.find(c => c.id === t.categoryId);
         if (cat?.type !== selectedType) return false;
       }
 
-      // Search filter (check description and category name)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const descMatch = t.description?.toLowerCase().includes(query);
@@ -253,43 +226,31 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
 
     const groups: { [key: string]: Transaction[] } = {};
     sorted.forEach(t => {
-      if (!groups[t.date]) {
-        groups[t.date] = [];
-      }
+      if (!groups[t.date]) groups[t.date] = [];
       groups[t.date].push(t);
     });
 
-    // Sort transactions within each date group by createdAt descending (newest first)
     Object.keys(groups).forEach(date => {
       groups[date].sort((a, b) => {
         const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return timeB - timeA; // Descending: newest input at top
+        return timeB - timeA;
       });
     });
 
     return groups;
   }, [filteredTransactions]);
 
-  // Calculate totals for filtered transactions
+  // Calculate totals
   const { totalIncome, totalExpense, totalBalance } = useMemo(() => {
     let income = 0;
     let expense = 0;
-
     filteredTransactions.forEach(t => {
       const cat = categories.find(c => c.id === t.categoryId);
-      if (cat?.type === 'INCOME') {
-        income += t.amount;
-      } else {
-        expense += t.amount;
-      }
+      if (cat?.type === 'INCOME') income += t.amount;
+      else expense += t.amount;
     });
-
-    return {
-      totalIncome: income,
-      totalExpense: expense,
-      totalBalance: income - expense
-    };
+    return { totalIncome: income, totalExpense: expense, totalBalance: income - expense };
   }, [filteredTransactions, categories]);
 
   const getDateParts = (dateStr: string) => {
@@ -308,7 +269,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     }, 0);
   };
 
-  // Get current filter label
   const getFilterLabel = () => {
     if (filterMode === 'month') {
       return `${getMonthName(selectedMonthIndex)} ${selectedYear}`;
@@ -319,7 +279,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     }
   };
 
-  // Helper to format date as YYYY-MM-DD without timezone issues
   const formatDateLocal = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -327,25 +286,18 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     return `${year}-${month}-${day}`;
   };
 
-  // Handle month select
   const handleMonthSelect = (monthIndex: number) => {
     setSelectedMonthIndex(monthIndex);
-    const firstDay = new Date(selectedYear, monthIndex, 1);
-    const lastDay = new Date(selectedYear, monthIndex + 1, 0);
-    setStartDate(formatDateLocal(firstDay));
-    setEndDate(formatDateLocal(lastDay));
+    setStartDate(formatDateLocal(new Date(selectedYear, monthIndex, 1)));
+    setEndDate(formatDateLocal(new Date(selectedYear, monthIndex + 1, 0)));
   };
 
-  // Handle year change
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
-    const firstDay = new Date(year, selectedMonthIndex, 1);
-    const lastDay = new Date(year, selectedMonthIndex + 1, 0);
-    setStartDate(formatDateLocal(firstDay));
-    setEndDate(formatDateLocal(lastDay));
+    setStartDate(formatDateLocal(new Date(year, selectedMonthIndex, 1)));
+    setEndDate(formatDateLocal(new Date(year, selectedMonthIndex + 1, 0)));
   };
 
-  // Handle start date change
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
     const [year, month] = value.split('-').map(Number);
@@ -353,7 +305,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     setSelectedMonthIndex(month - 1);
   };
 
-  // Handle end date change
   const handleEndDateChange = (value: string) => {
     setEndDate(value);
     const [startYear, startMonth] = startDate.split('-').map(Number);
@@ -368,16 +319,16 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     const now = new Date();
     setSelectedYear(now.getFullYear());
     setSelectedMonthIndex(now.getMonth());
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    setStartDate(formatDateLocal(firstDay));
-    setEndDate(formatDateLocal(lastDay));
+    setStartDate(formatDateLocal(new Date(now.getFullYear(), now.getMonth(), 1)));
+    setEndDate(formatDateLocal(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
   };
 
   const isCurrentMonth = () => {
     const now = new Date();
     return selectedYear === now.getFullYear() && selectedMonthIndex === now.getMonth();
   };
+
+  const hasActiveFilters = searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all';
 
   return (
     <>
@@ -391,469 +342,417 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
         />
       )}
 
-      <div className="space-y-4 pb-20 md:pb-0">
-        {/* Summary Cards (Top) */}
-        <div className="grid grid-cols-3 gap-3">
-          <div
-            className="rounded-xl border p-3 shadow-sm"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Pemasukan</p>
-            <p className="text-sm md:text-base font-bold" style={{ color: theme.colors.income }}>{formatRp(totalIncome)}</p>
-          </div>
-          <div
-            className="rounded-xl border p-3 shadow-sm"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Pengeluaran</p>
-            <p className="text-sm md:text-base font-bold" style={{ color: theme.colors.expense }}>{formatRp(totalExpense)}</p>
-          </div>
-          <div
-            className="rounded-xl border p-3 shadow-sm"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            <p className="text-xs mb-1" style={{ color: theme.colors.textMuted }}>Saldo</p>
-            <p
-              className="text-sm md:text-base font-bold"
-              style={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense }}
-            >
-              {totalBalance >= 0 ? '+' : ''}{formatRp(totalBalance)}
-            </p>
-          </div>
-        </div>
+      <Box sx={{ pb: { xs: 10, md: 0 } }}>
+        {/* Summary Cards */}
+        <Grid container spacing={1.5} sx={{ mb: 2 }}>
+          {[
+            { label: 'Pemasukan', value: totalIncome, color: theme.colors.income },
+            { label: 'Pengeluaran', value: totalExpense, color: theme.colors.expense },
+            { label: 'Saldo', value: totalBalance, color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense, prefix: totalBalance > 0 ? '+' : '' },
+          ].map((item) => (
+            <Grid size={{ xs: 4 }} key={item.label}>
+              <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                  {item.label}
+                </Typography>
+                <Typography variant="body2" fontWeight={700} sx={{ color: item.color, fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>
+                  {item.prefix}{formatRp(item.value)}
+                </Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
 
-        {/* Header with Filter Toggle */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold hidden md:block" style={{ color: theme.colors.textPrimary }}>Riwayat Transaksi</h2>
-
-          {/* Filter Toggle Button */}
-          <button
+        {/* Header + Filter Toggle */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, gap: 2 }}>
+          <Typography variant="h5" fontWeight={700} sx={{ display: { xs: 'none', md: 'block' } }}>
+            Riwayat Transaksi
+          </Typography>
+          <Button
+            variant="outlined"
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 border rounded-xl px-4 py-2.5 text-sm font-medium transition-colors shadow-sm"
-            style={{
-              backgroundColor: theme.colors.bgCard,
-              borderColor: theme.colors.border,
-              color: theme.colors.textPrimary
-            }}
+            startIcon={<IconDisplay name="Filter" size={16} />}
+            endIcon={<IconDisplay name={showFilters ? 'ArrowUp' : 'ArrowDown'} size={14} />}
+            sx={{ borderRadius: 3, fontWeight: 600, ml: { xs: 0, md: 'auto' } }}
           >
-            <IconDisplay name="Filter" size={16} />
-            <span>{getFilterLabel()}</span>
-            <IconDisplay name={showFilters ? "ArrowUp" : "ArrowDown"} size={14} style={{ color: theme.colors.textMuted }} />
-          </button>
-        </div>
+            {getFilterLabel()}
+          </Button>
+        </Box>
 
         {/* Filter Panel */}
         {showFilters && (
-          <div
-            className="rounded-xl border-2 p-5 shadow-md animate-fade-in-up"
-            style={{ 
-              backgroundColor: theme.name === 'dark' ? '#1e293b' : '#f8fafc',
-              borderColor: theme.name === 'dark' ? '#334155' : '#cbd5e1'
-            }}
-          >
+          <Paper variant="outlined" sx={{ p: 2.5, mb: 2, borderRadius: 3 }}>
             {/* Filter Mode Tabs */}
-            <div
-              className="flex p-1 rounded-lg mb-4"
-              style={{ backgroundColor: theme.colors.bgHover }}
-            >
-              <button
-                onClick={() => setFilterMode('month')}
-                className="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: filterMode === 'month' ? theme.colors.bgCard : 'transparent',
-                  color: filterMode === 'month' ? theme.colors.accent : theme.colors.textMuted,
-                  boxShadow: filterMode === 'month' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                <IconDisplay name="Calendar" size={16} />
-                Per Bulan
-              </button>
-              <button
-                onClick={() => setFilterMode('range')}
-                className="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: filterMode === 'range' ? theme.colors.bgCard : 'transparent',
-                  color: filterMode === 'range' ? theme.colors.accent : theme.colors.textMuted,
-                  boxShadow: filterMode === 'range' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                <IconDisplay name="CalendarDays" size={16} />
-                Rentang Tanggal
-              </button>
-            </div>
+            <Box sx={{ display: 'flex', p: 0.5, borderRadius: 2, bgcolor: 'action.hover', mb: 2 }}>
+              {[
+                { mode: 'month' as FilterMode, label: 'Per Bulan', icon: 'Calendar' },
+                { mode: 'range' as FilterMode, label: 'Rentang Tanggal', icon: 'CalendarDays' },
+              ].map((tab) => (
+                <Box
+                  key={tab.mode}
+                  component="button"
+                  onClick={() => setFilterMode(tab.mode)}
+                  sx={{
+                    flex: 1,
+                    py: 1,
+                    px: 1.5,
+                    border: 'none',
+                    borderRadius: 1.5,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    transition: 'all 0.15s',
+                    bgcolor: filterMode === tab.mode ? 'background.paper' : 'transparent',
+                    color: filterMode === tab.mode ? 'primary.main' : 'text.secondary',
+                    boxShadow: filterMode === tab.mode ? 1 : 0,
+                  }}
+                >
+                  <IconDisplay name={tab.icon} size={16} />
+                  {tab.label}
+                </Box>
+              ))}
+            </Box>
 
-            {/* Month Selector with Year */}
+            {/* Month Selector */}
             {filterMode === 'month' && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                  <span className="text-xs font-medium flex-shrink-0" style={{ color: theme.colors.textMuted }}>Tahun:</span>
+              <Box>
+                {/* Year selector */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflowX: 'auto', pb: 1, mb: 1.5 }}>
+                  <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flexShrink: 0 }}>
+                    Tahun:
+                  </Typography>
                   {yearOptions.map((year) => (
-                    <button
+                    <Box
                       key={year}
+                      component="button"
                       onClick={() => handleYearChange(year)}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0"
-                      style={{
-                        backgroundColor: selectedYear === year ? theme.colors.accent : theme.colors.bgHover,
-                        color: selectedYear === year ? theme.colors.accentText : theme.colors.textPrimary,
-                        boxShadow: selectedYear === year ? '0 2px 4px rgba(0,0,0,0.2)' : 'none'
+                      sx={{
+                        px: 1.5,
+                        py: 0.75,
+                        border: 'none',
+                        borderRadius: 1.5,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        fontFamily: 'inherit',
+                        flexShrink: 0,
+                        bgcolor: selectedYear === year ? 'primary.main' : 'action.hover',
+                        color: selectedYear === year ? '#fff' : 'text.primary',
+                        transition: 'all 0.15s',
                       }}
                     >
                       {year}
-                    </button>
+                    </Box>
                   ))}
-                </div>
+                </Box>
 
-                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                {/* Month grid */}
+                <Grid container spacing={1} sx={{ mb: 1 }}>
                   {Array.from({ length: 12 }, (_, i) => i).map((monthIndex) => (
-                    <button
-                      key={monthIndex}
-                      onClick={() => handleMonthSelect(monthIndex)}
-                      className="py-2 px-3 rounded-lg text-sm font-medium transition-all border"
-                      style={{
-                        backgroundColor: selectedMonthIndex === monthIndex ? theme.colors.accent : theme.colors.bgHover,
-                        color: selectedMonthIndex === monthIndex ? theme.colors.accentText : theme.colors.textPrimary,
-                        borderColor: selectedMonthIndex === monthIndex ? theme.colors.accent : theme.colors.border,
-                        boxShadow: selectedMonthIndex === monthIndex ? '0 2px 4px rgba(0,0,0,0.2)' : 'none'
-                      }}
-                    >
-                      {getShortMonthName(monthIndex)}
-                    </button>
+                    <Grid size={{ xs: 3, md: 2 }} key={monthIndex}>
+                      <Box
+                        component="button"
+                        onClick={() => handleMonthSelect(monthIndex)}
+                        sx={{
+                          width: '100%',
+                          py: 1,
+                          border: '1px solid',
+                          borderRadius: 1.5,
+                          cursor: 'pointer',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          fontFamily: 'inherit',
+                          bgcolor: selectedMonthIndex === monthIndex ? 'primary.main' : 'action.hover',
+                          color: selectedMonthIndex === monthIndex ? '#fff' : 'text.primary',
+                          borderColor: selectedMonthIndex === monthIndex ? 'primary.main' : 'divider',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {getShortMonthName(monthIndex)}
+                      </Box>
+                    </Grid>
                   ))}
-                </div>
+                </Grid>
 
                 {!isCurrentMonth() && (
-                  <button
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    size="small"
+                    startIcon={<IconDisplay name="RefreshCw" size={14} />}
                     onClick={resetToCurrentMonth}
-                    className="mt-3 w-full py-2 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm"
-                    style={{
-                      backgroundColor: theme.colors.bgHover,
-                      color: theme.colors.textPrimary
-                    }}
+                    sx={{ borderRadius: 2, mt: 1 }}
                   >
-                    <IconDisplay name="RefreshCw" size={14} />
                     Kembali ke Bulan Ini
-                  </button>
+                  </Button>
                 )}
-              </div>
+              </Box>
             )}
 
             {/* Date Range Selector */}
             {filterMode === 'range' && (
-              <div className="flex flex-col md:flex-row gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.textMuted }}>Dari Tanggal</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => handleStartDateChange(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg outline-none text-sm"
-                    style={{
-                      backgroundColor: theme.colors.bgHover,
-                      borderColor: theme.colors.border,
-                      color: theme.colors.textPrimary
-                    }}
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.textMuted }}>Sampai Tanggal</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => handleEndDateChange(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg outline-none text-sm"
-                    style={{
-                      backgroundColor: theme.colors.bgHover,
-                      borderColor: theme.colors.border,
-                      color: theme.colors.textPrimary
-                    }}
-                  />
-                </div>
-
-                <button
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { md: 'flex-end' } }}>
+                <TextField
+                  label="Dari Tanggal"
+                  type="date"
+                  size="small"
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Sampai Tanggal"
+                  type="date"
+                  size="small"
+                  value={endDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<IconDisplay name="RefreshCw" size={14} />}
                   onClick={resetToCurrentMonth}
-                  className="py-2 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm flex-shrink-0"
-                  style={{
-                    backgroundColor: theme.colors.bgHover,
-                    color: theme.colors.textPrimary
-                  }}
+                  sx={{ borderRadius: 2, flexShrink: 0, height: 40 }}
                 >
-                  <IconDisplay name="RefreshCw" size={14} />
                   Bulan Ini
-                </button>
-              </div>
+                </Button>
+              </Box>
             )}
 
-            {/* Search & Category Filter Bar */}
-            <div className="flex flex-col md:flex-row gap-3 mt-4">
-              {/* Search Input */}
-              <div className="flex-1 relative">
-                <IconDisplay
-                  name="Search"
-                  size={18}
-                  style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: theme.colors.textMuted
-                  }}
-                />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari transaksi..."
-                  className="w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm outline-none transition-colors"
-                  style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: searchQuery ? theme.colors.accent : theme.colors.border,
-                    color: theme.colors.textPrimary
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = theme.colors.accent;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${theme.colors.accentLight}`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = searchQuery ? theme.colors.accent : theme.colors.border;
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition-colors"
-                    style={{ color: theme.colors.textMuted }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = theme.colors.bgHover;
-                      e.currentTarget.style.color = theme.colors.textPrimary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = theme.colors.textMuted;
-                    }}
-                  >
-                    <IconDisplay name="X" size={14} />
-                  </button>
-                )}
-              </div>
+            {/* Search & Filters */}
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, mt: 2 }}>
+              {/* Search */}
+              <TextField
+                size="small"
+                placeholder="Cari transaksi..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <IconDisplay name="Search" size={18} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                          <IconDisplay name="X" size={14} />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                  }
+                }}
+                sx={{ flex: 1 }}
+              />
 
-              {/* Type Filter Buttons */}
-              <div
-                className="flex p-1 rounded-xl border"
-                style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-              >
+              {/* Type Filter */}
+              <Box sx={{ display: 'flex', p: 0.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', flexShrink: 0 }}>
                 {[
-                  { value: 'all' as const, label: 'Semua' },
+                  { value: 'all' as const, label: 'Semua', icon: null },
                   { value: 'EXPENSE' as const, label: 'Keluar', icon: 'TrendingDown' },
-                  { value: 'INCOME' as const, label: 'Masuk', icon: 'TrendingUp' }
+                  { value: 'INCOME' as const, label: 'Masuk', icon: 'TrendingUp' },
                 ].map((typeOption) => (
-                  <button
+                  <Box
                     key={typeOption.value}
+                    component="button"
                     onClick={() => setSelectedType(typeOption.value)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-                    style={{
-                      backgroundColor: selectedType === typeOption.value
-                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expenseBg : typeOption.value === 'INCOME' ? theme.colors.incomeBg : theme.colors.bgHover)
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.75,
+                      px: 1.5,
+                      py: 0.75,
+                      border: 'none',
+                      borderRadius: 1.5,
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      fontFamily: 'inherit',
+                      transition: 'all 0.15s',
+                      bgcolor: selectedType === typeOption.value
+                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expenseBg : typeOption.value === 'INCOME' ? theme.colors.incomeBg : 'action.selected')
                         : 'transparent',
                       color: selectedType === typeOption.value
-                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expense : typeOption.value === 'INCOME' ? theme.colors.income : theme.colors.accent)
-                        : theme.colors.textMuted
+                        ? (typeOption.value === 'EXPENSE' ? theme.colors.expense : typeOption.value === 'INCOME' ? theme.colors.income : 'primary.main')
+                        : 'text.secondary',
                     }}
                   >
                     {typeOption.icon && <IconDisplay name={typeOption.icon} size={14} />}
                     {typeOption.label}
-                  </button>
+                  </Box>
                 ))}
-              </div>
+              </Box>
 
-              {/* Category Filter Dropdown */}
-              <div className="relative">
-                <select
-                  ref={categorySelectRef}
+              {/* Category Filter */}
+              <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
+                <InputLabel>Kategori</InputLabel>
+                <Select
+                  label="Kategori"
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="appearance-none pl-4 pr-10 py-2.5 border rounded-xl text-sm font-medium outline-none transition-colors cursor-pointer min-w-[160px]"
-                  style={{
-                    backgroundColor: theme.colors.bgCard,
-                    borderColor: selectedCategoryId !== 'all' ? theme.colors.accent : theme.colors.border,
-                    color: theme.colors.textPrimary
-                  }}
                 >
-                  <option value="all">Semua Kategori</option>
-                  <optgroup label="📤 Pengeluaran">
-                    {categories.filter(c => c.type === 'EXPENSE').map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="📥 Pemasukan">
-                    {categories.filter(c => c.type === 'INCOME').map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </optgroup>
-                </select>
-                <button
-                  type="button"
-                  aria-label="Buka filter kategori"
-                  onClick={() => {
-                    categorySelectRef.current?.focus();
-                    categorySelectRef.current?.click();
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg"
-                  style={{ color: theme.colors.textMuted }}
-                >
-                  <IconDisplay name="ArrowDown" size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
+                  <MenuItem value="all">Semua Kategori</MenuItem>
+                  <MenuItem disabled sx={{ fontSize: 12, color: 'text.disabled', py: 0.25 }}>── Pengeluaran ──</MenuItem>
+                  {categories.filter(c => c.type === 'EXPENSE').map(cat => (
+                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                  ))}
+                  <MenuItem disabled sx={{ fontSize: 12, color: 'text.disabled', py: 0.25 }}>── Pemasukan ──</MenuItem>
+                  {categories.filter(c => c.type === 'INCOME').map(cat => (
+                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </Paper>
         )}
 
-        {/* Active Filters Indicator */}
-        {(searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all') && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-medium" style={{ color: theme.colors.textMuted }}>Filter aktif:</span>
+        {/* Active Filters */}
+        {hasActiveFilters && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={600}>Filter aktif:</Typography>
             {searchQuery && (
-              <span
-                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
-                style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
-              >
-                <IconDisplay name="Search" size={12} />
-                "{searchQuery}"
-                <button onClick={() => setSearchQuery('')} className="ml-1 hover:opacity-70">
-                  <IconDisplay name="X" size={10} />
-                </button>
-              </span>
+              <Chip
+                size="small"
+                icon={<IconDisplay name="Search" size={12} />}
+                label={`"${searchQuery}"`}
+                onDelete={() => setSearchQuery('')}
+                sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, height: 24 }}
+              />
             )}
             {selectedType !== 'all' && (
-              <span
-                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
-                style={{
-                  backgroundColor: selectedType === 'EXPENSE' ? theme.colors.expenseBg : theme.colors.incomeBg,
-                  color: selectedType === 'EXPENSE' ? theme.colors.expense : theme.colors.income
+              <Chip
+                size="small"
+                icon={<IconDisplay name={selectedType === 'EXPENSE' ? 'TrendingDown' : 'TrendingUp'} size={12} />}
+                label={selectedType === 'EXPENSE' ? 'Pengeluaran' : 'Pemasukan'}
+                onDelete={() => setSelectedType('all')}
+                sx={{
+                  bgcolor: selectedType === 'EXPENSE' ? theme.colors.expenseBg : theme.colors.incomeBg,
+                  color: selectedType === 'EXPENSE' ? theme.colors.expense : theme.colors.income,
+                  height: 24,
                 }}
-              >
-                <IconDisplay name={selectedType === 'EXPENSE' ? 'TrendingDown' : 'TrendingUp'} size={12} />
-                {selectedType === 'EXPENSE' ? 'Pengeluaran' : 'Pemasukan'}
-                <button onClick={() => setSelectedType('all')} className="ml-1 hover:opacity-70">
-                  <IconDisplay name="X" size={10} />
-                </button>
-              </span>
+              />
             )}
             {selectedCategoryId !== 'all' && (
-              <span
-                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
-                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-              >
-                <IconDisplay name="Tag" size={12} />
-                {categories.find(c => c.id === selectedCategoryId)?.name || 'Kategori'}
-                <button onClick={() => setSelectedCategoryId('all')} className="ml-1 hover:opacity-70">
-                  <IconDisplay name="X" size={10} />
-                </button>
-              </span>
+              <Chip
+                size="small"
+                icon={<IconDisplay name="Tag" size={12} />}
+                label={categories.find(c => c.id === selectedCategoryId)?.name || 'Kategori'}
+                onDelete={() => setSelectedCategoryId('all')}
+                sx={{ height: 24 }}
+              />
             )}
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedType('all');
-                setSelectedCategoryId('all');
-              }}
-              className="text-xs font-medium px-2 py-1 rounded-lg transition-colors"
-              style={{ color: theme.colors.expense }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
+            <Button
+              size="small"
+              color="error"
+              onClick={() => { setSearchQuery(''); setSelectedType('all'); setSelectedCategoryId('all'); }}
+              sx={{ fontSize: 12, px: 1, py: 0.5, minWidth: 0 }}
             >
               Hapus Semua
-            </button>
-          </div>
+            </Button>
+          </Box>
         )}
 
-
         {/* Transaction Count */}
-        <p className="text-sm" style={{ color: theme.colors.textSecondary }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           {filteredTransactions.length} transaksi ditemukan
-        </p>
+        </Typography>
 
         {/* Empty State */}
         {filteredTransactions.length === 0 && (
-          <div
-            className="flex flex-col items-center justify-center py-16 rounded-xl shadow-sm border"
-            style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-          >
-            <div className="p-4 rounded-full mb-4" style={{ backgroundColor: theme.colors.bgHover }}>
-              <IconDisplay name="Search" size={32} style={{ color: theme.colors.textMuted }} />
-            </div>
-            <p className="font-medium" style={{ color: theme.colors.textSecondary }}>Tidak ada transaksi ditemukan</p>
-            <p className="text-sm mt-1 text-center px-4" style={{ color: theme.colors.textMuted }}>
-              {searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all'
+          <Paper variant="outlined" sx={{ py: 8, borderRadius: 3, textAlign: 'center' }}>
+            <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+              <IconDisplay name="Search" size={32} style={{ color: 'var(--text-muted)' }} />
+            </Box>
+            <Typography fontWeight={600} color="text.secondary">Tidak ada transaksi ditemukan</Typography>
+            <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5, px: 4 }}>
+              {hasActiveFilters
                 ? 'Coba ubah filter atau kata kunci pencarian'
                 : 'Coba ubah filter tanggal'}
-            </p>
-          </div>
+            </Typography>
+          </Paper>
         )}
 
-        {/* Transactions List */}
-        <div className="space-y-4">
+        {/* Transactions grouped by date */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {Object.entries(groupedTransactions).map(([date, txs]) => {
             const transactionsForDate = txs as Transaction[];
             const { dayDate, dayName, monthYear } = getDateParts(date);
             const dailyTotal = calculateDailyTotal(transactionsForDate);
 
             return (
-              <div
-                key={date}
-                className="rounded-xl shadow-sm border overflow-hidden"
-                style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-              >
+              <Paper key={date} variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
                 {/* Date Header */}
-                <div
-                  className="px-4 py-3 flex justify-between items-center"
-                  style={{ backgroundColor: theme.colors.bgHover, borderBottom: `1px solid ${theme.colors.border}` }}
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    bgcolor: 'action.hover',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                  }}
                 >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="text-3xl font-light tracking-tighter leading-none"
-                      style={{ color: theme.colors.textPrimary }}
-                    >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Typography sx={{ fontSize: 28, fontWeight: 300, lineHeight: 1, letterSpacing: '-1px' }}>
                       {dayDate}
-                    </span>
-                    <div className="flex flex-col leading-tight">
-                      <span className="text-sm font-bold" style={{ color: theme.colors.textPrimary }}>{dayName}</span>
-                      <span className="text-xs" style={{ color: theme.colors.textMuted }}>{monthYear}</span>
-                    </div>
-                  </div>
-                  {/* Daily Summary */}
-                  <div
-                    className="text-xs font-semibold px-2 py-1 rounded"
-                    style={{
-                      backgroundColor: dailyTotal >= 0 ? theme.colors.incomeBg : theme.colors.expenseBg,
-                      color: dailyTotal >= 0 ? theme.colors.income : theme.colors.expense
+                    </Typography>
+                    <Box>
+                      <Typography variant="body2" fontWeight={700}>{dayName}</Typography>
+                      <Typography variant="caption" color="text.secondary">{monthYear}</Typography>
+                    </Box>
+                  </Box>
+                  <Chip
+                    label={`${dailyTotal > 0 ? '+' : ''}${formatRp(dailyTotal)}`}
+                    size="small"
+                    sx={{
+                      bgcolor: dailyTotal >= 0 ? theme.colors.incomeBg : theme.colors.expenseBg,
+                      color: dailyTotal >= 0 ? theme.colors.income : theme.colors.expense,
+                      fontWeight: 700,
+                      height: 24,
+                      fontSize: 12,
                     }}
-                  >
-                    {dailyTotal > 0 ? '+' : ''}{formatRp(dailyTotal)}
-                  </div>
-                </div>
+                  />
+                </Box>
 
-                {/* Transactions List */}
-                <div style={{ borderColor: theme.colors.border }}>
-                  {transactionsForDate.map((t) => {
-                    const cat = categories.find(c => c.id === t.categoryId);
-                    const isIncome = cat?.type === 'INCOME';
+                {/* Transaction rows */}
+                {transactionsForDate.map((t, idx) => {
+                  const cat = categories.find(c => c.id === t.categoryId);
+                  const isIncome = cat?.type === 'INCOME';
+                  const attachmentData = t.attachmentUrl
+                    ? { url: t.attachmentUrl, name: t.attachmentName || 'Lampiran', type: t.attachmentType || 'image' as 'image' | 'pdf' }
+                    : t.attachment
+                    ? { url: t.attachment.url, name: t.attachment.name, type: t.attachment.type }
+                    : null;
 
-                    return (
-                      <div
-                        key={t.id}
-                        className="p-4 flex items-center justify-between group relative select-none"
-                        style={{
-                          borderBottom: `1px solid ${theme.colors.border}`,
+                  return (
+                    <React.Fragment key={t.id}>
+                      {idx > 0 && <Divider />}
+                      <Box
+                        sx={{
+                          px: 2,
+                          py: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 2,
                           cursor: 'pointer',
-                          transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                          userSelect: 'none',
+                          transition: 'all 0.3s ease',
                           transform: longPressedId === t.id ? 'scale(0.97)' : 'scale(1)',
                           opacity: longPressedId === t.id ? 0.7 : 1,
-                          backgroundColor: longPressedId === t.id ? theme.colors.accentLight : 'transparent'
+                          bgcolor: longPressedId === t.id ? theme.colors.accentLight : 'transparent',
+                          '&:hover': { bgcolor: 'action.hover' },
                         }}
                         onTouchStart={() => handleTouchStart(t)}
                         onTouchEnd={handleTouchEnd}
@@ -862,114 +761,84 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                         onMouseUp={handleTouchEnd}
                         onMouseLeave={handleTouchEnd}
                       >
-                        <div className="flex items-center gap-4 overflow-hidden flex-1">
-                          {/* Icon */}
-                          <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-sm"
-                            style={{ backgroundColor: cat?.color || '#9ca3af' }}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden', flex: 1 }}>
+                          {/* Category icon */}
+                          <Box
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '50%',
+                              bgcolor: cat?.color || '#9ca3af',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              boxShadow: 1,
+                            }}
                           >
-                            <IconDisplay name={cat?.icon || 'HelpCircle'} size={18} />
-                          </div>
+                            <IconDisplay name={cat?.icon || 'HelpCircle'} size={18} style={{ color: '#fff' }} />
+                          </Box>
 
-                          {/* Text Content */}
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className="text-sm font-semibold truncate" style={{ color: theme.colors.textPrimary }}>
+                          {/* Text */}
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography variant="body2" fontWeight={600} noWrap>
                               {cat?.name || 'Kategori Dihapus'}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs truncate" style={{ color: theme.colors.textMuted }}>
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="caption" color="text.secondary" noWrap>
                                 {t.description || 'Tidak ada catatan'}
-                              </span>
-                              {t.attachmentUrl && (
-                                <button
+                              </Typography>
+                              {attachmentData && (
+                                <Chip
+                                  size="small"
+                                  icon={<IconDisplay name={attachmentData.type === 'image' ? 'Image' : 'FileText'} size={10} />}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setViewingAttachment({
-                                      url: t.attachmentUrl!,
-                                      name: t.attachmentName || 'Lampiran',
-                                      type: t.attachmentType || 'image'
-                                    });
+                                    setViewingAttachment(attachmentData);
                                   }}
-                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-all"
-                                  style={{
-                                    color: (t.attachmentType || 'image') === 'image' ? '#10b981' : '#f59e0b',
-                                    backgroundColor: (t.attachmentType || 'image') === 'image' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)'
+                                  sx={{
+                                    height: 18,
+                                    fontSize: 10,
+                                    cursor: 'pointer',
+                                    color: attachmentData.type === 'image' ? '#10b981' : '#f59e0b',
+                                    bgcolor: attachmentData.type === 'image' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                                    '& .MuiChip-label': { px: 0.75 },
                                   }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                  }}
-                                  title={`Lihat ${(t.attachmentType || 'image') === 'image' ? 'foto' : 'PDF'}`}
-                                >
-                                  <IconDisplay name={(t.attachmentType || 'image') === 'image' ? 'Image' : 'FileText'} size={12} />
-                                </button>
+                                />
                               )}
-                              {t.attachment && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setViewingAttachment({
-                                      url: t.attachment!.url,
-                                      name: t.attachment!.name,
-                                      type: t.attachment!.type
-                                    });
-                                  }}
-                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-all"
-                                  style={{
-                                    color: t.attachment.type === 'image' ? '#10b981' : '#f59e0b',
-                                    backgroundColor: t.attachment.type === 'image' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                  }}
-                                  title={`Lihat ${t.attachment.type === 'image' ? 'foto' : 'PDF'}`}
-                                >
-                                  <IconDisplay name={t.attachment.type === 'image' ? 'Image' : 'FileText'} size={12} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                            </Box>
+                          </Box>
+                        </Box>
 
-                        {/* Amount, Edit & Delete */}
-                        <div className="flex items-center gap-2 flex-shrink-0 pl-2">
-                          <span
-                            className="font-bold text-sm whitespace-nowrap mr-2"
-                            style={{ color: isIncome ? theme.colors.income : theme.colors.expense }}
-                          >
-                            {isIncome ? '+' : '-'}{formatRp(t.amount)}
-                          </span>
-
-
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                        {/* Amount */}
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{ color: isIncome ? theme.colors.income : theme.colors.expense, flexShrink: 0, whiteSpace: 'nowrap' }}
+                        >
+                          {isIncome ? '+' : '-'}{formatRp(t.amount)}
+                        </Typography>
+                      </Box>
+                    </React.Fragment>
+                  );
+                })}
+              </Paper>
             );
           })}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {/* Edit Modal */}
       {editingTransaction && onUpdate && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <TransactionForm
-            categories={categories}
-            initialData={editingTransaction}
-            onUpdate={onUpdate}
-            onDelete={onDelete}
-            onAddCategory={onAddCategory}
-            onClose={() => setEditingTransaction(null)}
-            onShowNotification={onShowNotification}
-          />
-        </div>
+        <TransactionForm
+          categories={categories}
+          initialData={editingTransaction}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onAddCategory={onAddCategory}
+          onClose={() => setEditingTransaction(null)}
+          onShowNotification={onShowNotification}
+        />
       )}
     </>
   );

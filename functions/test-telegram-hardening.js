@@ -1,6 +1,7 @@
 const { sanitizeFirestoreData } = require('./lib/utils/firestore');
 const { getFallbackCategory } = require('./lib/services/transactionService');
 const {
+  escapeMarkdown,
   withAccountHeader,
   formatTransactionDraftPreview,
   formatCategoryList,
@@ -35,6 +36,9 @@ function run() {
   const accountHeader = withAccountHeader('Halo', 'Pribadi_[1]');
   assert(accountHeader.includes('Pribadi\\_\\[1\\]'), 'account name should be escaped');
   console.log('✅ PASS: withAccountHeader escapes account name');
+
+  assert(escapeMarkdown(undefined) === '', 'escapeMarkdown should safely handle undefined values');
+  console.log('✅ PASS: escapeMarkdown handles undefined');
 
   const draftPreview = formatTransactionDraftPreview([
     { amount: 25000, description: 'kopi_[test]', categoryName: 'Belanja_[Mall]' },

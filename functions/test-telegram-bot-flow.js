@@ -6,6 +6,7 @@ const linkService = require('./lib/services/linkService');
 const transactionService = require('./lib/services/transactionService');
 const nluService = require('./lib/services/nluService');
 const geminiService = require('./lib/services/geminiService');
+const queryService = require('./lib/services/queryService');
 
 function assert(condition, message) {
   if (!condition) {
@@ -90,6 +91,13 @@ function getLatestCall(recorder, method) {
   return filtered[filtered.length - 1];
 }
 
+function getLatestFinalSendMessage(recorder) {
+  const filtered = recorder.calls.filter(
+    (call) => call.method === 'sendMessage' && typeof call.text === 'string' && !call.text.startsWith('⏳')
+  );
+  return filtered[filtered.length - 1];
+}
+
 async function run() {
   console.log('🧪 TELEGRAM BOT FLOW TEST SUITE');
   console.log('==================================================\n');
@@ -142,6 +150,51 @@ async function run() {
         { id: 'family', name: 'Keluarga', type: 'FAMILY' },
       ],
     }],
+    [9005, {
+      userId: 'user-1',
+      defaultAccountId: 'personal',
+      defaultAccountName: 'Pribadi',
+      accounts: [
+        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
+        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+      ],
+    }],
+    [9006, {
+      userId: 'user-1',
+      defaultAccountId: 'personal',
+      defaultAccountName: 'Pribadi',
+      accounts: [
+        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
+        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+      ],
+    }],
+    [9007, {
+      userId: 'user-1',
+      defaultAccountId: 'personal',
+      defaultAccountName: 'Pribadi',
+      accounts: [
+        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
+        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+      ],
+    }],
+    [9008, {
+      userId: 'user-1',
+      defaultAccountId: 'personal',
+      defaultAccountName: 'Pribadi',
+      accounts: [
+        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
+        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+      ],
+    }],
+    [9009, {
+      userId: 'user-1',
+      defaultAccountId: 'personal',
+      defaultAccountName: 'Pribadi',
+      accounts: [
+        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
+        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+      ],
+    }],
   ]);
 
   linkService.checkTelegramLink = async () => 'user-1';
@@ -170,9 +223,75 @@ async function run() {
 
   transactionService.getUserCategories = async () => categories;
   const savedBatches = [];
+  const detailRequests = [];
   transactionService.createManualTransactionsBatch = async (...args) => {
     savedBatches.push(args);
     return args[1].map((_, index) => `tx-${savedBatches.length}-${index + 1}`);
+  };
+  queryService.getTransactionDetails = async (...args) => {
+    detailRequests.push(args);
+    const typeFilter = args[7];
+
+    if (typeFilter === 'INCOME') {
+      return [
+        {
+          id: 'tx-income-1',
+          amount: 2500000,
+          description: 'Bonus proyek',
+          type: 'INCOME',
+          category: 'Gaji',
+          date: '2026-03-29',
+        },
+        {
+          id: 'tx-income-2',
+          amount: 1750000,
+          description: 'Freelance',
+          type: 'INCOME',
+          category: 'Gaji',
+          date: '2026-03-28',
+        },
+      ];
+    }
+
+    if (typeFilter === 'EXPENSE') {
+      return [
+        {
+          id: 'tx-expense-1',
+          amount: 120000,
+          description: 'Belanja mingguan',
+          type: 'EXPENSE',
+          category: 'Belanja',
+          date: '2026-03-29',
+        },
+        {
+          id: 'tx-expense-2',
+          amount: 18000,
+          description: 'Kopi',
+          type: 'EXPENSE',
+          category: 'Makanan',
+          date: '2026-03-28',
+        },
+      ];
+    }
+
+    return [
+      {
+        id: 'tx-list-1',
+        amount: 120000,
+        description: 'Belanja mingguan',
+        type: 'EXPENSE',
+        category: 'Belanja',
+        date: '2026-03-29',
+      },
+      {
+        id: 'tx-list-2',
+        amount: 18000,
+        description: 'Kopi',
+        type: 'EXPENSE',
+        category: 'Makanan',
+        date: '2026-03-28',
+      },
+    ];
   };
   nluService.classifyCategory = async (description, availableCategories) => {
     if (/hadiah/i.test(description)) {
@@ -396,6 +515,144 @@ async function run() {
   assert(voicePreview.text.includes('Klik *Simpan Semua* kalau sudah benar.'), 'voice preview should support batch save');
   passed += 1;
   console.log('✅ PASS: voice note preview');
+
+  const draftCountBeforeQuery = draftCollection.size;
+  await botModule.processUpdate({
+    update_id: 10,
+    message: {
+      message_id: 106,
+      date: 1,
+      chat: { id: 5001, type: 'private' },
+      from: { id: 9005, is_bot: false, first_name: 'Tester' },
+      text: 'tampilkan 10 trans terakhir',
+    },
+  });
+
+  const queryResponse = getLatestFinalSendMessage(recorder);
+  assert(draftCollection.size === draftCountBeforeQuery, 'recent transaction query should not create a draft session');
+  assert(!queryResponse.text.includes('Cek Dulu Sebelum Disimpan'), 'recent transaction query should not render transaction preview');
+  assert(queryResponse.text.includes('10 transaksi terakhir'), 'recent transaction query should return transaction details response');
+  passed += 1;
+  console.log('✅ PASS: shorthand recent transaction query stays in query flow');
+
+  const draftCountBeforeTopQuery = draftCollection.size;
+  await botModule.processUpdate({
+    update_id: 11,
+    message: {
+      message_id: 107,
+      date: 1,
+      chat: { id: 5001, type: 'private' },
+      from: { id: 9006, is_bot: false, first_name: 'Tester' },
+      text: 'top 10 biggest trans on thins month',
+    },
+  });
+
+  const topQueryResponse = getLatestFinalSendMessage(recorder);
+  assert(draftCollection.size === draftCountBeforeTopQuery, 'english top query should not create a draft session');
+  assert(!topQueryResponse.text.includes('Cek Dulu Sebelum Disimpan'), 'english top query should not render transaction preview');
+  assert(topQueryResponse.text.includes('10 transaksi tertinggi'), 'english top query should return top transaction details response');
+  passed += 1;
+  console.log('✅ PASS: english top transaction query stays in query flow');
+
+  const draftCountBeforeIndoTopQuery = draftCollection.size;
+  await botModule.processUpdate({
+    update_id: 12,
+    message: {
+      message_id: 108,
+      date: 1,
+      chat: { id: 5001, type: 'private' },
+      from: { id: 9007, is_bot: false, first_name: 'Tester' },
+      text: 'top 10 transaksi bulan ini',
+    },
+  });
+
+  const indoTopQueryResponse = getLatestFinalSendMessage(recorder);
+  assert(draftCollection.size === draftCountBeforeIndoTopQuery, 'indonesian top query should not create a draft session');
+  assert(!indoTopQueryResponse.text.includes('Cek Dulu Sebelum Disimpan'), 'indonesian top query should not render transaction preview');
+  assert(indoTopQueryResponse.text.includes('10 transaksi tertinggi'), 'indonesian top query should return top transaction details response');
+  passed += 1;
+  console.log('✅ PASS: indonesian top transaction query stays in query flow');
+
+  const draftCountBeforeShortIndoTopQuery = draftCollection.size;
+  await botModule.processUpdate({
+    update_id: 13,
+    message: {
+      message_id: 109,
+      date: 1,
+      chat: { id: 5001, type: 'private' },
+      from: { id: 9005, is_bot: false, first_name: 'Tester' },
+      text: '10 trans terbesar bln ini',
+    },
+  });
+
+  const shortIndoTopQueryResponse = getLatestFinalSendMessage(recorder);
+  assert(draftCollection.size === draftCountBeforeShortIndoTopQuery, 'indonesian shorthand top query should not create a draft session');
+  assert(!shortIndoTopQueryResponse.text.includes('Cek Dulu Sebelum Disimpan'), 'indonesian shorthand top query should not render transaction preview');
+  assert(shortIndoTopQueryResponse.text.includes('10 transaksi tertinggi'), 'indonesian shorthand top query should return top transaction details response');
+  passed += 1;
+  console.log('✅ PASS: indonesian shorthand top transaction query stays in query flow');
+
+  const draftCountBeforeTypoIndoTopQuery = draftCollection.size;
+  await botModule.processUpdate({
+    update_id: 14,
+    message: {
+      message_id: 110,
+      date: 1,
+      chat: { id: 5001, type: 'private' },
+      from: { id: 9008, is_bot: false, first_name: 'Tester' },
+      text: 'top 10 transaski bulan ini',
+    },
+  });
+
+  const typoIndoTopQueryResponse = getLatestFinalSendMessage(recorder);
+  assert(draftCollection.size === draftCountBeforeTypoIndoTopQuery, 'indonesian typo top query should not create a draft session');
+  assert(!typoIndoTopQueryResponse.text.includes('Cek Dulu Sebelum Disimpan'), 'indonesian typo top query should not render transaction preview');
+  assert(typoIndoTopQueryResponse.text.includes('10 transaksi tertinggi'), 'indonesian typo top query should return top transaction details response');
+  passed += 1;
+  console.log('✅ PASS: indonesian typo top transaction query stays in query flow');
+
+  const draftCountBeforeExpenseRankingQuery = draftCollection.size;
+  await botModule.processUpdate({
+    update_id: 15,
+    message: {
+      message_id: 111,
+      date: 1,
+      chat: { id: 5001, type: 'private' },
+      from: { id: 9009, is_bot: false, first_name: 'Tester' },
+      text: 'top 10 pengeluaran bulan ini',
+    },
+  });
+
+  const expenseRankingResponse = getLatestFinalSendMessage(recorder);
+  const latestExpenseDetailRequest = detailRequests[detailRequests.length - 1];
+  assert(draftCollection.size === draftCountBeforeExpenseRankingQuery, 'expense ranking query should not create a draft session');
+  assert(!expenseRankingResponse.text.includes('Cek Dulu Sebelum Disimpan'), 'expense ranking query should not render transaction preview');
+  assert(expenseRankingResponse.text.includes('10 pengeluaran tertinggi'), 'expense ranking query should use pengeluaran label');
+  assert(latestExpenseDetailRequest[7] === 'EXPENSE', 'expense ranking query should request EXPENSE filter');
+  passed += 1;
+  console.log('✅ PASS: expense ranking query uses expense filter');
+
+  const draftCountBeforeIncomeQuery = draftCollection.size;
+  await botModule.processUpdate({
+    update_id: 16,
+    message: {
+      message_id: 112,
+      date: 1,
+      chat: { id: 5001, type: 'private' },
+      from: { id: 9006, is_bot: false, first_name: 'Tester' },
+      text: 'tampilkan 10 pemasukan terakhir',
+    },
+  });
+
+  const incomeQueryResponse = getLatestFinalSendMessage(recorder);
+  const latestDetailRequest = detailRequests[detailRequests.length - 1];
+  assert(draftCollection.size === draftCountBeforeIncomeQuery, 'income detail query should not create a draft session');
+  assert(!incomeQueryResponse.text.includes('Cek Dulu Sebelum Disimpan'), 'income detail query should not render transaction preview');
+  assert(incomeQueryResponse.text.includes('10 pemasukan terakhir'), 'income detail query should use pemasukan label');
+  assert(incomeQueryResponse.text.includes('Pemasukan: Rp'), 'income detail query should summarize income totals');
+  assert(latestDetailRequest[7] === 'INCOME', 'income detail query should request INCOME filter');
+  passed += 1;
+  console.log('✅ PASS: income detail query uses income filter');
 
   console.log('\n==================================================');
   console.log(`📊 Results: ${passed} passed, 0 failed`);

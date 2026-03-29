@@ -63,6 +63,36 @@ parkir 5rb`,
       expectCount: 0,
       expectAttempt: false,
     },
+    {
+      name: 'shorthand recent transaction query should not be parsed as transaction',
+      input: 'tampilkan 10 trans terakhir',
+      expectCount: 0,
+      expectAttempt: false,
+    },
+    {
+      name: 'english top transaction query should not be parsed as transaction',
+      input: 'top 10 biggest trans on thins month',
+      expectCount: 0,
+      expectAttempt: false,
+    },
+    {
+      name: 'indonesian top transaction query should not be parsed as transaction',
+      input: 'top 10 transaksi bulan ini',
+      expectCount: 0,
+      expectAttempt: false,
+    },
+    {
+      name: 'indonesian shorthand biggest transaction query should not be parsed as transaction',
+      input: '10 trans terbesar bln ini',
+      expectCount: 0,
+      expectAttempt: false,
+    },
+    {
+      name: 'indonesian typo transaction query should not be parsed as transaction',
+      input: 'top 10 transaski bulan ini',
+      expectCount: 0,
+      expectAttempt: false,
+    },
   ];
 
   let passed = 0;

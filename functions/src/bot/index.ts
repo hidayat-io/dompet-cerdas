@@ -1202,6 +1202,7 @@ async function handleTextMessage(
                 const requestedLimit = parsedIntent.parameters.limit;
                 const specificDate = parsedIntent.parameters.specific_date;
                 const sortBy = parsedIntent.parameters.sort_by;
+                const typeFilter = parsedIntent.parameters.type_filter;
 
                 let limit = requestedLimit;
                 let limitNotice: string | undefined;
@@ -1211,22 +1212,25 @@ async function handleTextMessage(
                     limitNotice = '⚠️ Maksimal 30 transaksi. Menampilkan 30 transaksi terakhir.';
                 }
 
-                console.log('[query_details] Parameters:', { timeRange, categoryFilter, daysAgo, limit, specificDate, sortBy });
+                console.log('[query_details] Parameters:', { timeRange, categoryFilter, daysAgo, limit, specificDate, sortBy, typeFilter });
 
                 // Default to 'this_month' for better UX when no time range specified
                 // For limit-based queries without explicit time range, use all_time
                 const effectiveTimeRange = (limit && !timeRange && !specificDate && daysAgo === undefined)
                     ? 'all_time'
                     : (timeRange || 'this_month');
-                const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo, limit, specificDate, sortBy, accountId);
+                const details = await getTransactionDetails(userId, effectiveTimeRange, categoryFilter, daysAgo, limit, specificDate, sortBy, typeFilter, accountId);
 
                 let timeRangeText: string;
+                const typeLabel = typeFilter === 'INCOME'
+                    ? 'pemasukan'
+                    : typeFilter === 'EXPENSE'
+                        ? 'pengeluaran'
+                        : 'transaksi';
                 if (limit && sortBy === 'amount') {
-                    // "3 transaksi tertinggi bulan ini"
-                    timeRangeText = `${limit} transaksi tertinggi`;
+                    timeRangeText = `${limit} ${typeLabel} tertinggi`;
                 } else if (limit) {
-                    // "5 transaksi terakhir"
-                    timeRangeText = `${limit} transaksi terakhir`;
+                    timeRangeText = `${limit} ${typeLabel} terakhir`;
                 } else if (specificDate) {
                     timeRangeText = `tanggal ${responseFormatter.formatDate(specificDate)}`;
                 } else if (daysAgo !== undefined) {

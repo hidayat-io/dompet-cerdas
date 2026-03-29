@@ -1,6 +1,14 @@
 import React from 'react';
-import IconDisplay from './IconDisplay';
+import Dialog from '@mui/material/Dialog';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Grid from '@mui/material/Grid';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
 import { useTheme } from '../contexts/ThemeContext';
+import IconDisplay from './IconDisplay';
 
 interface OnboardingModalProps {
     isOpen: boolean;
@@ -22,8 +30,6 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({
     onGoToSettings,
 }) => {
     const { theme } = useTheme();
-
-    if (!isOpen) return null;
 
     const quickSteps = [
         {
@@ -59,124 +65,182 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-            <div
-                className="w-full max-w-3xl overflow-hidden rounded-[32px] border shadow-2xl"
-                style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            maxWidth="md"
+            fullWidth
+            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+            PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden' } }}
+        >
+            {/* Gradient Header */}
+            <Box
+                sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    px: { xs: 3, md: 4 },
+                    py: { xs: 3, md: 3.5 },
+                    background: `linear-gradient(135deg, ${theme.colors.accent} 0%, ${theme.colors.accentHover} 100%)`,
+                    color: '#fff',
+                }}
             >
-                <div
-                    className="relative overflow-hidden px-6 py-6 md:px-8 md:py-7"
-                    style={{
-                        background: `linear-gradient(135deg, ${theme.colors.accent} 0%, ${theme.colors.accentHover} 100%)`,
-                        color: '#ffffff',
+                {/* Decorative blur circle */}
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        right: -48,
+                        top: -56,
+                        width: 176,
+                        height: 176,
+                        borderRadius: '50%',
+                        bgcolor: 'rgba(255,255,255,0.1)',
+                        filter: 'blur(32px)',
+                        pointerEvents: 'none',
                     }}
-                >
-                    <div className="absolute -right-12 -top-14 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
-                    <div className="relative flex items-start justify-between gap-4">
-                        <div className="max-w-2xl">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
-                                Panduan Singkat
-                            </p>
-                            <h3 className="mt-2 text-2xl font-bold md:text-3xl">
-                                Mulai pakai {accountName}
-                            </h3>
-                            <p className="mt-3 text-sm leading-7 text-white/85 md:text-base">
-                                Tidak perlu paham akuntansi. Fokus kita cuma tiga hal: catat transaksi, lihat ringkasan, lalu atur yang ingin dipantau.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="rounded-2xl p-2.5 text-white/90"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
-                            aria-label="Tutup panduan"
-                        >
-                            <IconDisplay name="X" size={18} />
-                        </button>
-                    </div>
-                </div>
+                />
+                <Box sx={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+                    <Box sx={{ maxWidth: 480 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.8)' }}>
+                            Panduan Singkat
+                        </Typography>
+                        <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5, mb: 1.5 }}>
+                            Mulai pakai {accountName}
+                        </Typography>
+                        <Typography variant="body2" sx={{ lineHeight: 1.8, color: 'rgba(255,255,255,0.85)' }}>
+                            Tidak perlu paham akuntansi. Fokus kita cuma tiga hal: catat transaksi, lihat ringkasan, lalu atur yang ingin dipantau.
+                        </Typography>
+                    </Box>
+                    <IconButton
+                        onClick={onClose}
+                        aria-label="Tutup panduan"
+                        sx={{
+                            bgcolor: 'rgba(255,255,255,0.14)',
+                            color: 'rgba(255,255,255,0.9)',
+                            borderRadius: 2,
+                            '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
+                        }}
+                    >
+                        <IconDisplay name="X" size={18} />
+                    </IconButton>
+                </Box>
+            </Box>
 
-                <div className="space-y-6 px-6 py-6 md:px-8 md:py-8">
-                    <div className="grid gap-4 md:grid-cols-3">
-                        {quickSteps.map((step) => (
-                            <div
-                                key={step.title}
-                                className="rounded-[28px] border p-5"
-                                style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+            {/* Body */}
+            <Box sx={{ px: { xs: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+                {/* Step cards */}
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {quickSteps.map((step) => (
+                        <Grid size={{ xs: 12, md: 4 }} key={step.title}>
+                            <Box
+                                sx={{
+                                    borderRadius: '28px',
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    p: 2.5,
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                }}
                             >
-                                <div
-                                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                                    style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
+                                <Box
+                                    sx={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 2,
+                                        bgcolor: 'primary.light',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'primary.main',
+                                    }}
                                 >
                                     <IconDisplay name={step.icon} size={20} />
-                                </div>
-                                <h4 className="mt-4 text-lg font-semibold" style={{ color: theme.colors.textPrimary }}>
+                                </Box>
+                                <Typography variant="subtitle1" fontWeight={600} sx={{ mt: 2, mb: 1 }}>
                                     {step.title}
-                                </h4>
-                                <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, flex: 1 }}>
                                     {step.description}
-                                </p>
-                                <button
-                                    type="button"
+                                </Typography>
+                                <Button
+                                    variant="contained"
+                                    size="small"
                                     onClick={step.action}
-                                    className="mt-5 rounded-full px-4 py-2.5 text-sm font-semibold text-white"
-                                    style={{ backgroundColor: theme.colors.accent }}
+                                    sx={{ mt: 2.5, borderRadius: '999px', fontWeight: 600, alignSelf: 'flex-start', px: 2 }}
                                 >
                                     {step.actionLabel}
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+                                </Button>
+                            </Box>
+                        </Grid>
+                    ))}
+                </Grid>
 
-                    <div
-                        className="rounded-[28px] border p-5 md:p-6"
-                        style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                    >
-                        <div className="flex items-start gap-3">
-                            <div
-                                className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-                                style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.accent }}
-                            >
-                                <IconDisplay name="Sparkles" size={18} />
-                            </div>
-                            <div className="min-w-0">
-                                <h4 className="text-lg font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                    Contoh input yang bisa dipakai
-                                </h4>
-                                <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                                    Ini dipakai saat Anda mencatat transaksi lewat Telegram, voice note Telegram, atau nanti saat input natural tersedia di aplikasi. Gunakan kalimat biasa, lalu sistem akan minta konfirmasi sebelum menyimpan.
-                                </p>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {examples.map((example) => (
-                                        <span
-                                            key={example}
-                                            className="rounded-full px-3 py-1.5 text-sm"
-                                            style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.textPrimary }}
-                                        >
-                                            {example}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3 border-t pt-5 md:flex-row md:items-center md:justify-between" style={{ borderColor: theme.colors.border }}>
-                        <p className="text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                            Kalau nanti lupa cara pakainya, panduan ini bisa dibuka lagi dari menu Pengaturan.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="rounded-full px-5 py-3 text-sm font-semibold"
-                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
+                {/* Examples section */}
+                <Box
+                    sx={{
+                        borderRadius: '28px',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'action.hover',
+                        p: { xs: 2.5, md: 3 },
+                        mb: 3,
+                    }}
+                >
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                        <Box
+                            sx={{
+                                mt: 0.25,
+                                width: 40,
+                                height: 40,
+                                borderRadius: 2,
+                                bgcolor: 'background.paper',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'primary.main',
+                                flexShrink: 0,
+                            }}
                         >
-                            Tutup Panduan
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+                            <IconDisplay name="Sparkles" size={18} />
+                        </Box>
+                        <Box>
+                            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                                Contoh input yang bisa dipakai
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, mb: 2 }}>
+                                Ini dipakai saat Anda mencatat transaksi lewat Telegram, voice note Telegram, atau nanti saat input natural tersedia di aplikasi. Gunakan kalimat biasa, lalu sistem akan minta konfirmasi sebelum menyimpan.
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {examples.map((example) => (
+                                    <Chip
+                                        key={example}
+                                        label={example}
+                                        size="small"
+                                        sx={{ fontFamily: 'monospace', bgcolor: 'background.paper' }}
+                                    />
+                                ))}
+                            </Box>
+                        </Box>
+                    </Box>
+                </Box>
+
+                <Divider sx={{ mb: 2.5 }} />
+
+                {/* Footer */}
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                        Kalau nanti lupa cara pakainya, panduan ini bisa dibuka lagi dari menu Pengaturan.
+                    </Typography>
+                    <Button
+                        variant="outlined"
+                        onClick={onClose}
+                        sx={{ borderRadius: '999px', fontWeight: 600, whiteSpace: 'nowrap', px: 3 }}
+                    >
+                        Tutup Panduan
+                    </Button>
+                </Box>
+            </Box>
+        </Dialog>
     );
 };
 

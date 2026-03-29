@@ -15,8 +15,8 @@ export interface Category {
   id: string;
   name: string;
   type: TransactionType;
-  icon: string; // Name of the Lucide icon
-  color: string; // Tailwind color class or hex
+  icon: string; // Icon name — mapped to Material icon in IconDisplay
+  color: string; // Hex color
 }
 
 // Attachment structure

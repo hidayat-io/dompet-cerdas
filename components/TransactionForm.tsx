@@ -1,4 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Dialog from '@mui/material/Dialog';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import Chip from '@mui/material/Chip';
+import Fab from '@mui/material/Fab';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Divider from '@mui/material/Divider';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme as useMuiTheme } from '@mui/material/styles';
 import { Category, TransactionType, Transaction } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
@@ -11,21 +26,8 @@ import { NotificationType } from './NotificationModal';
 interface TransactionFormProps {
   categories: Category[];
   initialData?: Transaction;
-  onAdd?: (
-    amount: number,
-    categoryId: string,
-    date: string,
-    description: string,
-    attachment?: { file: File; type: 'image' | 'pdf' }
-  ) => Promise<void>;
-  onUpdate?: (
-    id: string,
-    amount: number,
-    categoryId: string,
-    date: string,
-    description: string,
-    attachment?: { file: File; type: 'image' | 'pdf' } | null
-  ) => Promise<void>;
+  onAdd?: (amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' }) => Promise<void>;
+  onUpdate?: (id: string, amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' } | null) => Promise<void>;
   onDelete?: (id: string) => void;
   onAddCategory?: (category: Omit<Category, 'id'>) => Promise<string | undefined>;
   onClose: () => void;
@@ -34,70 +36,46 @@ interface TransactionFormProps {
 
 const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
   const { theme } = useTheme();
+  const muiTheme = useMuiTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
-  // Determine initial state based on initialData
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [displayAmount, setDisplayAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [date, setDate] = useState(() => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   });
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
 
-  // Attachment state
   const [attachment, setAttachment] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [attachmentType, setAttachmentType] = useState<'image' | 'pdf' | null>(null);
   const [existingAttachment, setExistingAttachment] = useState(initialData?.attachment || (initialData?.attachmentUrl ? { url: initialData.attachmentUrl, name: initialData.attachmentName || 'Lampiran', type: initialData.attachmentType || 'image' } : null));
   const [isAttachmentDeleted, setIsAttachmentDeleted] = useState(false);
 
-  // Delete confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  // Category modal state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-
-  // Compression message state
-  const [compressionMessage, setCompressionMessage] = useState<string>('');
-
-  // Loading state for save operation
+  const [compressionMessage, setCompressionMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [savingMessage, setSavingMessage] = useState('');
-
-  // Toast state
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize form if editing
   useEffect(() => {
     if (initialData) {
-      // Find category to set type
       const cat = categories.find(c => c.id === initialData.categoryId);
-      if (cat) {
-        setType(cat.type);
-        setCategoryId(initialData.categoryId);
-      }
-
-      // Set amount format
-      const numberString = initialData.amount.toString();
-      const split = numberString.split(',');
-      const sisa = split[0].length % 3;
-      let rupiah = split[0].substr(0, sisa);
-      const ribuan = split[0].substr(sisa).match(/\d{3}/gi);
-      if (ribuan) {
-        const separator = sisa ? '.' : '';
-        rupiah += separator + ribuan.join('.');
-      }
+      if (cat) { setType(cat.type); setCategoryId(initialData.categoryId); }
+      const ns = initialData.amount.toString().split(',');
+      const sisa = ns[0].length % 3;
+      let rupiah = ns[0].substr(0, sisa);
+      const ribuan = ns[0].substr(sisa).match(/\d{3}/gi);
+      if (ribuan) rupiah += (sisa ? '.' : '') + ribuan.join('.');
       setDisplayAmount(rupiah);
-
       setDate(initialData.date);
       setDescription(initialData.description);
     }
@@ -105,699 +83,386 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
 
   const filteredCategories = categories.filter(c => c.type === type);
 
-  // Effect to reset category if type changes manually (only if not initializing)
   useEffect(() => {
-    if (!initialData || (initialData && categories.find(c => c.id === initialData.categoryId)?.type !== type)) {
+    if (!initialData || categories.find(c => c.id === initialData.categoryId)?.type !== type) {
       const currentCat = categories.find(c => c.id === categoryId);
-      if (currentCat && currentCat.type !== type) {
-        setCategoryId('');
-      }
+      if (currentCat && currentCat.type !== type) setCategoryId('');
     }
     setError('');
   }, [type, categories, categoryId, initialData]);
 
-  // Clean up preview URL on unmount
   useEffect(() => {
-    return () => {
-      if (attachmentPreview) {
-        URL.revokeObjectURL(attachmentPreview);
-      }
-    };
+    return () => { if (attachmentPreview) URL.revokeObjectURL(attachmentPreview); };
   }, [attachmentPreview]);
 
   const formatRupiah = (value: string) => {
-    const numberString = value.replace(/[^,\d]/g, '').toString();
-    const split = numberString.split(',');
-    const sisa = split[0].length % 3;
-    let rupiah = split[0].substr(0, sisa);
-    const ribuan = split[0].substr(sisa).match(/\d{3}/gi);
-
-    if (ribuan) {
-      const separator = sisa ? '.' : '';
-      rupiah += separator + ribuan.join('.');
-    }
-
-    return split[1] !== undefined ? rupiah + ',' + split[1] : rupiah;
+    const ns = value.replace(/[^,\d]/g, '').split(',');
+    const sisa = ns[0].length % 3;
+    let rupiah = ns[0].substr(0, sisa);
+    const ribuan = ns[0].substr(sisa).match(/\d{3}/gi);
+    if (ribuan) rupiah += (sisa ? '.' : '') + ribuan.join('.');
+    return ns[1] !== undefined ? rupiah + ',' + ns[1] : rupiah;
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/\D/g, '');
-    const formatted = formatRupiah(rawValue);
-    setDisplayAmount(formatted);
+    setDisplayAmount(formatRupiah(e.target.value.replace(/\D/g, '')));
     if (error) setError('');
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Reset states
-    setError('');
-    setCompressionMessage('');
-
-    // Validate file type
+    setError(''); setCompressionMessage('');
     const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const validPdfType = 'application/pdf';
-
-    if (!validImageTypes.includes(file.type) && file.type !== validPdfType) {
-      setError('⚠️ Hanya file foto (JPG, PNG, GIF, WEBP) atau PDF yang diizinkan.');
-      return;
+    if (!validImageTypes.includes(file.type) && file.type !== 'application/pdf') {
+      setError('Hanya file foto (JPG, PNG, GIF, WEBP) atau PDF yang diizinkan.'); return;
     }
-
-    // Validate initial file size (max 10MB before compression)
-    const maxInitialSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxInitialSize) {
-      setError('⚠️ Ukuran file terlalu besar (maksimal 10MB).');
-      return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Ukuran file terlalu besar (maksimal 10MB).'); return;
     }
-
     try {
-      // Process file (compress images, validate PDFs)
       const result = await processFileForUpload(file);
-
-      // Set attachment
-      setAttachment(result.file);
-      setIsAttachmentDeleted(false);
-      setAttachmentType(result.type);
-
-      // Set preview for images
-      if (result.type === 'image') {
-        setAttachmentPreview(URL.createObjectURL(result.file));
-      } else {
-        setAttachmentPreview(null);
-      }
-
-      // Show compression message
-      if (result.message) {
-        setCompressionMessage(result.message);
-      }
-
-    } catch (error) {
-      setError(error instanceof Error ? `⚠️ ${error.message}` : '⚠️ Gagal memproses file.');
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setAttachment(result.file); setIsAttachmentDeleted(false); setAttachmentType(result.type);
+      if (result.type === 'image') setAttachmentPreview(URL.createObjectURL(result.file));
+      else setAttachmentPreview(null);
+      if (result.message) setCompressionMessage(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memproses file.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const removeAttachment = () => {
-    setAttachment(null);
-    setAttachmentPreview(null);
-    setAttachmentType(null);
-    setCompressionMessage('');
-
-    // If there was an existing attachment, mark it as deleted
-    if (existingAttachment) {
-      setIsAttachmentDeleted(true);
-    }
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setAttachment(null); setAttachmentPreview(null); setAttachmentType(null); setCompressionMessage('');
+    if (existingAttachment) setIsAttachmentDeleted(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleDelete = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowDeleteConfirm(true);
-  };
+  const handleDelete = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(true); };
 
   const handleConfirmDelete = () => {
-    if (initialData && onDelete) {
-      onDelete(initialData.id);
-      setShowDeleteConfirm(false);
-      onClose();
-    }
+    if (initialData && onDelete) { onDelete(initialData.id); setShowDeleteConfirm(false); onClose(); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
     const rawAmount = parseInt(displayAmount.replace(/\./g, ''), 10);
 
-    if (!rawAmount || rawAmount <= 0) {
-      if (onShowNotification) {
-        onShowNotification('warning', 'Jumlah Tidak Valid', 'Mohon isi jumlah uang dengan nominal yang valid.', false);
-      } else {
-        setError("⚠️ Mohon isi jumlah uang dengan nominal yang valid.");
+    const validateAndNotify = (condition: boolean, title: string, msg: string) => {
+      if (condition) {
+        if (onShowNotification) onShowNotification('warning', title, msg, false);
+        else setError(msg);
+        return true;
       }
-      return;
-    }
+      return false;
+    };
 
-    if (!categoryId) {
-      if (onShowNotification) {
-        onShowNotification('warning', 'Kategori Wajib Dipilih', 'Kategori transaksi wajib dipilih.', false);
-      } else {
-        setError("⚠️ Kategori transaksi wajib dipilih.");
-      }
-      return;
-    }
+    if (validateAndNotify(!rawAmount || rawAmount <= 0, 'Jumlah Tidak Valid', 'Mohon isi jumlah uang dengan nominal yang valid.')) return;
+    if (validateAndNotify(!categoryId, 'Kategori Wajib Dipilih', 'Kategori transaksi wajib dipilih.')) return;
+    if (validateAndNotify(!date, 'Tanggal Harus Diisi', 'Tanggal transaksi harus diisi.')) return;
+    if (validateAndNotify(!description.trim(), 'Catatan Tidak Boleh Kosong', 'Catatan tidak boleh kosong.')) return;
 
-    if (!date) {
-      if (onShowNotification) {
-        onShowNotification('warning', 'Tanggal Harus Diisi', 'Tanggal transaksi harus diisi.', false);
-      } else {
-        setError("⚠️ Tanggal transaksi harus diisi.");
-      }
-      return;
-    }
-
-    if (!description.trim()) {
-      if (onShowNotification) {
-        onShowNotification('warning', 'Catatan Tidak Boleh Kosong', 'Catatan tidak boleh kosong.', false);
-      } else {
-        setError("⚠️ Catatan tidak boleh kosong.");
-      }
-      return;
-    }
-
-    // Start loading state
     setIsSaving(true);
-
-    // Show loading notification popup
     if (onShowNotification) {
-      if (attachment || (initialData && attachment)) {
-        onShowNotification('loading', 'Mengupload...', 'Sedang mengupload lampiran, mohon tunggu.', false);
-      } else {
-        onShowNotification('loading', 'Menyimpan...', 'Sedang menyimpan transaksi, mohon tunggu.', false);
-      }
+      onShowNotification('loading', attachment ? 'Mengupload...' : 'Menyimpan...', attachment ? 'Sedang mengupload lampiran, mohon tunggu.' : 'Sedang menyimpan transaksi, mohon tunggu.', false);
     } else {
-      // Fallback to old method
-      if (attachment || (initialData && attachment)) {
-        setSavingMessage('Mengupload lampiran...');
-      } else {
-        setSavingMessage('Menyimpan transaksi...');
-      }
+      setSavingMessage(attachment ? 'Mengupload lampiran...' : 'Menyimpan transaksi...');
     }
 
     try {
-      // Logic for Update vs Add
       if (initialData && onUpdate) {
         let attachmentPayload: { file: File; type: 'image' | 'pdf' } | null | undefined = undefined;
-
-        if (attachment && attachmentType) {
-          attachmentPayload = { file: attachment, type: attachmentType };
-        } else if (isAttachmentDeleted) {
-          attachmentPayload = null;
-        }
-
+        if (attachment && attachmentType) attachmentPayload = { file: attachment, type: attachmentType };
+        else if (isAttachmentDeleted) attachmentPayload = null;
         await onUpdate(initialData.id, rawAmount, categoryId, date, description, attachmentPayload);
-
       } else if (onAdd) {
-        if (attachment && attachmentType) {
-          await onAdd(rawAmount, categoryId, date, description, { file: attachment, type: attachmentType });
-        } else {
-          await onAdd(rawAmount, categoryId, date, description);
-        }
+        await onAdd(rawAmount, categoryId, date, description, attachment && attachmentType ? { file: attachment, type: attachmentType } : undefined);
       }
 
-      // Show success notification
       if (onShowNotification) {
         onShowNotification('success', 'Berhasil!', initialData ? 'Transaksi berhasil diupdate!' : 'Transaksi berhasil disimpan!', true);
         onClose();
       } else {
-        setToastMessage(initialData ? '✅ Transaksi berhasil diupdate!' : '✅ Transaksi berhasil disimpan!');
-        setToastType('success');
-        setShowToast(true);
-        setTimeout(() => {
-          onClose();
-        }, 200);
+        setToastMessage(initialData ? 'Transaksi berhasil diupdate!' : 'Transaksi berhasil disimpan!');
+        setToastType('success'); setShowToast(true);
+        setTimeout(() => onClose(), 200);
       }
-
-    } catch (error) {
-      console.error('Error saving transaction:', error);
-      if (onShowNotification) {
-        onShowNotification('error', 'Gagal Menyimpan', 'Gagal menyimpan transaksi. Silakan coba lagi.');
-      } else {
-        setError('⚠️ Gagal menyimpan transaksi. Silakan coba lagi.');
-        setToastMessage('❌ Gagal menyimpan transaksi');
-        setToastType('error');
-        setShowToast(true);
-      }
+    } catch (err) {
+      console.error('Error saving transaction:', err);
+      if (onShowNotification) onShowNotification('error', 'Gagal Menyimpan', 'Gagal menyimpan transaksi. Silakan coba lagi.');
+      else { setError('Gagal menyimpan transaksi. Silakan coba lagi.'); setToastMessage('Gagal menyimpan transaksi'); setToastType('error'); setShowToast(true); }
     } finally {
-      setIsSaving(false);
-      setSavingMessage('');
+      setIsSaving(false); setSavingMessage('');
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 md:bg-black md:bg-opacity-50 md:backdrop-blur-sm md:flex md:items-center md:justify-center md:p-4">
-      <div
-        className="h-full w-full md:h-auto md:w-auto md:max-w-md md:max-h-[90vh] md:rounded-2xl shadow-xl overflow-hidden transform transition-all animate-slide-up md:animate-fade-in flex flex-col"
-        style={{ backgroundColor: theme.colors.bgCard }}
-      >
-        {/* Header */}
-        <div className="p-4 flex justify-between items-center gap-3 flex-shrink-0" style={{ backgroundColor: theme.colors.accent }}>
-          <div className="flex items-center gap-3 flex-1">
-            {/* Back/Close Button */}
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center md:hidden"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-              }}
-            >
+  const hasAttachment = (attachment || (existingAttachment && !isAttachmentDeleted));
+  const showImagePreview = (attachmentType === 'image' && attachmentPreview) || (existingAttachment?.type === 'image' && existingAttachment.url && !isAttachmentDeleted);
+
+  const formContent = (
+    <Box component="form" id="transaction-form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header */}
+      <Box sx={{ bgcolor: 'primary.main', px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {isMobile && (
+            <IconButton size="small" onClick={onClose} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
               <IconDisplay name="ArrowLeft" size={20} />
-            </button>
+            </IconButton>
+          )}
+          <Typography variant="h6" fontWeight={600} color="#fff">
+            {initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {initialData && onDelete && isMobile && (
+            <IconButton size="small" onClick={handleDelete} disabled={isSaving} sx={{ bgcolor: '#ef4444', color: '#fff', '&:hover': { bgcolor: '#dc2626' } }}>
+              <IconDisplay name="Trash2" size={18} />
+            </IconButton>
+          )}
+          {!isMobile && (
+            <IconButton size="small" onClick={onClose} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
+              <IconDisplay name="X" size={18} />
+            </IconButton>
+          )}
+        </Box>
+      </Box>
 
-            <h3 className="text-white font-semibold text-lg flex-shrink-0">{initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}</h3>
-          </div>
+      {/* Scrollable content */}
+      <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 } }}>
+        {error && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
 
-          <div className="flex items-center gap-2">
-            {/* Delete Button (Header - Mobile only) */}
-            {initialData && onDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isSaving}
-                className="md:hidden p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor: '#ef4444',
-                  color: 'white'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.backgroundColor = '#dc2626';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ef4444';
-                }}
-                title="Hapus Transaksi"
-              >
-                <IconDisplay name="Trash2" size={18} />
-              </button>
+        {/* Type Toggle */}
+        <ToggleButtonGroup
+          fullWidth
+          exclusive
+          value={type}
+          onChange={(_, val) => val && setType(val)}
+          sx={{ mb: 2, bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}
+        >
+          <ToggleButton value="EXPENSE" sx={{ borderRadius: 1.5, fontWeight: 700, border: 'none', '&.Mui-selected': { bgcolor: 'background.paper', color: 'error.main', boxShadow: 1 } }}>
+            Pengeluaran
+          </ToggleButton>
+          <ToggleButton value="INCOME" sx={{ borderRadius: 1.5, fontWeight: 700, border: 'none', '&.Mui-selected': { bgcolor: 'background.paper', color: 'info.main', boxShadow: 1 } }}>
+            Pemasukan
+          </ToggleButton>
+        </ToggleButtonGroup>
+
+        {/* Amount */}
+        <TextField
+          fullWidth
+          label="Jumlah (Rp)"
+          value={displayAmount}
+          onChange={handleAmountChange}
+          disabled={isSaving}
+          inputProps={{ inputMode: 'numeric' }}
+          autoFocus={!initialData}
+          sx={{ mb: 2 }}
+          InputProps={{ startAdornment: <Typography sx={{ mr: 1, color: 'text.disabled', fontWeight: 700 }}>Rp</Typography> }}
+        />
+
+        {/* Category */}
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="caption" fontWeight={700} textTransform="uppercase" letterSpacing="0.1em" color="text.disabled">Kategori</Typography>
+            {onAddCategory && (
+              <Chip
+                label="Baru"
+                size="small"
+                icon={<IconDisplay name="Plus" size={12} style={{ color: theme.colors.accent }} />}
+                onClick={() => setShowCategoryModal(true)}
+                sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, height: 24, cursor: 'pointer' }}
+              />
             )}
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+            {filteredCategories.map((cat) => (
+              <Box
+                key={cat.id}
+                component="button"
+                type="button"
+                onClick={() => setCategoryId(cat.id)}
+                sx={{
+                  p: 1.25, borderRadius: 2, border: '1px solid', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
+                  transition: 'all 0.15s',
+                  borderColor: categoryId === cat.id ? 'primary.main' : 'divider',
+                  bgcolor: categoryId === cat.id ? 'primary.light' : 'action.hover',
+                  boxShadow: categoryId === cat.id ? '0 0 0 2px ' + theme.colors.accent : 'none',
+                }}
+              >
+                <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconDisplay name={cat.icon} size={16} style={{ color: '#fff' }} />
+                </Box>
+                <Typography variant="caption" fontWeight={600} textAlign="center" noWrap sx={{ width: '100%' }}>{cat.name}</Typography>
+              </Box>
+            ))}
+          </Box>
+          {filteredCategories.length === 0 && (
+            <Typography variant="body2" color="text.disabled" textAlign="center" sx={{ py: 1 }}>
+              Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.
+              {onAddCategory && (
+                <Box component="span" onClick={() => setShowCategoryModal(true)} sx={{ ml: 0.5, color: 'primary.main', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+                  Buat sekarang
+                </Box>
+              )}
+            </Typography>
+          )}
+        </Box>
 
-            {/* Close Button (Desktop only) */}
-            <button
-              onClick={onClose}
-              className="hidden md:flex p-2 rounded-lg transition-all focus:outline-none items-center justify-center"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        {/* Date */}
+        <TextField
+          fullWidth
+          label="Tanggal"
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          disabled={isSaving}
+          InputLabelProps={{ shrink: true }}
+          sx={{ mb: 2 }}
+        />
+
+        {/* Description */}
+        <TextField
+          fullWidth
+          label="Catatan"
+          multiline
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          disabled={isSaving}
+          placeholder="Contoh: Makan siang, Gaji bulanan"
+          sx={{ mb: 2 }}
+        />
+
+        {/* Attachment */}
+        <Box>
+          <Typography variant="caption" fontWeight={700} textTransform="uppercase" letterSpacing="0.1em" color="text.disabled" display="block" sx={{ mb: 1 }}>
+            Lampiran (opsional)
+          </Typography>
+          <input type="file" ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileSelect} disabled={isSaving} style={{ display: 'none' }} />
+          {!hasAttachment ? (
+            <Box
+              onClick={() => fileInputRef.current?.click()}
+              sx={{
+                border: '2px dashed', borderColor: 'divider', borderRadius: 2, p: 2.5, textAlign: 'center', cursor: 'pointer',
+                bgcolor: 'action.hover', '&:hover': { borderColor: 'primary.main' },
               }}
             >
-              <IconDisplay name="X" size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Form Content */}
-        <form id="transaction-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-6 space-y-4 pb-24 md:pb-6">
-            {/* Loading Message - now handled by popup notification */}
-
-            {error && (
-              <div className="border-l-4 border-red-500 p-3 rounded-md text-sm font-medium flex items-center gap-2 animate-pulse"
-                style={{
-                  backgroundColor: theme.colors.expenseBg,
-                  color: theme.colors.expense
-                }}
-              >
-                <IconDisplay name="AlertCircle" size={18} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Type Toggle */}
-            <div className="flex p-1 rounded-lg" style={{ backgroundColor: theme.colors.bgMuted }}>
-              <button
-                type="button"
-                onClick={() => setType('EXPENSE')}
-                className="flex-1 py-2 text-sm font-bold rounded-md transition-all shadow-sm"
-                style={{
-                  backgroundColor: type === 'EXPENSE' ? theme.colors.bgCard : 'transparent',
-                  color: type === 'EXPENSE' ? theme.colors.expense : theme.colors.textMuted
-                }}
-              >
-                Pengeluaran
-              </button>
-              <button
-                type="button"
-                onClick={() => setType('INCOME')}
-                className="flex-1 py-2 text-sm font-bold rounded-md transition-all shadow-sm"
-                style={{
-                  backgroundColor: type === 'INCOME' ? theme.colors.bgCard : 'transparent',
-                  color: type === 'INCOME' ? theme.colors.income : theme.colors.textMuted
-                }}
-              >
-                Pemasukan
-              </button>
-            </div>
-
-            {/* Amount Input */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>
-                Jumlah (Rp)
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-3 font-bold" style={{ color: theme.colors.textMuted }}>Rp</span>
-                <input
-                  type="text"
-                  value={displayAmount}
-                  onChange={handleAmountChange}
-                  disabled={isSaving}
-                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    backgroundColor: theme.colors.bgHover,
-                    borderColor: theme.colors.border,
-                    color: theme.colors.textPrimary
-                  }}
-                  placeholder="0"
-                  inputMode="numeric"
-                  autoFocus={!initialData}
-                />
-              </div>
-            </div>
-
-            {/* Category Selection */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold uppercase tracking-wide" style={{ color: theme.colors.textMuted }}>Kategori</label>
-                {onAddCategory && (
-                  <button
-                    type="button"
-                    onClick={() => setShowCategoryModal(true)}
-                    className="text-xs font-medium flex items-center gap-1 px-2 py-1 rounded-full transition-all"
-                    style={{
-                      backgroundColor: theme.colors.accentLight,
-                      color: theme.colors.accent
-                    }}
-                  >
-                    <IconDisplay name="Plus" size={12} />
-                    Baru
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {filteredCategories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setCategoryId(cat.id)}
-                    className="p-2 rounded-lg border text-xs font-medium flex flex-col items-center gap-1 transition-all"
-                    style={categoryId === cat.id ? {
-                      backgroundColor: theme.colors.accentLight,
-                      borderColor: theme.colors.accent,
-                      color: theme.colors.textPrimary,
-                      boxShadow: `0 0 0 2px ${theme.colors.accent}`
-                    } : {
-                      backgroundColor: theme.colors.bgHover,
-                      borderColor: theme.colors.border,
-                      color: theme.colors.textPrimary
-                    }}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white mb-1"
-                      style={{ backgroundColor: cat.color }}
-                    >
-                      <IconDisplay name={cat.icon} size={16} />
-                    </div>
-                    <span className="truncate w-full text-center">{cat.name}</span>
-                  </button>
-                ))}
-              </div>
-              {filteredCategories.length === 0 && (
-                <p className="text-xs text-center py-2" style={{ color: theme.colors.textMuted }}>
-                  Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.
-                  {onAddCategory && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCategoryModal(true)}
-                      className="ml-1 underline font-medium"
-                      style={{ color: theme.colors.accent }}
-                    >
-                      Buat sekarang
-                    </button>
+              <IconDisplay name="Camera" size={24} style={{ color: theme.colors.textMuted, marginBottom: 4 }} />
+              <Typography variant="body2" color="text.disabled">Tambah Foto atau PDF</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5, bgcolor: 'action.hover' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, overflow: 'hidden' }}>
+                  {showImagePreview ? (
+                    <Box component="img" src={attachmentPreview || existingAttachment?.url} alt="Preview" sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1.5 }} />
+                  ) : (
+                    <Box sx={{ width: 48, height: 48, borderRadius: 1.5, bgcolor: theme.colors.expenseBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IconDisplay name="FileText" size={24} style={{ color: theme.colors.expense }} />
+                    </Box>
                   )}
-                </p>
-              )}
-            </div>
+                  <Box sx={{ overflow: 'hidden' }}>
+                    <Typography variant="body2" fontWeight={600} noWrap>{attachment?.name || existingAttachment?.name}</Typography>
+                    <Typography variant="caption" color="text.disabled">
+                      {attachment ? `${(attachment.size / 1024).toFixed(1)} KB` : 'Terlampir'} • {attachmentType === 'image' || existingAttachment?.type === 'image' ? 'Foto' : 'PDF'}
+                    </Typography>
+                  </Box>
+                </Box>
+                <IconButton size="small" onClick={removeAttachment} disabled={isSaving}>
+                  <IconDisplay name="X" size={18} />
+                </IconButton>
+              </Box>
+            </Box>
+          )}
+          <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
+            Maksimal 10MB. Format: JPG, PNG, GIF, WEBP, PDF
+          </Typography>
+          {compressionMessage && (
+            <Alert severity="success" sx={{ mt: 1, py: 0.5, fontSize: 12 }}>{compressionMessage}</Alert>
+          )}
+        </Box>
+      </Box>
 
-            {/* Date Input */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>Tanggal</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                disabled={isSaving}
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor: theme.colors.bgHover,
-                  borderColor: theme.colors.border,
-                  color: theme.colors.textPrimary
-                }}
-              />
-            </div>
-
-            {/* Description Input */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>Catatan</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isSaving}
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor: theme.colors.bgHover,
-                  borderColor: theme.colors.border,
-                  color: theme.colors.textPrimary
-                }}
-                rows={2}
-                placeholder="Contoh: Makan siang, Gaji bulanan"
-              />
-            </div>
-
-            {/* Attachment Input */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.colors.textMuted }}>
-                Lampiran (opsional)
-              </label>
-
-              {!attachment && !existingAttachment || (isAttachmentDeleted && !attachment) ? (
-                <div
-                  className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors"
-                  style={{
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.bgHover
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/*,application/pdf"
-                    onChange={handleFileSelect}
-                    disabled={isSaving}
-                  />
-                  <IconDisplay name="Camera" size={24} className="mx-auto mb-2" style={{ color: theme.colors.textMuted }} />
-                  <p className="text-sm" style={{ color: theme.colors.textMuted }}>Tambah Foto atau PDF</p>
-                </div>
-              ) : (
-                <div
-                  className="border rounded-lg p-3"
-                  style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      {/* Check if it's new attachment preview or existing one */}
-                      {(attachmentType === 'image' && attachmentPreview) || (existingAttachment?.type === 'image' && existingAttachment.url && !isAttachmentDeleted) ? (
-                        <img
-                          src={attachmentPreview || existingAttachment?.url}
-                          alt="Preview"
-                          className="w-12 h-12 object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: theme.colors.expenseBg }}>
-                          <IconDisplay name="FileText" size={24} style={{ color: theme.colors.expense }} />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: theme.colors.textPrimary }}>
-                          {attachment?.name || existingAttachment?.name}
-                        </p>
-                        <p className="text-xs" style={{ color: theme.colors.textMuted }}>
-                          {attachment ? (attachment.size / 1024).toFixed(1) + ' KB' : 'Terlampir'} • {attachmentType === 'image' || existingAttachment?.type === 'image' ? 'Foto' : 'PDF'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={removeAttachment}
-                      disabled={isSaving}
-                      className="p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{
-                        color: theme.colors.textMuted
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSaving) {
-                          e.currentTarget.style.backgroundColor = theme.colors.expenseBg;
-                          e.currentTarget.style.color = theme.colors.expense;
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = theme.colors.textMuted;
-                      }}
-                    >
-                      <IconDisplay name="X" size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-              <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>Maksimal 10MB. Format: JPG, PNG, GIF, WEBP, PDF</p>
-              {compressionMessage && (
-                <div
-                  className="text-xs mt-2 p-2 rounded-md flex items-center gap-2"
-                  style={{
-                    backgroundColor: theme.colors.incomeBg,
-                    color: theme.colors.income
-                  }}
-                >
-                  <IconDisplay name="CheckCircle2" size={14} />
-                  <span>{compressionMessage}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </form>
-
-        {/* Desktop Footer (Hidden on Mobile) */}
-        <div
-          className="hidden md:flex p-4 border-t flex-shrink-0"
-          style={{
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.bgCard
-          }}
-        >
-          <div className="flex items-center gap-3 w-full">
-            {/* Delete Button (only show when editing) */}
+      {/* Desktop Footer */}
+      {!isMobile && (
+        <>
+          <Divider />
+          <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
             {initialData && onDelete && (
-              <button
-                type="button"
+              <Button
+                variant="contained"
+                color="error"
                 onClick={handleDelete}
                 disabled={isSaving}
-                className="px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2"
-                style={{
-                  backgroundColor: '#ef4444',
-                  color: 'white'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.backgroundColor = '#dc2626';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ef4444';
-                }}
-                title="Hapus Transaksi"
+                startIcon={<IconDisplay name="Trash2" size={18} style={{ color: '#fff' }} />}
+                sx={{ fontWeight: 600 }}
               >
-                <IconDisplay name="Trash2" size={18} />
-                <span>Hapus</span>
-              </button>
+                Hapus
+              </Button>
             )}
-
-            {/* Spacer */}
-            <div className="flex-1"></div>
-
-            {/* Save/Update Button (Desktop) */}
-            <button
+            <Box sx={{ flex: 1 }} />
+            <Button
               type="submit"
               form="transaction-form"
+              variant="contained"
               disabled={isSaving}
-              className="px-6 py-3 rounded-lg font-semibold transition-all focus:outline-none flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-              style={{
-                backgroundColor: isSaving ? theme.colors.bgMuted : theme.colors.accent,
-                color: 'white'
-              }}
-              onMouseEnter={(e) => {
-                if (!isSaving) e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
+              startIcon={isSaving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name={initialData ? 'Check' : 'Save'} size={18} style={{ color: '#fff' }} />}
+              sx={{ fontWeight: 600, minWidth: 120 }}
             >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-current border-t-transparent" />
-                  <span>Menyimpan...</span>
-                </>
-              ) : (
-                <>
-                  <IconDisplay name={initialData ? "Check" : "Save"} size={18} />
-                  <span>{initialData ? 'Update' : 'Simpan'}</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+              {isSaving ? 'Menyimpan...' : initialData ? 'Update' : 'Simpan'}
+            </Button>
+          </Box>
+        </>
+      )}
 
-        {/* Mobile FAB (Floating Action Button) */}
-        <button
+      {/* Mobile FAB */}
+      {isMobile && (
+        <Fab
           type="submit"
-          form="transaction-form"
           disabled={isSaving}
-          className="md:hidden fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed z-50"
-          style={{
-            background: isSaving
-              ? theme.colors.bgMuted
-              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            boxShadow: isSaving
-              ? '0 4px 12px rgba(0,0,0,0.15)'
-              : '0 10px 30px rgba(102, 126, 234, 0.5)',
-            transform: isSaving ? 'scale(0.95)' : 'scale(1)'
-          }}
-          onTouchStart={(e) => {
-            if (!isSaving) e.currentTarget.style.transform = 'scale(0.9)';
-          }}
-          onTouchEnd={(e) => {
-            if (!isSaving) e.currentTarget.style.transform = 'scale(1)';
+          sx={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 50,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff', boxShadow: '0 10px 30px rgba(102,126,234,0.5)',
+            '&:disabled': { opacity: 0.6 },
           }}
         >
-          {isSaving ? (
-            <div className="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent" />
-          ) : (
-            <IconDisplay name={initialData ? "Check" : "Save"} size={28} style={{ color: 'white' }} />
-          )}
-        </button>
-      </div>
+          {isSaving ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : <IconDisplay name={initialData ? 'Check' : 'Save'} size={24} style={{ color: '#fff' }} />}
+        </Fab>
+      )}
+    </Box>
+  );
 
-      {/* Delete Confirmation Dialog */}
+  return (
+    <>
+      <Dialog
+        open
+        onClose={onClose}
+        fullScreen={isMobile}
+        maxWidth="sm"
+        fullWidth={!isMobile}
+        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, overflow: 'hidden', height: isMobile ? '100%' : 'auto', maxHeight: isMobile ? '100%' : '90vh' } }}
+      >
+        {formContent}
+      </Dialog>
+
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleConfirmDelete}
         title="Hapus Transaksi"
         message={
-          <div className="space-y-2">
-            <p>Apakah Anda yakin ingin menghapus transaksi ini?</p>
-            <div className="p-3 rounded-lg text-left" style={{ backgroundColor: theme.colors.bgHover }}>
-              <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>
-                {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(initialData?.amount || 0)}
-              </p>
-              <p className="text-sm opacity-80">{initialData?.description || 'Tidak ada catatan'}</p>
-            </div>
-            <p className="text-sm opacity-80">Tindakan ini tidak dapat dibatalkan.</p>
-          </div>
+          <Box>
+            <Typography sx={{ mb: 1 }}>Apakah Anda yakin ingin menghapus transaksi ini?</Typography>
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
+              <Typography fontWeight={600}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(initialData?.amount || 0)}</Typography>
+              <Typography variant="body2" color="text.secondary">{initialData?.description || 'Tidak ada catatan'}</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Tindakan ini tidak dapat dibatalkan.</Typography>
+          </Box>
         }
         confirmText="Hapus"
         cancelText="Batal"
@@ -805,7 +470,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         icon="Trash2"
       />
 
-      {/* Category Form Modal */}
       {onAddCategory && (
         <CategoryFormModal
           isOpen={showCategoryModal}
@@ -814,23 +478,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           onClose={() => setShowCategoryModal(false)}
           onSave={async (categoryData) => {
             const newCategoryId = await onAddCategory(categoryData);
-            if (newCategoryId) {
-              setCategoryId(newCategoryId);
-            }
-            // Modal will close itself via onClose after this returns
+            if (newCategoryId) setCategoryId(newCategoryId);
           }}
         />
       )}
 
-      {/* Toast Notification */}
-      {showToast && (
-        <Toast
-          message={toastMessage}
-          type={toastType}
-          onClose={() => setShowToast(false)}
-        />
-      )}
-    </div>
+      {showToast && <Toast message={toastMessage} type={toastType} onClose={() => setShowToast(false)} />}
+    </>
   );
 };
 

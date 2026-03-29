@@ -3,6 +3,17 @@ import { DebtKind, DebtPayment, DebtRecord } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Grid from '@mui/material/Grid';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 
 interface DebtManagerProps {
     debts: DebtRecord[];
@@ -67,12 +78,7 @@ const formatRp = (value: number) => new Intl.NumberFormat('id-ID', {
 const formatShortDate = (value?: string) => {
     const date = parseLocalDate(value);
     if (!date) return '-';
-
-    return new Intl.DateTimeFormat('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(date);
+    return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 };
 
 const formatRupiahInput = (value: string) => {
@@ -117,12 +123,8 @@ const getKindSummary = (kind: DebtKind) => (
 const getSupportingText = (debt: DebtRecord) => {
     const note = debt.notes?.trim();
     if (note) return note;
-
     const legacyTitle = debt.title?.trim();
-    if (legacyTitle && legacyTitle.toLowerCase() !== debt.personName.trim().toLowerCase()) {
-        return legacyTitle;
-    }
-
+    if (legacyTitle && legacyTitle.toLowerCase() !== debt.personName.trim().toLowerCase()) return legacyTitle;
     return debt.dueDate ? `Jatuh tempo ${formatShortDate(debt.dueDate)}` : 'Belum ada keterangan tambahan';
 };
 
@@ -147,21 +149,14 @@ const DebtManager: React.FC<DebtManagerProps> = ({
     const [payoffTarget, setPayoffTarget] = useState<DebtRecord | null>(null);
     const [markingPaid, setMarkingPaid] = useState(false);
 
-    const activeDebts = useMemo(
-        () => debts.filter((debt) => debt.status !== 'PAID'),
-        [debts]
-    );
+    const activeDebts = useMemo(() => debts.filter((debt) => debt.status !== 'PAID'), [debts]);
 
     const summary = useMemo(() => ({
-        totalOwe: activeDebts
-            .filter((debt) => debt.kind === 'DEBT')
-            .reduce((total, debt) => total + debt.remainingAmount, 0),
-        totalCollect: activeDebts
-            .filter((debt) => debt.kind === 'RECEIVABLE')
-            .reduce((total, debt) => total + debt.remainingAmount, 0),
-        oweCount: activeDebts.filter((debt) => debt.kind === 'DEBT').length,
-        collectCount: activeDebts.filter((debt) => debt.kind === 'RECEIVABLE').length,
-        overdueCount: activeDebts.filter((debt) => isOverdue(debt)).length,
+        totalOwe: activeDebts.filter((d) => d.kind === 'DEBT').reduce((t, d) => t + d.remainingAmount, 0),
+        totalCollect: activeDebts.filter((d) => d.kind === 'RECEIVABLE').reduce((t, d) => t + d.remainingAmount, 0),
+        oweCount: activeDebts.filter((d) => d.kind === 'DEBT').length,
+        collectCount: activeDebts.filter((d) => d.kind === 'RECEIVABLE').length,
+        overdueCount: activeDebts.filter((d) => isOverdue(d)).length,
     }), [activeDebts]);
 
     const filteredDebts = useMemo(() => {
@@ -170,7 +165,6 @@ const DebtManager: React.FC<DebtManagerProps> = ({
             if (activeView === 'OWE') return debt.kind === 'DEBT' && debt.status !== 'PAID';
             return debt.kind === 'RECEIVABLE' && debt.status !== 'PAID';
         });
-
         return [...base].sort((left, right) => {
             if (activeView !== 'PAID') {
                 const overdueDiff = Number(isOverdue(right)) - Number(isOverdue(left));
@@ -181,7 +175,6 @@ const DebtManager: React.FC<DebtManagerProps> = ({
     }, [activeView, debts]);
 
     const activeDebt = filteredDebts.find((debt) => debt.id === activeDebtId) || null;
-
     const isDraftValid = !!draft.personName.trim() && Number(draft.amount.replace(/\./g, '')) > 0;
     const isPaymentValid = !!paymentDraft?.date && Number(paymentDraft?.amount.replace(/\./g, '') || '0') > 0;
 
@@ -213,10 +206,8 @@ const DebtManager: React.FC<DebtManagerProps> = ({
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-
         const amount = Number(draft.amount.replace(/\./g, ''));
         if (!draft.personName.trim() || !amount) return;
-
         setSaving(true);
         try {
             await onSaveDebt({
@@ -238,10 +229,8 @@ const DebtManager: React.FC<DebtManagerProps> = ({
     const handleSavePayment = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!paymentDraft) return;
-
         const amount = Number(paymentDraft.amount.replace(/\./g, ''));
         if (!amount || !paymentDraft.date) return;
-
         setSavingPayment(true);
         try {
             await onRecordPayment(paymentDraft.debtId, {
@@ -260,9 +249,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({
         setDeleting(true);
         try {
             await onDeleteDebt(deleteTarget.id);
-            if (activeDebtId === deleteTarget.id) {
-                setActiveDebtId(null);
-            }
+            if (activeDebtId === deleteTarget.id) setActiveDebtId(null);
             setDeleteTarget(null);
         } finally {
             setDeleting(false);
@@ -280,378 +267,305 @@ const DebtManager: React.FC<DebtManagerProps> = ({
         }
     };
 
-    const getStatusStyle = (debt: DebtRecord) => {
-        if (debt.status === 'PAID') {
-            return {
-                backgroundColor: theme.colors.incomeBg,
-                color: theme.colors.income,
-            };
-        }
-        if (isOverdue(debt)) {
-            return {
-                backgroundColor: theme.colors.expenseBg,
-                color: theme.colors.expense,
-            };
-        }
-        return {
-            backgroundColor: theme.colors.accentLight,
-            color: theme.colors.accent,
-        };
+    const getStatusChipSx = (debt: DebtRecord) => {
+        if (debt.status === 'PAID') return { bgcolor: theme.colors.incomeBg, color: theme.colors.income };
+        if (isOverdue(debt)) return { bgcolor: theme.colors.expenseBg, color: theme.colors.expense };
+        return { bgcolor: theme.colors.accentLight, color: theme.colors.accent };
     };
 
-    const getSummaryCardStyle = (kind: DebtKind) => {
-        const baseColor = kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense;
-        return {
-            background: `linear-gradient(145deg, ${baseColor} 0%, ${baseColor}dd 100%)`,
-            color: '#ffffff',
-        };
+    const heroGradient = (kind: DebtKind) => {
+        const c = kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense;
+        return `linear-gradient(145deg, ${c} 0%, ${c}dd 100%)`;
     };
 
-    const heroStyle = activeDebt
-        ? {
-            background: `linear-gradient(145deg, ${activeDebt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense} 0%, ${activeDebt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense}dd 100%)`,
-            color: '#ffffff',
-        }
-        : undefined;
+    const sectionTitle = activeView === 'OWE'
+        ? 'Yang perlu saya bayar'
+        : activeView === 'COLLECT'
+            ? 'Yang perlu dibayar ke saya'
+            : 'Yang sudah selesai';
 
-    const formModal = showForm ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div
-                className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-[32px] p-6 shadow-xl md:p-7"
-                style={{ backgroundColor: theme.colors.bgCard }}
-            >
-                <form onSubmit={handleSubmit}>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: theme.colors.textMuted }}>
-                                Hutang Piutang
-                            </p>
-                            <h4 className="mt-2 text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                                {draft.debtId ? 'Ubah Catatan' : 'Catat Baru'}
-                            </h4>
-                            <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                                Isi yang penting dulu. Detail tambahan tetap ada kalau memang dibutuhkan.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={resetForm}
-                            className="rounded-2xl p-2.5"
-                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textMuted }}
-                            aria-label="Tutup"
-                        >
-                            <IconDisplay name="X" size={18} />
-                        </button>
-                    </div>
+    const emptyLabel = activeView === 'PAID'
+        ? 'Belum ada catatan yang selesai.'
+        : activeView === 'OWE'
+            ? getKindSummary('DEBT').emptyLabel
+            : getKindSummary('RECEIVABLE').emptyLabel;
 
-                    <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+    // ── Form modal ──────────────────────────────────────────────────
+    const formModal = (
+        <Dialog
+            open={showForm}
+            onClose={resetForm}
+            maxWidth="sm"
+            fullWidth
+            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+            PaperProps={{ sx: { borderRadius: 4 } }}
+        >
+            <Box sx={{ px: 3, pt: 3, pb: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+                <Box>
+                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.16em' }} color="text.secondary">
+                        Hutang Piutang
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
+                        {draft.debtId ? 'Ubah Catatan' : 'Catat Baru'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Isi yang penting dulu. Detail tambahan tetap ada kalau memang dibutuhkan.
+                    </Typography>
+                </Box>
+                <IconButton onClick={resetForm} aria-label="Tutup" sx={{ flexShrink: 0 }}>
+                    <IconDisplay name="X" size={18} />
+                </IconButton>
+            </Box>
+
+            <DialogContent sx={{ px: 3, pb: 3 }}>
+                <Box component="form" onSubmit={handleSubmit}>
+                    {/* Kind selector */}
+                    <Grid container spacing={1.5} sx={{ mb: 3 }}>
                         {(['RECEIVABLE', 'DEBT'] as DebtKind[]).map((kindOption) => {
                             const selected = draft.kind === kindOption;
                             const isReceivable = kindOption === 'RECEIVABLE';
-
                             return (
-                                <button
-                                    key={kindOption}
-                                    type="button"
-                                    onClick={() => setDraft((current) => ({ ...current, kind: kindOption }))}
-                                    className="rounded-full px-5 py-4 text-left transition-all"
-                                    style={{
-                                        backgroundColor: selected ? theme.colors.accent : theme.colors.bgHover,
-                                        color: selected ? '#ffffff' : theme.colors.textPrimary,
-                                        boxShadow: selected ? `0 16px 35px ${theme.colors.accent}25` : 'none',
-                                    }}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <span
-                                            className="flex h-8 w-8 items-center justify-center rounded-full"
-                                            style={{
-                                                backgroundColor: selected ? 'rgba(255,255,255,0.18)' : theme.colors.bgCard,
-                                                color: selected ? '#ffffff' : theme.colors.textSecondary,
-                                            }}
-                                        >
-                                            <IconDisplay name={isReceivable ? 'ArrowDown' : 'ArrowUp'} size={16} />
-                                        </span>
-                                        <div>
-                                            <p className="text-sm font-semibold">
-                                                {isReceivable ? 'Orang Pinjam ke Saya' : 'Saya Pinjam ke Orang'}
-                                            </p>
-                                            <p className="mt-1 text-xs" style={{ color: selected ? 'rgba(255,255,255,0.82)' : theme.colors.textMuted }}>
-                                                {getKindSummary(kindOption).helper}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </button>
+                                <Grid size={{ xs: 12, sm: 6 }} key={kindOption}>
+                                    <Box
+                                        component="button"
+                                        type="button"
+                                        onClick={() => setDraft((c) => ({ ...c, kind: kindOption }))}
+                                        sx={{
+                                            width: '100%',
+                                            borderRadius: 6,
+                                            px: 2.5,
+                                            py: 2,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            bgcolor: selected ? theme.colors.accent : 'action.hover',
+                                            color: selected ? '#fff' : 'text.primary',
+                                            boxShadow: selected ? `0 16px 35px ${theme.colors.accent}25` : 'none',
+                                            transition: 'all 0.15s',
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <Box sx={{
+                                                width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                bgcolor: selected ? 'rgba(255,255,255,0.18)' : 'background.paper',
+                                                color: selected ? '#fff' : 'text.secondary',
+                                            }}>
+                                                <IconDisplay name={isReceivable ? 'ArrowDown' : 'ArrowUp'} size={16} />
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="body2" fontWeight={700} sx={{ color: 'inherit' }}>
+                                                    {isReceivable ? 'Orang Pinjam ke Saya' : 'Saya Pinjam ke Orang'}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: selected ? 'rgba(255,255,255,0.82)' : 'text.secondary' }}>
+                                                    {getKindSummary(kindOption).helper}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                </Grid>
                             );
                         })}
-                    </div>
+                    </Grid>
 
-                    <div className="mt-6 space-y-4">
-                        <div>
-                            <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                Nama Orang
-                            </label>
-                            <div
-                                className="flex items-center gap-3 rounded-[26px] border px-4 py-4"
-                                style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                            >
-                                <IconDisplay name="CircleUser" size={18} style={{ color: theme.colors.textMuted }} />
-                                <input
-                                    type="text"
-                                    value={draft.personName}
-                                    onChange={(event) => setDraft((current) => ({ ...current, personName: event.target.value }))}
-                                    placeholder={draft.kind === 'RECEIVABLE' ? 'Siapa yang meminjam?' : 'Saya pinjam dari siapa?'}
-                                    className="w-full bg-transparent text-base outline-none"
-                                    style={{ color: theme.colors.textPrimary }}
-                                />
-                            </div>
-                        </div>
+                    {/* Name */}
+                    <TextField
+                        label="Nama Orang"
+                        fullWidth
+                        size="small"
+                        value={draft.personName}
+                        onChange={(e) => setDraft((c) => ({ ...c, personName: e.target.value }))}
+                        placeholder={draft.kind === 'RECEIVABLE' ? 'Siapa yang meminjam?' : 'Saya pinjam dari siapa?'}
+                        sx={{ mb: 2 }}
+                    />
 
-                        <div>
-                            <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                Jumlah Uang
-                            </label>
-                            <div
-                                className="flex items-center gap-3 rounded-[26px] border px-4 py-4"
-                                style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                            >
-                                <span className="text-2xl font-semibold" style={{ color: theme.colors.textMuted }}>Rp</span>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={draft.amount}
-                                    onChange={(event) => setDraft((current) => ({ ...current, amount: formatRupiahInput(event.target.value) }))}
-                                    placeholder="0"
-                                    className="w-full bg-transparent text-3xl font-semibold outline-none"
-                                    style={{ color: theme.colors.textPrimary }}
-                                />
-                            </div>
-                        </div>
+                    {/* Amount */}
+                    <Box sx={{ mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, px: 2, py: 1.5, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Typography variant="h6" fontWeight={600} color="text.secondary">Rp</Typography>
+                        <Box
+                            component="input"
+                            type="text"
+                            inputMode="numeric"
+                            value={draft.amount}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((c) => ({ ...c, amount: formatRupiahInput(e.target.value) }))}
+                            placeholder="0"
+                            sx={{
+                                flex: 1, border: 'none', bgcolor: 'transparent', outline: 'none',
+                                fontSize: '1.75rem', fontWeight: 700, fontFamily: 'inherit',
+                                color: 'text.primary',
+                            }}
+                        />
+                    </Box>
 
-                        <div>
-                            <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                Catatan
-                            </label>
-                            <textarea
-                                rows={4}
-                                value={draft.notes}
-                                onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
-                                placeholder="Untuk keperluan apa? Misalnya makan siang, bensin, patungan, atau titip beli sesuatu."
-                                className="w-full resize-none rounded-[26px] border px-4 py-4 outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary,
-                                }}
-                            />
-                        </div>
-                    </div>
+                    {/* Notes */}
+                    <TextField
+                        label="Catatan"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        value={draft.notes}
+                        onChange={(e) => setDraft((c) => ({ ...c, notes: e.target.value }))}
+                        placeholder="Untuk keperluan apa? Misalnya makan siang, bensin, patungan, atau titip beli sesuatu."
+                        sx={{ mb: 2 }}
+                    />
 
-                    <div
-                        className="mt-5 rounded-[28px] border px-5 py-4"
-                        style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                    >
-                        <div className="flex items-start gap-3">
-                            <span
-                                className="mt-1 flex h-8 w-8 items-center justify-center rounded-full"
-                                style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
-                            >
+                    {/* Info box */}
+                    <Paper variant="outlined" sx={{ px: 2.5, py: 2, borderRadius: 3, mb: 2, bgcolor: 'action.hover' }}>
+                        <Box sx={{ display: 'flex', gap: 1.5 }}>
+                            <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: theme.colors.accentLight, color: theme.colors.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.25 }}>
                                 <IconDisplay name="Info" size={16} />
-                            </span>
-                            <div>
-                                <p className="font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                    Pencatatan Aman
-                                </p>
-                                <p className="mt-1 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
+                            </Box>
+                            <Box>
+                                <Typography variant="body2" fontWeight={700}>Pencatatan Aman</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.6 }}>
                                     Catatan ini membantu kita melacak siapa yang masih perlu dibayar atau ditagih tanpa harus melihat transaksi satu per satu.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Paper>
 
-                    <div className="mt-5">
-                        <button
-                            type="button"
-                            onClick={() => setShowAdvancedFields((current) => !current)}
-                            className="inline-flex items-center gap-2 text-sm font-semibold"
-                            style={{ color: theme.colors.accent }}
-                        >
-                            <IconDisplay name={showAdvancedFields ? 'Minus' : 'Plus'} size={16} />
-                            {showAdvancedFields ? 'Sembunyikan detail tambahan' : 'Tambahkan detail'}
-                        </button>
-                    </div>
+                    {/* Advanced toggle */}
+                    <Button
+                        size="small"
+                        startIcon={<IconDisplay name={showAdvancedFields ? 'Minus' : 'Plus'} size={16} />}
+                        onClick={() => setShowAdvancedFields((c) => !c)}
+                        sx={{ color: theme.colors.accent, mb: showAdvancedFields ? 2 : 0, fontWeight: 600 }}
+                    >
+                        {showAdvancedFields ? 'Sembunyikan detail tambahan' : 'Tambahkan detail'}
+                    </Button>
 
                     {showAdvancedFields && (
-                        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
-                                <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                    Tanggal Catat
-                                </label>
-                                <input
+                        <Grid container spacing={2} sx={{ mb: 2 }}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    label="Tanggal Catat"
                                     type="date"
+                                    size="small"
+                                    fullWidth
                                     value={draft.transactionDate}
-                                    onChange={(event) => setDraft((current) => ({ ...current, transactionDate: event.target.value }))}
-                                    className="w-full rounded-[22px] border px-4 py-3 outline-none"
-                                    style={{
-                                        backgroundColor: theme.colors.bgHover,
-                                        borderColor: theme.colors.border,
-                                        color: theme.colors.textPrimary,
-                                    }}
+                                    onChange={(e) => setDraft((c) => ({ ...c, transactionDate: e.target.value }))}
+                                    slotProps={{ inputLabel: { shrink: true } }}
                                 />
-                            </div>
-                            <div>
-                                <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                    Jatuh Tempo
-                                </label>
-                                <input
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    label="Jatuh Tempo"
                                     type="date"
+                                    size="small"
+                                    fullWidth
                                     value={draft.dueDate}
-                                    onChange={(event) => setDraft((current) => ({ ...current, dueDate: event.target.value }))}
-                                    className="w-full rounded-[22px] border px-4 py-3 outline-none"
-                                    style={{
-                                        backgroundColor: theme.colors.bgHover,
-                                        borderColor: theme.colors.border,
-                                        color: theme.colors.textPrimary,
-                                    }}
+                                    onChange={(e) => setDraft((c) => ({ ...c, dueDate: e.target.value }))}
+                                    slotProps={{ inputLabel: { shrink: true } }}
                                 />
-                            </div>
-                        </div>
+                            </Grid>
+                        </Grid>
                     )}
 
-                    <div className="mt-8 flex flex-col gap-3">
-                        <button
+                    {/* Actions */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
+                        <Button
                             type="submit"
+                            variant="contained"
+                            fullWidth
                             disabled={!isDraftValid || saving}
-                            className="w-full rounded-full px-5 py-4 text-base font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-55"
-                            style={{ backgroundColor: theme.colors.accent }}
+                            startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                            sx={{ borderRadius: 99, py: 1.5, fontWeight: 700, fontSize: 16 }}
                         >
                             {saving ? 'Menyimpan...' : 'Simpan Catatan'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={resetForm}
-                            className="text-sm font-medium"
-                            style={{ color: theme.colors.textSecondary }}
-                        >
+                        </Button>
+                        <Button fullWidth onClick={resetForm} sx={{ color: 'text.secondary', fontWeight: 600 }}>
                             Batal
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    ) : null;
+                        </Button>
+                    </Box>
+                </Box>
+            </DialogContent>
+        </Dialog>
+    );
 
-    const paymentModal = paymentDraft ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div
-                className="w-full max-w-lg rounded-[32px] p-6 shadow-xl md:p-7"
-                style={{ backgroundColor: theme.colors.bgCard }}
-            >
-                <form onSubmit={handleSavePayment}>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: theme.colors.textMuted }}>
-                                Hutang Piutang
-                            </p>
-                            <h4 className="mt-2 text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                                Catat Pembayaran
-                            </h4>
-                            <p className="mt-2 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                                Simpan nominal yang sudah dibayar. Catatan tambahan tetap opsional.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setPaymentDraft(null)}
-                            className="rounded-2xl p-2.5"
-                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textMuted }}
-                            aria-label="Tutup"
-                        >
-                            <IconDisplay name="X" size={18} />
-                        </button>
-                    </div>
+    // ── Payment modal ────────────────────────────────────────────────
+    const paymentModal = (
+        <Dialog
+            open={!!paymentDraft}
+            onClose={() => setPaymentDraft(null)}
+            maxWidth="sm"
+            fullWidth
+            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+            PaperProps={{ sx: { borderRadius: 4 } }}
+        >
+            <Box sx={{ px: 3, pt: 3, pb: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+                <Box>
+                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.16em' }} color="text.secondary">
+                        Hutang Piutang
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>Catat Pembayaran</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Simpan nominal yang sudah dibayar. Catatan tambahan tetap opsional.
+                    </Typography>
+                </Box>
+                <IconButton onClick={() => setPaymentDraft(null)} aria-label="Tutup" sx={{ flexShrink: 0 }}>
+                    <IconDisplay name="X" size={18} />
+                </IconButton>
+            </Box>
 
-                    <div className="mt-6 space-y-4">
-                        <div>
-                            <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                Nominal Bayar
-                            </label>
-                            <div
-                                className="flex items-center gap-3 rounded-[26px] border px-4 py-4"
-                                style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                            >
-                                <span className="text-2xl font-semibold" style={{ color: theme.colors.textMuted }}>Rp</span>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={paymentDraft.amount}
-                                    onChange={(event) => setPaymentDraft((current) => current ? ({
-                                        ...current,
-                                        amount: formatRupiahInput(event.target.value),
-                                    }) : current)}
-                                    className="w-full bg-transparent text-3xl font-semibold outline-none"
-                                    style={{ color: theme.colors.textPrimary }}
-                                />
-                            </div>
-                        </div>
+            <DialogContent sx={{ px: 3, pb: 3 }}>
+                <Box component="form" onSubmit={handleSavePayment}>
+                    {/* Amount */}
+                    <Box sx={{ mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, px: 2, py: 1.5, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Typography variant="h6" fontWeight={600} color="text.secondary">Rp</Typography>
+                        <Box
+                            component="input"
+                            type="text"
+                            inputMode="numeric"
+                            value={paymentDraft?.amount || ''}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentDraft((c) => c ? ({ ...c, amount: formatRupiahInput(e.target.value) }) : c)}
+                            sx={{
+                                flex: 1, border: 'none', bgcolor: 'transparent', outline: 'none',
+                                fontSize: '1.75rem', fontWeight: 700, fontFamily: 'inherit',
+                                color: 'text.primary',
+                            }}
+                        />
+                    </Box>
 
-                        <div>
-                            <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                Tanggal Bayar
-                            </label>
-                            <input
-                                type="date"
-                                value={paymentDraft.date}
-                                onChange={(event) => setPaymentDraft((current) => current ? ({ ...current, date: event.target.value }) : current)}
-                                className="w-full rounded-[22px] border px-4 py-3 outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary,
-                                }}
-                            />
-                        </div>
+                    <TextField
+                        label="Tanggal Bayar"
+                        type="date"
+                        size="small"
+                        fullWidth
+                        value={paymentDraft?.date || ''}
+                        onChange={(e) => setPaymentDraft((c) => c ? ({ ...c, date: e.target.value }) : c)}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                        sx={{ mb: 2 }}
+                    />
 
-                        <div>
-                            <label className="mb-2 block text-sm font-medium" style={{ color: theme.colors.textPrimary }}>
-                                Catatan
-                            </label>
-                            <textarea
-                                rows={3}
-                                value={paymentDraft.note}
-                                onChange={(event) => setPaymentDraft((current) => current ? ({ ...current, note: event.target.value }) : current)}
-                                placeholder="Opsional"
-                                className="w-full resize-none rounded-[22px] border px-4 py-4 outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary,
-                                }}
-                            />
-                        </div>
-                    </div>
+                    <TextField
+                        label="Catatan"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        value={paymentDraft?.note || ''}
+                        onChange={(e) => setPaymentDraft((c) => c ? ({ ...c, note: e.target.value }) : c)}
+                        placeholder="Opsional"
+                        sx={{ mb: 3 }}
+                    />
 
-                    <div className="mt-8 flex flex-col gap-3">
-                        <button
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Button
                             type="submit"
+                            variant="contained"
+                            fullWidth
                             disabled={!isPaymentValid || savingPayment}
-                            className="w-full rounded-full px-5 py-4 text-base font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-55"
-                            style={{ backgroundColor: theme.colors.accent }}
+                            startIcon={savingPayment ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                            sx={{ borderRadius: 99, py: 1.5, fontWeight: 700, fontSize: 16 }}
                         >
                             {savingPayment ? 'Menyimpan...' : 'Simpan Pembayaran'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setPaymentDraft(null)}
-                            className="text-sm font-medium"
-                            style={{ color: theme.colors.textSecondary }}
-                        >
+                        </Button>
+                        <Button fullWidth onClick={() => setPaymentDraft(null)} sx={{ color: 'text.secondary', fontWeight: 600 }}>
                             Batal
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    ) : null;
+                        </Button>
+                    </Box>
+                </Box>
+            </DialogContent>
+        </Dialog>
+    );
 
     const deleteDialog = (
         <ConfirmDialog
@@ -660,14 +574,10 @@ const DebtManager: React.FC<DebtManagerProps> = ({
             onConfirm={handleConfirmDelete}
             title="Hapus Catatan"
             message={deleteTarget ? (
-                <div className="space-y-2">
-                    <p>
-                        Catatan untuk <strong>{deleteTarget.personName}</strong> akan dihapus.
-                    </p>
-                    <p className="text-sm opacity-80">
-                        Riwayat pembayaran di catatan ini juga ikut terhapus.
-                    </p>
-                </div>
+                <Box>
+                    <Typography>Catatan untuk <strong>{deleteTarget.personName}</strong> akan dihapus.</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>Riwayat pembayaran di catatan ini juga ikut terhapus.</Typography>
+                </Box>
             ) : ''}
             confirmText="Hapus"
             type="danger"
@@ -682,14 +592,10 @@ const DebtManager: React.FC<DebtManagerProps> = ({
             onConfirm={handleConfirmPaid}
             title="Tandai Lunas"
             message={payoffTarget ? (
-                <div className="space-y-2">
-                    <p>
-                        Catatan untuk <strong>{payoffTarget.personName}</strong> akan ditandai lunas.
-                    </p>
-                    <p className="text-sm opacity-80">
-                        Sisa nominal akan dianggap selesai.
-                    </p>
-                </div>
+                <Box>
+                    <Typography>Catatan untuk <strong>{payoffTarget.personName}</strong> akan ditandai lunas.</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>Sisa nominal akan dianggap selesai.</Typography>
+                </Box>
             ) : ''}
             confirmText="Tandai Lunas"
             type="success"
@@ -698,463 +604,350 @@ const DebtManager: React.FC<DebtManagerProps> = ({
         />
     );
 
-    const sectionTitle = activeView === 'OWE'
-        ? 'Yang perlu saya bayar'
-        : activeView === 'COLLECT'
-            ? 'Yang perlu dibayar ke saya'
-            : 'Yang sudah selesai';
-
-    const emptyLabel = activeView === 'PAID'
-        ? 'Belum ada catatan yang selesai.'
-        : activeView === 'OWE'
-            ? getKindSummary('DEBT').emptyLabel
-            : getKindSummary('RECEIVABLE').emptyLabel;
-
-    return (
-        <div className="space-y-6 pb-20 md:pb-0 animate-fade-in-up">
-            {activeDebt ? (
-                <>
-                    <div className="flex items-center justify-between gap-3">
-                        <button
-                            onClick={() => setActiveDebtId(null)}
-                            className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold"
-                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                        >
-                            <IconDisplay name="ArrowLeft" size={16} />
-                            Kembali ke Daftar
-                        </button>
-                        <button
-                            onClick={() => openCreateForm(activeDebt.kind)}
-                            className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
-                            style={{ backgroundColor: theme.colors.accent }}
-                        >
-                            + Tambah Catatan
-                        </button>
-                    </div>
-
-                    <section
-                        className="rounded-[32px] border p-5 md:p-6"
-                        style={{
-                            backgroundColor: theme.colors.bgCard,
-                            borderColor: theme.colors.border,
-                            boxShadow: isDark ? 'none' : '0 18px 55px rgba(15, 23, 42, 0.04)',
-                        }}
+    // ── Active debt detail ───────────────────────────────────────────
+    if (activeDebt) {
+        return (
+            <Box sx={{ pb: { xs: 10, md: 0 } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<IconDisplay name="ArrowLeft" size={16} />}
+                        onClick={() => setActiveDebtId(null)}
+                        sx={{ borderRadius: 99, fontWeight: 600 }}
                     >
-                        <div className="space-y-5">
-                            <div
-                                className="rounded-[32px] px-6 py-6 md:px-7 md:py-7"
-                                style={heroStyle}
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div
-                                        className="flex h-14 w-14 items-center justify-center rounded-full border text-lg font-bold"
-                                        style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.16)' }}
-                                    >
-                                        {getInitials(activeDebt.personName)}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => openEditForm(activeDebt)}
-                                            className="rounded-2xl p-2.5"
-                                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: '#ffffff' }}
-                                            title="Ubah"
-                                        >
-                                            <IconDisplay name="Edit" size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setDeleteTarget(activeDebt)}
-                                            className="rounded-2xl p-2.5"
-                                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: '#ffffff' }}
-                                            title="Hapus"
-                                        >
-                                            <IconDisplay name="Trash2" size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/72">
-                                        {getKindSummary(activeDebt.kind).detailLabel}
-                                    </p>
-                                    <h3 className="mt-2 text-3xl font-bold md:text-4xl">
-                                        {activeDebt.personName}
-                                    </h3>
-                                    <p className="mt-4 text-sm text-white/82">
-                                        Total sisa {activeDebt.kind === 'RECEIVABLE' ? 'yang perlu diterima' : 'yang perlu dibayar'}
-                                    </p>
-                                    <p className="mt-2 text-[2rem] font-bold leading-tight md:text-[2.5rem]">
-                                        {formatRp(activeDebt.remainingAmount)}
-                                    </p>
-                                </div>
-
-                                <div className="mt-5 flex flex-wrap gap-2">
-                                    <span className="rounded-full bg-white/14 px-3 py-1.5 text-xs font-semibold text-white/90">
-                                        {getStatusLabel(activeDebt.status)}
-                                    </span>
-                                    <span className="rounded-full bg-white/14 px-3 py-1.5 text-xs font-semibold text-white/90">
-                                        Dicatat {formatShortDate(activeDebt.transactionDate)}
-                                    </span>
-                                    {activeDebt.dueDate && (
-                                        <span className="rounded-full bg-white/14 px-3 py-1.5 text-xs font-semibold text-white/90">
-                                            Jatuh tempo {formatShortDate(activeDebt.dueDate)}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                {[
-                                    { label: 'Nominal Awal', value: formatRp(activeDebt.amount) },
-                                    { label: 'Sudah Dibayar', value: formatRp(activeDebt.paidAmount) },
-                                    { label: 'Sisa', value: formatRp(activeDebt.remainingAmount) },
-                                ].map((item) => (
-                                    <div
-                                        key={item.label}
-                                        className="rounded-[24px] px-4 py-4"
-                                        style={{ backgroundColor: theme.colors.bgHover }}
-                                    >
-                                        <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: theme.colors.textMuted }}>
-                                            {item.label}
-                                        </p>
-                                        <p className="mt-2 text-lg font-bold" style={{ color: theme.colors.textPrimary }}>
-                                            {item.value}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {activeDebt.status !== 'PAID' && (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    <button
-                                        onClick={() => setPaymentDraft({
-                                            debtId: activeDebt.id,
-                                            amount: activeDebt.remainingAmount > 0
-                                                ? new Intl.NumberFormat('id-ID').format(activeDebt.remainingAmount)
-                                                : '',
-                                            date: getToday(),
-                                            note: '',
-                                        })}
-                                        className="w-full rounded-full px-5 py-4 text-base font-semibold text-white"
-                                        style={{ backgroundColor: theme.colors.accent }}
-                                    >
-                                        {activeDebt.kind === 'RECEIVABLE' ? 'Terima Pembayaran' : 'Catat Pembayaran'}
-                                    </button>
-                                    <button
-                                        onClick={() => setPayoffTarget(activeDebt)}
-                                        className="w-full rounded-full px-5 py-4 text-base font-semibold"
-                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                                    >
-                                        Tandai Lunas
-                                    </button>
-                                </div>
-                            )}
-
-                            <div>
-                                <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <h4 className="text-xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                                            Riwayat Pembayaran
-                                        </h4>
-                                        <p className="mt-1 text-sm" style={{ color: theme.colors.textMuted }}>
-                                            Semua pembayaran yang sudah tercatat ada di sini.
-                                        </p>
-                                    </div>
-                                    <span
-                                        className="rounded-full px-3 py-1.5 text-xs font-semibold"
-                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textSecondary }}
-                                    >
-                                        {activeDebt.payments.length} pembayaran
-                                    </span>
-                                </div>
-
-                                <div className="mt-4 space-y-3">
-                                    <div
-                                        className="rounded-[24px] px-4 py-4"
-                                        style={{ backgroundColor: theme.colors.bgHover }}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                                    Catatan dibuat
-                                                </p>
-                                                <p className="mt-1 text-xs" style={{ color: theme.colors.textMuted }}>
-                                                    {formatShortDate(activeDebt.transactionDate)}
-                                                </p>
-                                            </div>
-                                            <span className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                                {formatRp(activeDebt.amount)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {activeDebt.payments.length === 0 ? (
-                                        <div
-                                            className="rounded-[24px] border border-dashed px-4 py-5 text-sm"
-                                            style={{ borderColor: theme.colors.border, color: theme.colors.textMuted }}
-                                        >
-                                            Belum ada pembayaran tercatat.
-                                        </div>
-                                    ) : activeDebt.payments.map((payment: DebtPayment, index) => (
-                                        <div
-                                            key={payment.id}
-                                            className="rounded-[24px] px-4 py-4"
-                                            style={{ backgroundColor: theme.colors.bgHover }}
-                                        >
-                                            <div className="flex items-start gap-3">
-                                                <span
-                                                    className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                                                    style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.accent }}
-                                                >
-                                                    <IconDisplay name="CheckCircle" size={18} />
-                                                </span>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div>
-                                                            <p className="text-sm font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                                                Pembayaran {index === 0 ? 'Terbaru' : `Ke-${index + 1}`}
-                                                            </p>
-                                                            <p className="mt-1 text-xs" style={{ color: theme.colors.textMuted }}>
-                                                                {formatShortDate(payment.date)}
-                                                            </p>
-                                                        </div>
-                                                        <span
-                                                            className="text-sm font-bold"
-                                                            style={{ color: activeDebt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense }}
-                                                        >
-                                                            {formatRp(payment.amount)}
-                                                        </span>
-                                                    </div>
-                                                    {payment.note && (
-                                                        <p className="mt-3 text-sm leading-6" style={{ color: theme.colors.textSecondary }}>
-                                                            {payment.note}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                </>
-            ) : (
-                <>
-                    <section
-                        className="rounded-[32px] border p-6 md:p-8"
-                        style={{
-                            backgroundColor: theme.colors.bgCard,
-                            borderColor: theme.colors.border,
-                            boxShadow: isDark ? 'none' : '0 18px 55px rgba(15, 23, 42, 0.05)',
-                        }}
+                        Kembali ke Daftar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => openCreateForm(activeDebt.kind)}
+                        sx={{ borderRadius: 99, fontWeight: 600 }}
                     >
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="max-w-2xl">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: theme.colors.textMuted }}>
-                                    Hutang Piutang
-                                </p>
-                                <h2 className="mt-2 text-2xl font-bold md:text-3xl" style={{ color: theme.colors.textPrimary }}>
-                                    Ringkas, jelas, dan gampang dipantau
-                                </h2>
-                                <p className="mt-3 text-sm leading-7 md:text-base" style={{ color: theme.colors.textSecondary }}>
-                                    Kita fokus ke yang paling penting: siapa yang terlibat, berapa nominalnya, dan masih sisa berapa sampai selesai.
-                                </p>
-                            </div>
+                        + Tambah Catatan
+                    </Button>
+                </Box>
 
-                            <button
-                                onClick={() => openCreateForm()}
-                                className="rounded-full px-6 py-3.5 text-sm font-semibold text-white transition-transform hover:scale-[1.01]"
-                                style={{ backgroundColor: theme.colors.accent }}
-                            >
-                                + Tambah Catatan
-                            </button>
-                        </div>
-
-                        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            {[
-                                {
-                                    key: 'collect',
-                                    title: 'Piutang Saya',
-                                    subtitle: 'Orang berhutang ke saya',
-                                    amount: summary.totalCollect,
-                                    count: summary.collectCount,
-                                    kind: 'RECEIVABLE' as DebtKind,
-                                },
-                                {
-                                    key: 'owe',
-                                    title: 'Hutang Saya',
-                                    subtitle: 'Saya masih berhutang',
-                                    amount: summary.totalOwe,
-                                    count: summary.oweCount,
-                                    kind: 'DEBT' as DebtKind,
-                                },
-                            ].map((card) => (
-                                <div
-                                    key={card.key}
-                                    className="relative overflow-hidden rounded-[30px] px-5 py-5 md:px-6 md:py-6"
-                                    style={getSummaryCardStyle(card.kind)}
+                <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 4, boxShadow: isDark ? 0 : 4 }}>
+                    {/* Hero card */}
+                    <Box sx={{ background: heroGradient(activeDebt.kind), borderRadius: 4, px: { xs: 3, md: 3.5 }, py: { xs: 3, md: 3.5 }, color: '#fff', mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3 }}>
+                            <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>
+                                {getInitials(activeDebt.personName)}
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => openEditForm(activeDebt)}
+                                    title="Ubah"
+                                    sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: '#fff' }}
                                 >
-                                    <div className="absolute -right-4 -top-5 opacity-10">
-                                        <IconDisplay name={card.kind === 'RECEIVABLE' ? 'Wallet' : 'BadgeDollarSign'} size={92} />
-                                    </div>
-                                    <p className="text-sm font-semibold">{card.title}</p>
-                                    <p className="mt-1 text-sm text-white/80">{card.subtitle}</p>
-                                    <p className="mt-4 text-3xl font-bold md:text-[2rem]">{formatRp(card.amount)}</p>
-                                    <div className="mt-4 inline-flex rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold">
-                                        {card.count} catatan
-                                    </div>
-                                </div>
+                                    <IconDisplay name="Edit" size={16} />
+                                </IconButton>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setDeleteTarget(activeDebt)}
+                                    title="Hapus"
+                                    sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: '#fff' }}
+                                >
+                                    <IconDisplay name="Trash2" size={16} />
+                                </IconButton>
+                            </Box>
+                        </Box>
+
+                        <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.16em', color: 'rgba(255,255,255,0.72)' }}>
+                            {getKindSummary(activeDebt.kind).detailLabel}
+                        </Typography>
+                        <Typography variant="h4" fontWeight={700} sx={{ mt: 0.5 }}>{activeDebt.personName}</Typography>
+                        <Typography variant="body2" sx={{ mt: 2, color: 'rgba(255,255,255,0.82)' }}>
+                            Total sisa {activeDebt.kind === 'RECEIVABLE' ? 'yang perlu diterima' : 'yang perlu dibayar'}
+                        </Typography>
+                        <Typography sx={{ mt: 0.5, fontSize: { xs: '2rem', md: '2.5rem' }, fontWeight: 700, lineHeight: 1.2 }}>
+                            {formatRp(activeDebt.remainingAmount)}
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+                            {[getStatusLabel(activeDebt.status), `Dicatat ${formatShortDate(activeDebt.transactionDate)}`, ...(activeDebt.dueDate ? [`Jatuh tempo ${formatShortDate(activeDebt.dueDate)}`] : [])].map((tag) => (
+                                <Box key={tag} sx={{ bgcolor: 'rgba(255,255,255,0.14)', px: 1.5, py: 0.75, borderRadius: 99, fontSize: 11, fontWeight: 700 }}>
+                                    {tag}
+                                </Box>
                             ))}
-                        </div>
+                        </Box>
+                    </Box>
 
-                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-                            <span
-                                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
-                                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textSecondary }}
-                            >
-                                <IconDisplay name="AlertCircle" size={14} style={{ color: summary.overdueCount > 0 ? theme.colors.expense : theme.colors.textMuted }} />
-                                {summary.overdueCount > 0 ? `${summary.overdueCount} catatan lewat jatuh tempo` : 'Belum ada yang lewat jatuh tempo'}
-                            </span>
-                            <span
-                                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
-                                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textSecondary }}
-                            >
-                                <IconDisplay name="RefreshCw" size={14} style={{ color: theme.colors.textMuted }} />
-                                Data otomatis menyesuaikan saat ada pembayaran baru
-                            </span>
-                        </div>
-                    </section>
-
-                    <div className="flex flex-wrap gap-3">
+                    {/* Stats */}
+                    <Grid container spacing={1.5} sx={{ mb: 2 }}>
                         {[
-                            { id: 'OWE' as const, label: 'Perlu Dibayar' },
-                            { id: 'COLLECT' as const, label: 'Perlu Ditagih' },
-                            { id: 'PAID' as const, label: 'Selesai' },
-                        ].map((tab) => {
-                            const active = activeView === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => {
-                                        setActiveView(tab.id);
-                                        setActiveDebtId(null);
-                                    }}
-                                    className="rounded-full px-4 py-2.5 text-sm font-semibold transition-all"
-                                    style={{
-                                        backgroundColor: active ? theme.colors.accent : theme.colors.bgHover,
-                                        color: active ? '#ffffff' : theme.colors.textSecondary,
-                                    }}
-                                >
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
-                    </div>
+                            { label: 'Nominal Awal', value: formatRp(activeDebt.amount) },
+                            { label: 'Sudah Dibayar', value: formatRp(activeDebt.paidAmount) },
+                            { label: 'Sisa', value: formatRp(activeDebt.remainingAmount) },
+                        ].map((item) => (
+                            <Grid size={{ xs: 12, md: 4 }} key={item.label}>
+                                <Paper variant="outlined" sx={{ px: 2, py: 2, borderRadius: 3, bgcolor: 'action.hover' }}>
+                                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.14em' }} color="text.secondary">
+                                        {item.label}
+                                    </Typography>
+                                    <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5 }}>{item.value}</Typography>
+                                </Paper>
+                            </Grid>
+                        ))}
+                    </Grid>
 
-                    <section
-                        className="rounded-[32px] border p-5 md:p-6"
-                        style={{
-                            backgroundColor: theme.colors.bgCard,
-                            borderColor: theme.colors.border,
-                            boxShadow: isDark ? 'none' : '0 18px 55px rgba(15, 23, 42, 0.04)',
-                        }}
+                    {/* Actions */}
+                    {activeDebt.status !== 'PAID' && (
+                        <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    onClick={() => setPaymentDraft({
+                                        debtId: activeDebt.id,
+                                        amount: activeDebt.remainingAmount > 0
+                                            ? new Intl.NumberFormat('id-ID').format(activeDebt.remainingAmount)
+                                            : '',
+                                        date: getToday(),
+                                        note: '',
+                                    })}
+                                    sx={{ borderRadius: 99, py: 1.5, fontWeight: 700 }}
+                                >
+                                    {activeDebt.kind === 'RECEIVABLE' ? 'Terima Pembayaran' : 'Catat Pembayaran'}
+                                </Button>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <Button
+                                    fullWidth
+                                    variant="outlined"
+                                    onClick={() => setPayoffTarget(activeDebt)}
+                                    sx={{ borderRadius: 99, py: 1.5, fontWeight: 700 }}
+                                >
+                                    Tandai Lunas
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    {/* Payment history */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Box>
+                            <Typography variant="h6" fontWeight={700}>Riwayat Pembayaran</Typography>
+                            <Typography variant="body2" color="text.secondary">Semua pembayaran yang sudah tercatat ada di sini.</Typography>
+                        </Box>
+                        <Chip label={`${activeDebt.payments.length} pembayaran`} size="small" />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        {/* Initial record */}
+                        <Paper variant="outlined" sx={{ px: 2, py: 2, borderRadius: 3, bgcolor: 'action.hover' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Box>
+                                    <Typography variant="body2" fontWeight={600}>Catatan dibuat</Typography>
+                                    <Typography variant="caption" color="text.secondary">{formatShortDate(activeDebt.transactionDate)}</Typography>
+                                </Box>
+                                <Typography variant="body2" fontWeight={600}>{formatRp(activeDebt.amount)}</Typography>
+                            </Box>
+                        </Paper>
+
+                        {activeDebt.payments.length === 0 ? (
+                            <Paper variant="outlined" sx={{ px: 2, py: 3, borderRadius: 3, borderStyle: 'dashed', textAlign: 'center' }}>
+                                <Typography variant="body2" color="text.secondary">Belum ada pembayaran tercatat.</Typography>
+                            </Paper>
+                        ) : activeDebt.payments.map((payment: DebtPayment, index) => (
+                            <Paper key={payment.id} variant="outlined" sx={{ px: 2, py: 2, borderRadius: 3, bgcolor: 'action.hover' }}>
+                                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                                    <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: 'background.paper', color: theme.colors.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.25 }}>
+                                        <IconDisplay name="CheckCircle" size={18} />
+                                    </Box>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                                            <Box>
+                                                <Typography variant="body2" fontWeight={600}>
+                                                    Pembayaran {index === 0 ? 'Terbaru' : `Ke-${index + 1}`}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">{formatShortDate(payment.date)}</Typography>
+                                            </Box>
+                                            <Typography variant="body2" fontWeight={700} sx={{ color: activeDebt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense, flexShrink: 0 }}>
+                                                {formatRp(payment.amount)}
+                                            </Typography>
+                                        </Box>
+                                        {payment.note && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, lineHeight: 1.6 }}>
+                                                {payment.note}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Box>
+                            </Paper>
+                        ))}
+                    </Box>
+                </Paper>
+
+                {formModal}
+                {paymentModal}
+                {deleteDialog}
+                {paidDialog}
+            </Box>
+        );
+    }
+
+    // ── Main list view ───────────────────────────────────────────────
+    return (
+        <Box sx={{ pb: { xs: 10, md: 0 } }}>
+            {/* Header */}
+            <Paper variant="outlined" sx={{ p: { xs: 3, md: 4 }, borderRadius: 4, mb: 3, boxShadow: isDark ? 0 : 4 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'flex-start' }, justifyContent: 'space-between', gap: 3, mb: 3 }}>
+                    <Box>
+                        <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.16em' }} color="text.secondary">
+                            Hutang Piutang
+                        </Typography>
+                        <Typography variant="h4" fontWeight={700} sx={{ mt: 0.5 }}>Ringkas, jelas, dan gampang dipantau</Typography>
+                        <Typography variant="body1" color="text.secondary" sx={{ mt: 1, lineHeight: 1.7, maxWidth: 600 }}>
+                            Kita fokus ke yang paling penting: siapa yang terlibat, berapa nominalnya, dan masih sisa berapa sampai selesai.
+                        </Typography>
+                    </Box>
+                    <Button
+                        variant="contained"
+                        onClick={() => openCreateForm()}
+                        sx={{ borderRadius: 99, px: 3, py: 1.5, fontWeight: 700, flexShrink: 0 }}
                     >
-                        <div className="mb-5 flex items-center justify-between gap-3">
-                            <div>
-                                <h3 className="text-xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                                    Aktivitas Terkini
-                                </h3>
-                                <p className="mt-1 text-sm" style={{ color: theme.colors.textMuted }}>
-                                    {sectionTitle}
-                                </p>
-                            </div>
-                            <span
-                                className="rounded-full px-3 py-1.5 text-xs font-semibold"
-                                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textSecondary }}
-                            >
-                                {filteredDebts.length} catatan
-                            </span>
-                        </div>
+                        + Tambah Catatan
+                    </Button>
+                </Box>
 
-                        <div className="space-y-3">
-                            {filteredDebts.length === 0 ? (
-                                <div
-                                    className="rounded-[28px] border border-dashed p-8 text-center text-sm"
-                                    style={{ borderColor: theme.colors.border, color: theme.colors.textMuted }}
-                                >
-                                    {emptyLabel}
-                                </div>
-                            ) : filteredDebts.map((debt) => (
-                                <button
-                                    key={debt.id}
-                                    onClick={() => setActiveDebtId(debt.id)}
-                                    className="w-full rounded-[28px] border px-4 py-4 text-left transition-all"
-                                    style={{
-                                        backgroundColor: theme.colors.bgCard,
-                                        borderColor: theme.colors.border,
-                                    }}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div
-                                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                                            style={{
-                                                backgroundColor: debt.kind === 'RECEIVABLE' ? theme.colors.incomeBg : theme.colors.expenseBg,
-                                                color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense,
-                                            }}
-                                        >
-                                            {getInitials(debt.personName)}
-                                        </div>
+                {/* Summary cards */}
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                    {[
+                        { key: 'collect', title: 'Piutang Saya', subtitle: 'Orang berhutang ke saya', amount: summary.totalCollect, count: summary.collectCount, kind: 'RECEIVABLE' as DebtKind },
+                        { key: 'owe', title: 'Hutang Saya', subtitle: 'Saya masih berhutang', amount: summary.totalOwe, count: summary.oweCount, kind: 'DEBT' as DebtKind },
+                    ].map((card) => (
+                        <Grid size={{ xs: 12, sm: 6 }} key={card.key}>
+                            <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: 4, px: { xs: 2.5, md: 3 }, py: { xs: 2.5, md: 3 }, background: heroGradient(card.kind), color: '#fff' }}>
+                                <Box sx={{ position: 'absolute', right: -16, top: -20, opacity: 0.1 }}>
+                                    <IconDisplay name={card.kind === 'RECEIVABLE' ? 'Wallet' : 'BadgeDollarSign'} size={92} />
+                                </Box>
+                                <Typography variant="body2" fontWeight={600}>{card.title}</Typography>
+                                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mt: 0.25 }}>{card.subtitle}</Typography>
+                                <Typography sx={{ mt: 2, fontSize: { xs: '1.75rem', md: '2rem' }, fontWeight: 700, lineHeight: 1 }}>
+                                    {formatRp(card.amount)}
+                                </Typography>
+                                <Box sx={{ mt: 2, display: 'inline-flex', bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 99, px: 1.5, py: 0.75, fontSize: 12, fontWeight: 700 }}>
+                                    {card.count} catatan
+                                </Box>
+                            </Box>
+                        </Grid>
+                    ))}
+                </Grid>
 
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-base font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                                        {debt.personName}
-                                                    </p>
-                                                    <p className="mt-1 line-clamp-1 text-sm" style={{ color: theme.colors.textSecondary }}>
-                                                        {getSupportingText(debt)}
-                                                    </p>
-                                                </div>
-                                                <div className="shrink-0 text-right">
-                                                    <p
-                                                        className="text-base font-bold"
-                                                        style={{ color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense }}
-                                                    >
-                                                        {formatRp(debt.remainingAmount)}
-                                                    </p>
-                                                </div>
-                                            </div>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                    <Chip
+                        size="small"
+                        icon={<IconDisplay name="AlertCircle" size={13} style={{ color: summary.overdueCount > 0 ? theme.colors.expense : undefined }} />}
+                        label={summary.overdueCount > 0 ? `${summary.overdueCount} catatan lewat jatuh tempo` : 'Belum ada yang lewat jatuh tempo'}
+                    />
+                    <Chip size="small" icon={<IconDisplay name="RefreshCw" size={13} />} label="Data otomatis menyesuaikan saat ada pembayaran baru" />
+                </Box>
+            </Paper>
 
-                                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                <span
-                                                    className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                                                    style={getStatusStyle(debt)}
-                                                >
-                                                    {getStatusLabel(debt.status)}
-                                                </span>
-                                                {debt.dueDate && (
-                                                    <span
-                                                        className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textSecondary }}
-                                                    >
-                                                        {isOverdue(debt) ? 'Lewat jatuh tempo' : `Jatuh tempo ${formatShortDate(debt.dueDate)}`}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </section>
-                </>
-            )}
+            {/* Tabs */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
+                {[
+                    { id: 'OWE' as DebtView, label: 'Perlu Dibayar' },
+                    { id: 'COLLECT' as DebtView, label: 'Perlu Ditagih' },
+                    { id: 'PAID' as DebtView, label: 'Selesai' },
+                ].map((tab) => {
+                    const active = activeView === tab.id;
+                    return (
+                        <Box
+                            key={tab.id}
+                            component="button"
+                            onClick={() => { setActiveView(tab.id); setActiveDebtId(null); }}
+                            sx={{
+                                borderRadius: 99, px: 2, py: 1.25, border: 'none', cursor: 'pointer',
+                                fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+                                bgcolor: active ? theme.colors.accent : 'action.hover',
+                                color: active ? '#fff' : 'text.secondary',
+                                transition: 'all 0.15s',
+                            }}
+                        >
+                            {tab.label}
+                        </Box>
+                    );
+                })}
+            </Box>
+
+            {/* Debt list */}
+            <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 4, boxShadow: isDark ? 0 : 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Aktivitas Terkini</Typography>
+                        <Typography variant="body2" color="text.secondary">{sectionTitle}</Typography>
+                    </Box>
+                    <Chip label={`${filteredDebts.length} catatan`} size="small" />
+                </Box>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {filteredDebts.length === 0 ? (
+                        <Paper variant="outlined" sx={{ p: 5, borderRadius: 3.5, borderStyle: 'dashed', textAlign: 'center' }}>
+                            <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>
+                        </Paper>
+                    ) : filteredDebts.map((debt) => (
+                        <Paper
+                            key={debt.id}
+                            variant="outlined"
+                            component="button"
+                            onClick={() => setActiveDebtId(debt.id)}
+                            sx={{
+                                px: 2, py: 2, borderRadius: 3.5, cursor: 'pointer', textAlign: 'left', width: '100%',
+                                bgcolor: 'background.paper', transition: 'box-shadow 0.15s',
+                                '&:hover': { boxShadow: 3 },
+                            }}
+                        >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Box sx={{
+                                    width: 48, height: 48, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 14, fontWeight: 700,
+                                    bgcolor: debt.kind === 'RECEIVABLE' ? theme.colors.incomeBg : theme.colors.expenseBg,
+                                    color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense,
+                                }}>
+                                    {getInitials(debt.personName)}
+                                </Box>
+
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 0.5 }}>
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography variant="body1" fontWeight={600} noWrap>{debt.personName}</Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {getSupportingText(debt)}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="body1" fontWeight={700} sx={{ color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense, flexShrink: 0 }}>
+                                            {formatRp(debt.remainingAmount)}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                        <Chip
+                                            size="small"
+                                            label={getStatusLabel(debt.status)}
+                                            sx={{ ...getStatusChipSx(debt), height: 22, fontSize: 11, fontWeight: 700 }}
+                                        />
+                                        {debt.dueDate && (
+                                            <Chip
+                                                size="small"
+                                                label={isOverdue(debt) ? 'Lewat jatuh tempo' : `Jatuh tempo ${formatShortDate(debt.dueDate)}`}
+                                                sx={{ height: 22, fontSize: 11, fontWeight: 600 }}
+                                            />
+                                        )}
+                                    </Box>
+                                </Box>
+                            </Box>
+                        </Paper>
+                    ))}
+                </Box>
+            </Paper>
 
             {formModal}
             {paymentModal}
             {deleteDialog}
             {paidDialog}
-        </div>
+        </Box>
     );
 };
 

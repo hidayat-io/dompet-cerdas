@@ -499,6 +499,7 @@ export async function getTransactionDetails(
     limit?: number,
     specificDate?: string,
     sortBy?: 'date' | 'amount', // 'date' = recent first, 'amount' = highest first
+    typeFilter?: 'INCOME' | 'EXPENSE',
     accountId?: string
 ): Promise<TransactionDetail[]> {
     const { transactionsCollection, categoriesCollection } = await getScopedCollections(userId, accountId);
@@ -569,9 +570,14 @@ export async function getTransactionDetails(
         const categoryInfo = categories.get(categoryId);
         const categoryName = categoryInfo?.name || 'Other';
         const categoryIcon = categoryInfo?.icon || 'Package';
+        const transactionType = (categoryInfo?.type as 'INCOME' | 'EXPENSE') || 'EXPENSE';
 
         // Apply AI-matched category filter if specified
         if (matchedCategoryName && categoryName !== matchedCategoryName) {
+            return;
+        }
+
+        if (typeFilter && transactionType !== typeFilter) {
             return;
         }
 
@@ -582,7 +588,7 @@ export async function getTransactionDetails(
             date: data.date,
             createdAt: data.createdAt || data.date,
             icon: categoryIcon,
-            type: (categoryInfo?.type as 'INCOME' | 'EXPENSE') || 'EXPENSE'
+            type: transactionType
         });
     });
 

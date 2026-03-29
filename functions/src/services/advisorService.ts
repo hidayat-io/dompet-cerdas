@@ -270,7 +270,7 @@ export async function analyzeFinancialHealth(
         getTotalExpenses(userId, timeRange, undefined, undefined, accountId),
         getTotalExpenses(userId, 'last_month', undefined, undefined, accountId),
         getCategoryBreakdown(userId, timeRange, undefined, accountId),
-        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount', accountId),
+        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount', undefined, accountId),
         getBalance(userId, undefined, undefined, undefined, accountId),
         getMonthlyAggregates(userId, 3, accountId)  // Last 3 months aggregate
     ]);
@@ -369,7 +369,7 @@ export async function generateSavingsStrategy(
         getTotalExpenses(userId, timeRange, undefined, undefined, accountId),
         getCategoryBreakdown(userId, timeRange, undefined, accountId),
         getMonthlyAggregates(userId, 3, accountId),
-        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount', accountId)
+        getTransactionDetails(userId, timeRange, undefined, undefined, 100, undefined, 'amount', undefined, accountId)
     ]);
     
     const selectedTransactions = selectRelevantTransactions(recentTransactions, 50);
@@ -442,7 +442,7 @@ export async function analyzeExpenseReduction(
         allTransactions
     ] = await Promise.all([
         getCategoryBreakdown(userId, timeRange, undefined, accountId),
-        getTransactionDetails(userId, timeRange, undefined, undefined, 150, undefined, 'amount', accountId)
+        getTransactionDetails(userId, timeRange, undefined, undefined, 150, undefined, 'amount', undefined, accountId)
     ]);
     
     // For expense analysis, we want more detail

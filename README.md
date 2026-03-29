@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.6.0
+# DompetCerdas - Smart Expense Tracker v2.7.0
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -41,15 +41,16 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.6.0`
-- **Build Date**: `March 28, 2026`
-- **Status**: Internal testing build yang sudah mencakup phase 0 sampai phase 9
+- **Version**: `v2.7.0`
+- **Build Date**: `March 29, 2026`
+- **Status**: Internal testing build yang sudah mencakup phase 0 sampai phase 10
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | Frontend | React 19, TypeScript, Vite |
+| UI Library | **Material UI (MUI)** v6, `@mui/icons-material` |
 | Hosting | **Firebase Hosting** (CDN Global) |
 | Backend | Firebase Functions (Node.js 22) |
 | Database | Firestore |
@@ -131,6 +132,7 @@ GEMINI_API_KEY=your_gemini_api_key
 - Phase 7: voice note Telegram dengan transkrip + preview + confirm
 - Phase 8: modul `Hutang Piutang` + redesign UX yang lebih sederhana
 - Phase 9: onboarding user baru, helper dashboard, dan panduan singkat
+- Phase 10: migrasi UI ke Material UI (MUI) — semua komponen pakai MUI, icons ke `@mui/icons-material`, hapus `lucide-react`
 
 ## License
 

@@ -38,6 +38,12 @@ const QUERY_KEYWORDS = [
     'analisis',
 ];
 
+const QUERY_PREFIX_REGEX = /^(tampilkan|tampilin|tunjukkan|lihat(?:kan)?|liat(?:in)?|show|cek)\b/i;
+const TRANSACTION_QUERY_WORD_REGEX = /\b(trans(?:aksi)?|transaski|transaksi|transsaksi|tranaksi)\b/i;
+const QUERY_TARGET_REGEX = new RegExp(`${TRANSACTION_QUERY_WORD_REGEX.source}|\\b(riwayat|detail|rincian|pengeluaran|pemasukan|saldo|kategori|breakdown)\\b`, 'i');
+const QUERY_ORDER_OR_TIME_REGEX = /\b(terakhir|sekarang|hari\s+ini|minggu\s+ini|bulan\s+ini|bln\s+ini|bulan\s+ni|kemarin|hari\s+terakhir)\b/i;
+const QUERY_RANKING_REGEX = /\b(top|biggest|highest|largest|tertinggi|terbesar|terbanyak)\b/i;
+
 const ENTRY_PREFIX_REGEX = /^(tambah(?:in)?|catat(?:kan)?|input|masukin|masukan|record|log)\s+/i;
 const AMOUNT_REGEX = /(?:rp\s*|idr\s*)?\d[\d.,]*\s*(?:k|rb|ribu|jt|juta|m|milyar|miliar)?\b/gi;
 const LOCAL_MULTI_ENTRY_SEPARATOR_REGEX = /\s+(?:dan|lalu|terus|trus|&)\s+/i;
@@ -46,6 +52,36 @@ const MAX_PARSED_TRANSACTION_ITEMS = 20;
 function containsQueryKeywords(message: string): boolean {
     const lower = message.toLowerCase();
     return QUERY_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
+function looksLikeQueryMessage(message: string): boolean {
+    const lower = message.toLowerCase().trim();
+
+    if (containsQueryKeywords(lower)) {
+        return true;
+    }
+
+    if (QUERY_PREFIX_REGEX.test(lower) && (QUERY_TARGET_REGEX.test(lower) || QUERY_ORDER_OR_TIME_REGEX.test(lower))) {
+        return true;
+    }
+
+    if (new RegExp(`\\b\\d+\\s*${TRANSACTION_QUERY_WORD_REGEX.source.replace(/^\\b|\\b$/g, '')}\\s+terakhir\\b`, 'i').test(lower)) {
+        return true;
+    }
+
+    if (/\b(last|latest)\s+\d+\s*(trans|transaction|transactions)\b/i.test(lower)) {
+        return true;
+    }
+
+    if (/\btop\s+\d+\b/i.test(lower) && TRANSACTION_QUERY_WORD_REGEX.test(lower)) {
+        return true;
+    }
+
+    if (QUERY_RANKING_REGEX.test(lower) && /\b\d+\b/.test(lower) && TRANSACTION_QUERY_WORD_REGEX.test(lower)) {
+        return true;
+    }
+
+    return false;
 }
 
 function hasAmountLikeToken(message: string): boolean {
@@ -364,15 +400,20 @@ export function shouldAttemptTransactionParsing(message: string): boolean {
     if (!trimmed) return false;
     if (trimmed.startsWith('/')) return false;
     if (/[?？]/.test(trimmed)) return false;
+
+    const lower = trimmed.toLowerCase();
+    const hasExplicitEntryVerb = /^(tambah(?:in)?|catat(?:kan)?|input|masukin|masukan)\b/.test(lower);
+
+    if (!hasExplicitEntryVerb && looksLikeQueryMessage(trimmed)) {
+        return false;
+    }
+
     resetAmountRegex();
     if (!hasAmountLikeToken(trimmed)) {
         resetAmountRegex();
         return false;
     }
     resetAmountRegex();
-
-    const lower = trimmed.toLowerCase();
-    const hasExplicitEntryVerb = /^(tambah(?:in)?|catat(?:kan)?|input|masukin|masukan)\b/.test(lower);
 
     if (containsQueryKeywords(trimmed) && !hasExplicitEntryVerb) {
         return false;

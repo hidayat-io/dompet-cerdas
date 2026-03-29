@@ -1,6 +1,14 @@
 import React from 'react';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import IconDisplay from './IconDisplay';
-import { useTheme } from '../contexts/ThemeContext';
 import { IconName } from '../types';
 
 export type DialogType = 'danger' | 'warning' | 'success' | 'info';
@@ -18,35 +26,11 @@ interface ConfirmDialogProps {
     isLoading?: boolean;
 }
 
-const typeConfig: Record<DialogType, { bgColor: string; iconBg: string; iconColor: string; buttonBg: string; buttonHover: string }> = {
-    danger: {
-        bgColor: 'bg-red-600',
-        iconBg: 'bg-white/20',
-        iconColor: 'text-white',
-        buttonBg: 'bg-red-600',
-        buttonHover: 'hover:bg-red-700'
-    },
-    warning: {
-        bgColor: 'bg-amber-500',
-        iconBg: 'bg-white/20',
-        iconColor: 'text-white',
-        buttonBg: 'bg-amber-500',
-        buttonHover: 'hover:bg-amber-600'
-    },
-    success: {
-        bgColor: 'bg-emerald-500',
-        iconBg: 'bg-white/20',
-        iconColor: 'text-white',
-        buttonBg: 'bg-emerald-500',
-        buttonHover: 'hover:bg-emerald-600'
-    },
-    info: {
-        bgColor: 'bg-blue-500',
-        iconBg: 'bg-white/20',
-        iconColor: 'text-white',
-        buttonBg: 'bg-blue-500',
-        buttonHover: 'hover:bg-blue-600'
-    }
+const typeColors: Record<DialogType, string> = {
+    danger: '#dc2626',
+    warning: '#f59e0b',
+    success: '#10b981',
+    info: '#3b82f6',
 };
 
 const defaultIcons: Record<DialogType, IconName> = {
@@ -68,71 +52,96 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     icon,
     isLoading = false
 }) => {
-    const { theme } = useTheme();
-    const config = typeConfig[type];
+    const color = typeColors[type];
     const displayIcon = icon || defaultIcons[type];
 
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
-            <div
-                className="rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-fade-in-up"
-                style={{ backgroundColor: theme.colors.bgCard }}
+        <Dialog
+            open={isOpen}
+            onClose={isLoading ? undefined : onClose}
+            maxWidth="xs"
+            fullWidth
+            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+            PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
+        >
+            {/* Colored Header */}
+            <Box
+                sx={{
+                    bgcolor: color,
+                    px: 3,
+                    py: 4,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    gap: 2,
+                }}
             >
-                {/* Header with Icon */}
-                <div className={`${config.bgColor} p-6 flex flex-col items-center text-center`}>
-                    <div className={`${config.iconBg} p-4 rounded-full mb-4`}>
-                        <IconDisplay name={displayIcon} size={32} className={config.iconColor} />
-                    </div>
-                    <h3 className="text-white font-bold text-xl">{title}</h3>
-                </div>
+                <Box
+                    sx={{
+                        bgcolor: 'rgba(255,255,255,0.2)',
+                        borderRadius: '50%',
+                        p: 1.5,
+                        display: 'flex',
+                    }}
+                >
+                    <IconDisplay name={displayIcon} size={32} style={{ color: '#fff' }} />
+                </Box>
+                <Typography variant="h6" fontWeight={700} color="#fff">
+                    {title}
+                </Typography>
+            </Box>
 
-                {/* Body */}
-                <div className="p-6">
-                    <div className="text-center mb-6" style={{ color: theme.colors.textSecondary }}>
-                        {typeof message === 'string' ? <p>{message}</p> : message}
-                    </div>
+            {/* Body */}
+            <DialogContent sx={{ pt: 3, pb: 1, textAlign: 'center' }}>
+                {typeof message === 'string' ? (
+                    <Typography variant="body1" color="text.secondary">
+                        {message}
+                    </Typography>
+                ) : (
+                    message
+                )}
+            </DialogContent>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                        <button
-                            onClick={onClose}
-                            disabled={isLoading}
-                            className="flex-1 py-3 px-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-                            style={{
-                                backgroundColor: theme.colors.bgHover,
-                                color: theme.colors.textPrimary,
-                                border: `1px solid ${theme.colors.border}`
-                            }}
-                        >
-                            {cancelText}
-                        </button>
-                        <button
-                            onClick={onConfirm}
-                            disabled={isLoading}
-                            className={`flex-1 py-3 px-4 rounded-xl font-semibold text-white transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 ${config.buttonBg} ${config.buttonHover} disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                            {isLoading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                    <span>Memproses...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <IconDisplay name={displayIcon} size={18} />
-                                    <span>{confirmText}</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+            {/* Actions */}
+            <DialogActions sx={{ px: 3, pb: 3, gap: 1.5 }}>
+                <Button
+                    fullWidth
+                    variant="outlined"
+                    onClick={onClose}
+                    disabled={isLoading}
+                    sx={{ borderRadius: 2, py: 1.25, fontWeight: 600 }}
+                >
+                    {cancelText}
+                </Button>
+                <Button
+                    fullWidth
+                    variant="contained"
+                    onClick={onConfirm}
+                    disabled={isLoading}
+                    sx={{
+                        borderRadius: 2,
+                        py: 1.25,
+                        fontWeight: 600,
+                        bgcolor: color,
+                        '&:hover': { bgcolor: color, filter: 'brightness(0.9)' },
+                    }}
+                >
+                    {isLoading ? (
+                        <CircularProgress size={18} sx={{ color: '#fff' }} />
+                    ) : (
+                        <>
+                            <IconDisplay name={displayIcon} size={18} style={{ color: '#fff', marginRight: 6 }} />
+                            {confirmText}
+                        </>
+                    )}
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 
-// Toast/Notification for success/error messages
+// Inline Toast — dipakai di beberapa tempat via named export
 interface ToastProps {
     isOpen: boolean;
     onClose: () => void;
@@ -146,63 +155,32 @@ export const Toast: React.FC<ToastProps> = ({
     onClose,
     message,
     type = 'success',
-    duration = 1600
+    duration = 1600,
 }) => {
-    const { theme } = useTheme();
-
     React.useEffect(() => {
         if (isOpen && duration > 0) {
-            const timer = setTimeout(() => {
-                onClose();
-            }, duration);
+            const timer = setTimeout(onClose, duration);
             return () => clearTimeout(timer);
         }
     }, [isOpen, duration, onClose]);
 
-    if (!isOpen) return null;
-
-    const toastConfig = {
-        success: {
-            bg: theme.colors.incomeBg,
-            color: theme.colors.income,
-            icon: 'CheckCircle' as IconName
-        },
-        error: {
-            bg: theme.colors.expenseBg,
-            color: theme.colors.expense,
-            icon: 'XCircle' as IconName
-        },
-        info: {
-            bg: theme.colors.accentLight,
-            color: theme.colors.accent,
-            icon: 'Info' as IconName
-        }
-    };
-
-    const config = toastConfig[type];
+    const severity = type === 'error' ? 'error' : type === 'info' ? 'info' : 'success';
 
     return (
-        <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
-            <div
-                className="flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border"
-                style={{
-                    backgroundColor: config.bg,
-                    borderColor: config.color + '40'
-                }}
+        <Snackbar
+            open={isOpen}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            sx={{ bottom: { xs: 96, md: 32 } }}
+        >
+            <Alert
+                onClose={onClose}
+                severity={severity}
+                variant="filled"
+                sx={{ borderRadius: '999px', fontWeight: 600, alignItems: 'center' }}
             >
-                <IconDisplay name={config.icon} size={20} style={{ color: config.color }} />
-                <span className="font-medium text-sm" style={{ color: config.color }}>
-                    {message}
-                </span>
-                <button
-                    onClick={onClose}
-                    className="p-1 rounded-full transition-colors hover:opacity-70"
-                    style={{ color: config.color }}
-                >
-                    <IconDisplay name="X" size={16} />
-                </button>
-            </div>
-        </div>
+                {message}
+            </Alert>
+        </Snackbar>
     );
 };
 

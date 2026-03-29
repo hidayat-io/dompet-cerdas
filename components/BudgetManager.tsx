@@ -4,6 +4,19 @@ import IconDisplay from './IconDisplay';
 import ConfirmDialog from './ConfirmDialog';
 import { useTheme } from '../contexts/ThemeContext';
 import { getBudgetOverview, getBudgetSummaries, getBudgetTransactions, getMonthKey, getMonthLabel, getPreviousMonthKey } from '../utils/budget';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Grid from '@mui/material/Grid';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import LinearProgress from '@mui/material/LinearProgress';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import InputAdornment from '@mui/material/InputAdornment';
 
 interface BudgetManagerProps {
     budgets: Budget[];
@@ -145,10 +158,8 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-
         const limitAmount = Number(draft.limitAmount.replace(/\./g, ''));
         if (!draft.name.trim() || !limitAmount || draft.categoryIds.length === 0) return;
-
         setSaving(true);
         try {
             await onSaveBudget({
@@ -168,12 +179,8 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
         setDeletingBudgetId(budgetId);
         try {
             await onDeleteBudget(budgetId);
-            if (draft.budgetId === budgetId) {
-                resetForm();
-            }
-            if (activeBudgetId === budgetId) {
-                setActiveBudgetId(null);
-            }
+            if (draft.budgetId === budgetId) resetForm();
+            if (activeBudgetId === budgetId) setActiveBudgetId(null);
         } finally {
             setDeletingBudgetId(null);
         }
@@ -181,7 +188,6 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
 
     const handleConfirmDeleteBudget = async () => {
         if (!budgetToDelete) return;
-
         try {
             await handleDeleteBudget(budgetToDelete.id);
         } finally {
@@ -205,6 +211,140 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
     }).format(new Date(dateValue));
 
     const activeTransactionsTotal = activeBudgetTransactions.reduce((total, item) => total + item.transaction.amount, 0);
+
+    const isFormValid = draft.name.trim() && Number(draft.limitAmount.replace(/\./g, '')) > 0 && draft.categoryIds.length > 0;
+
+    const budgetFormModal = (
+        <Dialog
+            open={showForm}
+            onClose={resetForm}
+            maxWidth="md"
+            fullWidth
+            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+            PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+            <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+                <Box>
+                    <Typography variant="h6" fontWeight={700}>
+                        {draft.budgetId ? 'Edit Anggaran' : 'Anggaran Baru'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Pilih kategori yang memang ingin dipantau. Kategori yang sudah dipakai anggaran lain tidak akan muncul di sini.
+                    </Typography>
+                </Box>
+                <IconButton size="small" onClick={resetForm} sx={{ flexShrink: 0 }}>
+                    <IconDisplay name="X" size={18} />
+                </IconButton>
+            </Box>
+
+            <DialogContent sx={{ px: 3, pb: 3, pt: 0 }}>
+                <Box component="form" onSubmit={handleSubmit}>
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid size={{ xs: 12, md: 7 }}>
+                            <TextField
+                                label="Nama Anggaran"
+                                fullWidth
+                                size="small"
+                                value={draft.name}
+                                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                                placeholder="Mis: Makan Harian"
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 5 }}>
+                            <TextField
+                                label="Batas Pengeluaran"
+                                fullWidth
+                                size="small"
+                                inputMode="numeric"
+                                value={draft.limitAmount}
+                                onChange={(e) => setDraft((d) => ({ ...d, limitAmount: formatRupiahInput(e.target.value) }))}
+                                placeholder="0"
+                                slotProps={{
+                                    input: {
+                                        startAdornment: <InputAdornment position="start">Rp</InputAdornment>
+                                    }
+                                }}
+                            />
+                        </Grid>
+                    </Grid>
+
+                    <Typography variant="body2" fontWeight={600} sx={{ mb: 1.5 }}>
+                        {draft.budgetId ? 'Kategori dalam Anggaran' : 'Pilih Kategori'}
+                    </Typography>
+
+                    {availableCategories.length === 0 ? (
+                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, borderStyle: 'dashed', textAlign: 'center', mb: 3 }}>
+                            <Typography variant="body2" color="text.secondary">
+                                Semua kategori pengeluaran di bulan ini sudah dipakai anggaran lain.
+                            </Typography>
+                        </Paper>
+                    ) : (
+                        <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                            {availableCategories.map((category) => {
+                                const selected = draft.categoryIds.includes(category.id);
+                                return (
+                                    <Grid size={{ xs: 6, md: 4 }} key={category.id}>
+                                        <Paper
+                                            variant="outlined"
+                                            onClick={() => toggleCategory(category.id)}
+                                            sx={{
+                                                p: 2,
+                                                borderRadius: 2,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s',
+                                                bgcolor: selected ? theme.colors.accentLight : 'background.paper',
+                                                borderColor: selected ? theme.colors.accent : 'divider',
+                                                '&:hover': { boxShadow: 2 },
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box
+                                                    sx={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        borderRadius: '50%',
+                                                        bgcolor: category.color,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    <IconDisplay name={category.icon} size={16} style={{ color: '#fff' }} />
+                                                </Box>
+                                                <Box sx={{ minWidth: 0 }}>
+                                                    <Typography variant="body2" fontWeight={600} noWrap>{category.name}</Typography>
+                                                    <Typography variant="caption" sx={{ color: selected ? theme.colors.accent : 'text.secondary' }}>
+                                                        {selected ? 'Dipilih' : 'Pilih kategori'}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Paper>
+                                    </Grid>
+                                );
+                            })}
+                        </Grid>
+                    )}
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+                        <Button variant="outlined" onClick={resetForm} sx={{ borderRadius: 2 }}>
+                            Batal
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={saving || !isFormValid}
+                            startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                            sx={{ borderRadius: 2, minWidth: 140 }}
+                        >
+                            {saving ? 'Menyimpan...' : draft.budgetId ? 'Update Anggaran' : 'Simpan Anggaran'}
+                        </Button>
+                    </Box>
+                </Box>
+            </DialogContent>
+        </Dialog>
+    );
+
     const deleteDialog = (
         <ConfirmDialog
             isOpen={!!budgetToDelete}
@@ -212,562 +352,413 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
             onConfirm={handleConfirmDeleteBudget}
             title="Hapus Anggaran"
             message={budgetToDelete ? (
-                <div className="space-y-2">
-                    <p>
+                <Box>
+                    <Typography>
                         Anggaran <strong>"{budgetToDelete.name}"</strong> akan dihapus.
-                    </p>
-                    <p className="text-sm opacity-80">
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
                         Transaksi yang sudah tercatat tidak ikut terhapus.
-                    </p>
-                </div>
+                    </Typography>
+                </Box>
             ) : ''}
             confirmText="Hapus"
             type="danger"
             isLoading={!!deletingBudgetId}
         />
     );
-    const budgetFormModal = showForm ? (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div
-                className="rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 animate-fade-in-up"
-                style={{ backgroundColor: theme.colors.bgCard }}
-            >
-                <form onSubmit={handleSubmit}>
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <h4 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
-                                {draft.budgetId ? 'Edit Anggaran' : 'Anggaran Baru'}
-                            </h4>
-                            <p className="text-sm mt-1" style={{ color: theme.colors.textMuted }}>
-                                Pilih kategori yang memang ingin dipantau. Kategori yang sudah dipakai anggaran lain tidak akan muncul di sini.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={resetForm}
-                            className="p-2 rounded-lg"
-                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textMuted }}
-                        >
-                            <IconDisplay name="X" size={16} />
-                        </button>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-[1.2fr_0.8fr] gap-4 mt-5">
-                        <div>
-                            <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
-                                Nama Anggaran
-                            </label>
-                            <input
-                                type="text"
-                                value={draft.name}
-                                onChange={(event) => setDraft((currentDraft) => ({ ...currentDraft, name: event.target.value }))}
-                                placeholder="Mis: Makan Harian"
-                                className="w-full rounded-xl border px-4 py-3 outline-none"
-                                style={{
-                                    backgroundColor: theme.colors.bgHover,
-                                    borderColor: theme.colors.border,
-                                    color: theme.colors.textPrimary,
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
-                                Batas Pengeluaran
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-3 text-sm" style={{ color: theme.colors.textMuted }}>Rp</span>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={draft.limitAmount}
-                                    onChange={(event) => setDraft((currentDraft) => ({
-                                        ...currentDraft,
-                                        limitAmount: formatRupiahInput(event.target.value),
-                                    }))}
-                                    placeholder="0"
-                                    className="w-full rounded-xl border py-3 pl-10 pr-4 outline-none"
-                                    style={{
-                                        backgroundColor: theme.colors.bgHover,
-                                        borderColor: theme.colors.border,
-                                        color: theme.colors.textPrimary,
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-5">
-                        <label className="block text-sm font-medium mb-3" style={{ color: theme.colors.textPrimary }}>
-                            {draft.budgetId ? 'Kategori dalam Anggaran' : 'Pilih Kategori'}
-                        </label>
-                        {availableCategories.length === 0 ? (
-                            <div
-                                className="rounded-xl border border-dashed px-4 py-5 text-sm"
-                                style={{ borderColor: theme.colors.border, color: theme.colors.textMuted }}
-                            >
-                                Semua kategori pengeluaran di bulan ini sudah dipakai anggaran lain.
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                {availableCategories.map((category) => {
-                                    const selected = draft.categoryIds.includes(category.id);
-                                    return (
-                                        <button
-                                            type="button"
-                                            key={category.id}
-                                            onClick={() => toggleCategory(category.id)}
-                                            className="rounded-2xl border p-4 text-left transition-all"
-                                            style={{
-                                                backgroundColor: selected ? theme.colors.accentLight : theme.colors.bgHover,
-                                                borderColor: selected ? theme.colors.accent : theme.colors.border,
-                                                color: theme.colors.textPrimary,
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0"
-                                                    style={{ backgroundColor: category.color }}
-                                                >
-                                                    <IconDisplay name={category.icon} size={16} />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-semibold truncate">{category.name}</p>
-                                                    <p className="text-xs mt-1" style={{ color: selected ? theme.colors.accent : theme.colors.textMuted }}>
-                                                        {selected ? 'Dipilih' : 'Pilih kategori'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex justify-end gap-2 mt-6">
-                        <button
-                            type="button"
-                            onClick={resetForm}
-                            className="px-4 py-3 rounded-xl text-sm font-semibold"
-                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                        >
-                            Batal
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={saving || !draft.name.trim() || !Number(draft.limitAmount.replace(/\./g, '')) || draft.categoryIds.length === 0}
-                            className="px-4 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                            style={{ backgroundColor: theme.colors.accent }}
-                        >
-                            {saving ? 'Menyimpan...' : draft.budgetId ? 'Update Anggaran' : 'Simpan Anggaran'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    ) : null;
-
+    // Active budget detail view
     if (activeSummary) {
         return (
-            <div className="space-y-6 pb-20 animate-fade-in-up">
-                <div>
-                    <button
-                        onClick={() => setActiveBudgetId(null)}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold shadow-sm transition-colors"
-                        style={{
-                            backgroundColor: theme.colors.bgCard,
-                            borderColor: theme.colors.border,
-                            color: theme.colors.accent,
-                        }}
-                    >
-                        <IconDisplay name="ArrowLeft" size={16} />
-                        <span>Kembali ke Daftar Anggaran</span>
-                    </button>
-                </div>
-
-                <div
-                    className="rounded-2xl border p-6"
-                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
+            <Box sx={{ pb: { xs: 10, md: 0 } }}>
+                <Button
+                    variant="outlined"
+                    startIcon={<IconDisplay name="ArrowLeft" size={16} />}
+                    onClick={() => setActiveBudgetId(null)}
+                    sx={{ borderRadius: 2, mb: 3, fontWeight: 600 }}
                 >
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>
-                                {activeSummary.budget.name}
-                            </h2>
-                            <p className="text-sm mt-1" style={{ color: theme.colors.textMuted }}>
+                    Kembali ke Daftar Anggaran
+                </Button>
+
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                        <Box>
+                            <Typography variant="h5" fontWeight={700}>{activeSummary.budget.name}</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                                 Menampilkan transaksi yang masuk ke anggaran ini di {getMonthLabel(selectedMonth)}.
-                            </p>
-                            <div className="flex flex-wrap gap-2 mt-4">
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
                                 {activeSummary.categories.map((category) => (
-                                    <span
+                                    <Chip
                                         key={category.id}
-                                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
-                                        style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textSecondary }}
-                                    >
-                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: category.color }} />
-                                        {category.name}
-                                    </span>
+                                        size="small"
+                                        icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: category.color, ml: 1 }} />}
+                                        label={category.name}
+                                        sx={{ height: 24 }}
+                                    />
                                 ))}
-                            </div>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                            <button
-                                onClick={() => openEditForm(activeSummary.budget)}
-                                className="px-4 py-2.5 rounded-xl text-sm font-semibold"
-                                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
-                            >
+                            </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                            <Button variant="outlined" size="small" onClick={() => openEditForm(activeSummary.budget)} sx={{ borderRadius: 2 }}>
                                 Edit
-                            </button>
-                            <button
-                                onClick={() => setBudgetToDelete(activeSummary.budget)}
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                color="error"
                                 disabled={deletingBudgetId === activeSummary.budget.id}
-                                className="px-4 py-2.5 rounded-xl text-sm font-semibold"
-                                style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.expense }}
+                                onClick={() => setBudgetToDelete(activeSummary.budget)}
+                                sx={{ borderRadius: 2 }}
                             >
                                 {deletingBudgetId === activeSummary.budget.id ? 'Menghapus...' : 'Hapus'}
-                            </button>
-                        </div>
-                    </div>
+                            </Button>
+                        </Box>
+                    </Box>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-                        <div className="rounded-2xl border p-4" style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}>
-                            <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Batas Anggaran</p>
-                            <p className="mt-2 text-lg font-bold" style={{ color: theme.colors.textPrimary }}>{formatRp(activeSummary.budget.limitAmount)}</p>
-                        </div>
-                        <div className="rounded-2xl border p-4" style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}>
-                            <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Sudah Terpakai</p>
-                            <p className="mt-2 text-lg font-bold" style={{ color: theme.colors.expense }}>{formatRp(activeTransactionsTotal)}</p>
-                        </div>
-                        <div className="rounded-2xl border p-4" style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}>
-                            <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Sisa Anggaran</p>
-                            <p className="mt-2 text-lg font-bold" style={{ color: activeSummary.remaining >= 0 ? theme.colors.income : theme.colors.expense }}>
-                                {formatRp(activeSummary.remaining)}
-                            </p>
-                        </div>
-                        <div className="rounded-2xl border p-4" style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}>
-                            <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Jumlah Transaksi</p>
-                            <p className="mt-2 text-lg font-bold" style={{ color: theme.colors.textPrimary }}>{activeBudgetTransactions.length}</p>
-                        </div>
-                    </div>
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                        {[
+                            { label: 'Batas Anggaran', value: formatRp(activeSummary.budget.limitAmount), color: 'text.primary' as const },
+                            { label: 'Sudah Terpakai', value: formatRp(activeTransactionsTotal), color: theme.colors.expense },
+                            { label: 'Sisa Anggaran', value: formatRp(activeSummary.remaining), color: activeSummary.remaining >= 0 ? theme.colors.income : theme.colors.expense },
+                            { label: 'Jumlah Transaksi', value: String(activeBudgetTransactions.length), color: 'text.primary' as const },
+                        ].map((stat) => (
+                            <Grid size={{ xs: 6, md: 3 }} key={stat.label}>
+                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary" display="block">
+                                        {stat.label}
+                                    </Typography>
+                                    <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5, color: stat.color }}>
+                                        {stat.value}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                        ))}
+                    </Grid>
 
-                    <div className="mt-5">
-                        <div className="flex items-center justify-between text-xs mb-2" style={{ color: theme.colors.textMuted }}>
-                            <span>{Math.min(activeSummary.percentage, 100).toFixed(0)}% terpakai</span>
-                            <span>{activeSummary.isOverBudget ? 'Melebihi Anggaran' : 'Masih aman'}</span>
-                        </div>
-                        <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.colors.bgHover }}>
-                            <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                    width: `${Math.min(activeSummary.percentage, 100)}%`,
-                                    backgroundColor: activeSummary.isOverBudget ? theme.colors.expense : theme.colors.accent,
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-                <div
-                    className="rounded-2xl border p-5"
-                    style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-                >
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                        <div>
-                            <h3 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
-                                Transaksi dalam Anggaran
-                            </h3>
-                            <p className="text-sm mt-1" style={{ color: theme.colors.textMuted }}>
+                    <Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="caption" color="text.secondary">
+                                {Math.min(activeSummary.percentage, 100).toFixed(0)}% terpakai
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                {activeSummary.isOverBudget ? 'Melebihi Anggaran' : 'Masih aman'}
+                            </Typography>
+                        </Box>
+                        <LinearProgress
+                            variant="determinate"
+                            value={Math.min(activeSummary.percentage, 100)}
+                            sx={{
+                                height: 8,
+                                borderRadius: 4,
+                                bgcolor: 'action.hover',
+                                '& .MuiLinearProgress-bar': {
+                                    bgcolor: activeSummary.isOverBudget ? theme.colors.expense : theme.colors.accent,
+                                    borderRadius: 4,
+                                },
+                            }}
+                        />
+                    </Box>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Box>
+                            <Typography variant="h6" fontWeight={700}>Transaksi dalam Anggaran</Typography>
+                            <Typography variant="body2" color="text.secondary">
                                 Transaksi yang dihitung ke anggaran ini pada {getMonthLabel(selectedMonth)}.
-                            </p>
-                        </div>
-                        <div
-                            className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                            style={{ backgroundColor: theme.colors.accentLight, color: theme.colors.accent }}
-                        >
-                            {activeBudgetTransactions.length} transaksi
-                        </div>
-                    </div>
+                            </Typography>
+                        </Box>
+                        <Chip
+                            label={`${activeBudgetTransactions.length} transaksi`}
+                            size="small"
+                            sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600 }}
+                        />
+                    </Box>
 
                     {activeBudgetTransactions.length === 0 ? (
-                        <div
-                            className="rounded-2xl border border-dashed p-8 text-center"
-                            style={{ borderColor: theme.colors.border, color: theme.colors.textMuted }}
-                        >
-                            <IconDisplay name="Receipt" size={36} className="mx-auto mb-3 opacity-30" />
-                            <p className="font-medium">Belum ada transaksi yang masuk ke anggaran ini.</p>
-                            <p className="text-sm mt-2">Tambah transaksi dengan kategori yang termasuk di anggaran ini agar progress-nya terisi.</p>
-                        </div>
+                        <Paper variant="outlined" sx={{ p: 5, borderRadius: 2, borderStyle: 'dashed', textAlign: 'center' }}>
+                            <IconDisplay name="Receipt" size={36} style={{ color: 'rgba(0,0,0,0.2)', marginBottom: 12 }} />
+                            <Typography fontWeight={600} color="text.secondary">
+                                Belum ada transaksi yang masuk ke anggaran ini.
+                            </Typography>
+                            <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+                                Tambah transaksi dengan kategori yang termasuk di anggaran ini agar progress-nya terisi.
+                            </Typography>
+                        </Paper>
                     ) : (
-                        <div className="space-y-3">
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                             {activeBudgetTransactions.map(({ transaction, category }) => (
-                                <div
-                                    key={transaction.id}
-                                    className="rounded-2xl border p-4"
-                                    style={{ backgroundColor: theme.colors.bgHover, borderColor: theme.colors.border }}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div
-                                                className="w-11 h-11 rounded-full flex items-center justify-center text-white shrink-0"
-                                                style={{ backgroundColor: category?.color || theme.colors.accent }}
+                                <Paper key={transaction.id} variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    borderRadius: '50%',
+                                                    bgcolor: category?.color || theme.colors.accent,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                }}
                                             >
-                                                <IconDisplay name={category?.icon || 'Receipt'} size={16} />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="font-semibold truncate" style={{ color: theme.colors.textPrimary }}>
+                                                <IconDisplay name={category?.icon || 'Receipt'} size={16} style={{ color: '#fff' }} />
+                                            </Box>
+                                            <Box sx={{ minWidth: 0 }}>
+                                                <Typography variant="body2" fontWeight={600} noWrap>
                                                     {transaction.description || 'Tanpa deskripsi'}
-                                                </p>
-                                                <div className="flex flex-wrap items-center gap-2 mt-1 text-xs" style={{ color: theme.colors.textMuted }}>
-                                                    <span>{formatTransactionDate(transaction.date)}</span>
-                                                    <span>•</span>
-                                                    <span>{category?.name || 'Tanpa Kategori'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <span className="text-sm font-bold whitespace-nowrap" style={{ color: theme.colors.expense }}>
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {formatTransactionDate(transaction.date)}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.disabled">•</Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {category?.name || 'Tanpa Kategori'}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                        <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense, flexShrink: 0, whiteSpace: 'nowrap' }}>
                                             {formatRp(transaction.amount)}
-                                        </span>
-                                    </div>
-                                </div>
+                                        </Typography>
+                                    </Box>
+                                </Paper>
                             ))}
-                        </div>
+                        </Box>
                     )}
-                </div>
+                </Paper>
+
                 {budgetFormModal}
                 {deleteDialog}
-            </div>
+            </Box>
         );
     }
 
+    // Main budget list view
     return (
-        <div className="space-y-6 pb-20 animate-fade-in-up">
-                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold" style={{ color: theme.colors.textPrimary }}>Anggaran</h2>
-                    <p className="text-sm mt-1" style={{ color: theme.colors.textMuted }}>
+        <Box sx={{ pb: { xs: 10, md: 0 } }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-end' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                <Box>
+                    <Typography variant="h5" fontWeight={700}>Anggaran</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                         Buat anggaran yang memang ingin dipantau. Satu anggaran bisa berisi satu atau beberapa kategori.
-                    </p>
-                </div>
-                <div className="w-full md:w-auto">
-                    <label className="block text-xs font-semibold uppercase tracking-[0.16em] mb-2" style={{ color: theme.colors.textMuted }}>
+                    </Typography>
+                </Box>
+
+                <Box>
+                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.1em', color: 'text.secondary', display: 'block', mb: 1 }}>
                         Bulan Anggaran
-                    </label>
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                        <button
-                            type="button"
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <IconButton
                             onClick={() => {
-                                setSelectedMonth((currentMonth) => shiftMonth(currentMonth, -1));
+                                setSelectedMonth((m) => shiftMonth(m, -1));
                                 setShowForm(false);
                                 setDraft(emptyDraft);
-                            }}
-                            className="h-12 w-12 rounded-xl border flex items-center justify-center shrink-0"
-                            style={{
-                                backgroundColor: theme.colors.bgCard,
-                                borderColor: theme.colors.border,
-                                color: theme.colors.textPrimary,
                             }}
                             aria-label="Bulan sebelumnya"
+                            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
                         >
                             <IconDisplay name="ArrowLeft" size={18} />
-                        </button>
-                        <div
-                            className="min-w-0 flex-1 md:w-[220px] rounded-xl border px-4 py-3"
-                            style={{
-                                backgroundColor: theme.colors.bgCard,
-                                borderColor: theme.colors.border,
-                                color: theme.colors.textPrimary,
-                            }}
-                        >
-                            <p className="text-base font-semibold" style={{ color: theme.colors.textPrimary }}>
-                                {getMonthLabel(selectedMonth)}
-                            </p>
-                            <p className="text-xs mt-1" style={{ color: theme.colors.textMuted }}>
-                                {selectedMonth}
-                            </p>
-                        </div>
-                        <button
-                            type="button"
+                        </IconButton>
+                        <Paper variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: 2, minWidth: 180, textAlign: 'center' }}>
+                            <Typography variant="body1" fontWeight={600}>{getMonthLabel(selectedMonth)}</Typography>
+                            <Typography variant="caption" color="text.secondary">{selectedMonth}</Typography>
+                        </Paper>
+                        <IconButton
                             onClick={() => {
-                                setSelectedMonth((currentMonth) => shiftMonth(currentMonth, 1));
+                                setSelectedMonth((m) => shiftMonth(m, 1));
                                 setShowForm(false);
                                 setDraft(emptyDraft);
                             }}
-                            className="h-12 w-12 rounded-xl border flex items-center justify-center shrink-0"
-                            style={{
-                                backgroundColor: theme.colors.bgCard,
-                                borderColor: theme.colors.border,
-                                color: theme.colors.textPrimary,
-                            }}
                             aria-label="Bulan berikutnya"
+                            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
                         >
                             <IconDisplay name="ArrowRight" size={18} />
-                        </button>
-                    </div>
-                </div>
-            </div>
+                        </IconButton>
+                    </Box>
+                </Box>
+            </Box>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="rounded-2xl border p-5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
-                    <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Total Anggaran</p>
-                    <p className="mt-2 text-xl font-bold" style={{ color: theme.colors.textPrimary }}>{formatRp(overview.totalBudget)}</p>
-                </div>
-                <div className="rounded-2xl border p-5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
-                    <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Sudah Terpakai</p>
-                    <p className="mt-2 text-xl font-bold" style={{ color: theme.colors.expense }}>{formatRp(overview.totalSpent)}</p>
-                </div>
-                <div className="rounded-2xl border p-5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
-                    <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Sisa Anggaran</p>
-                    <p className="mt-2 text-xl font-bold" style={{ color: overview.remaining >= 0 ? theme.colors.income : theme.colors.expense }}>
-                        {formatRp(overview.remaining)}
-                    </p>
-                </div>
-                <div className="rounded-2xl border p-5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
-                    <p className="text-xs uppercase font-semibold" style={{ color: theme.colors.textMuted }}>Status</p>
-                    <p className="mt-2 text-xl font-bold" style={{ color: overview.overBudgetCount > 0 ? theme.colors.expense : theme.colors.textPrimary }}>
-                        {overview.overBudgetCount > 0 ? `${overview.overBudgetCount} lewat` : 'Aman'}
-                    </p>
-                    <p className="text-xs mt-2" style={{ color: theme.colors.textMuted }}>
-                        {overview.activeBudgetCount} anggaran aktif di {getMonthLabel(selectedMonth)}
-                    </p>
-                </div>
-            </div>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[
+                    { label: 'Total Anggaran', value: formatRp(overview.totalBudget), color: 'text.primary' as const },
+                    { label: 'Sudah Terpakai', value: formatRp(overview.totalSpent), color: theme.colors.expense },
+                    { label: 'Sisa Anggaran', value: formatRp(overview.remaining), color: overview.remaining >= 0 ? theme.colors.income : theme.colors.expense },
+                    {
+                        label: 'Status',
+                        value: overview.overBudgetCount > 0 ? `${overview.overBudgetCount} lewat` : 'Aman',
+                        color: overview.overBudgetCount > 0 ? theme.colors.expense : 'text.primary' as const,
+                        sub: `${overview.activeBudgetCount} anggaran aktif di ${getMonthLabel(selectedMonth)}`,
+                    },
+                ].map((stat) => (
+                    <Grid size={{ xs: 6, md: 3 }} key={stat.label}>
+                        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+                            <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary" display="block">
+                                {stat.label}
+                            </Typography>
+                            <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5, color: stat.color }}>
+                                {stat.value}
+                            </Typography>
+                            {stat.sub && (
+                                <Typography variant="caption" color="text.secondary">{stat.sub}</Typography>
+                            )}
+                        </Paper>
+                    </Grid>
+                ))}
+            </Grid>
 
-            <div
-                className="rounded-2xl border p-5"
-                style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}
-            >
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <h3 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
-                            Anggaran {getMonthLabel(selectedMonth)}
-                        </h3>
-                        <p className="text-sm mt-1" style={{ color: theme.colors.textMuted }}>
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Anggaran {getMonthLabel(selectedMonth)}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             Pemakaian bulan ini dihitung dari transaksi di {getMonthLabel(selectedMonth)}. Saat pindah bulan, pemakaian mulai dari 0 lagi.
-                        </p>
-                    </div>
-                    <div className="flex flex-col sm:items-end gap-3 w-full md:w-auto">
-                        <button
-                            onClick={handleCopyPreviousMonth}
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, flexShrink: 0, minWidth: { md: 220 } }}>
+                        <Button
+                            fullWidth
+                            variant="outlined"
                             disabled={copying || previousMonthBudgetCount === 0}
-                            className="w-full sm:w-64 px-4 py-3 rounded-xl text-sm font-semibold disabled:opacity-50 text-center"
-                            style={{ backgroundColor: theme.colors.bgHover, color: theme.colors.textPrimary }}
+                            startIcon={copying ? <CircularProgress size={16} /> : undefined}
+                            onClick={handleCopyPreviousMonth}
+                            sx={{ borderRadius: 2 }}
                         >
                             {copying ? 'Menyalin...' : `Salin ${getMonthLabel(previousMonth)}`}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            startIcon={<IconDisplay name="Plus" size={18} style={{ color: '#fff' }} />}
                             onClick={openCreateForm}
-                            className="w-full sm:w-64 px-4 py-3 rounded-xl text-sm font-semibold text-white text-center"
-                            style={{ backgroundColor: theme.colors.accent }}
+                            sx={{ borderRadius: 2 }}
                         >
                             Buat Anggaran
-                        </button>
-                    </div>
-                </div>
+                        </Button>
+                    </Box>
+                </Box>
 
-                <div className="space-y-4 mt-5">
-                    {summaries.length === 0 ? (
-                        <div
-                            className="rounded-2xl border border-dashed p-8 text-center"
-                            style={{ borderColor: theme.colors.border, color: theme.colors.textMuted }}
-                        >
-                            <IconDisplay name="PiggyBank" size={36} className="mx-auto mb-3 opacity-30" />
-                            <p className="font-medium">Belum ada anggaran di {getMonthLabel(selectedMonth)}.</p>
-                            <p className="text-sm mt-2">Mulai dengan membuat anggaran untuk kategori yang memang ingin dipantau.</p>
-                        </div>
-                    ) : (
-                        summaries.map((summary) => (
-                            <div
+                {summaries.length === 0 ? (
+                    <Paper variant="outlined" sx={{ p: 6, borderRadius: 2, borderStyle: 'dashed', textAlign: 'center' }}>
+                        <IconDisplay name="PiggyBank" size={40} style={{ color: 'rgba(0,0,0,0.2)', marginBottom: 12 }} />
+                        <Typography fontWeight={600} color="text.secondary">
+                            Belum ada anggaran di {getMonthLabel(selectedMonth)}.
+                        </Typography>
+                        <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+                            Mulai dengan membuat anggaran untuk kategori yang memang ingin dipantau.
+                        </Typography>
+                    </Paper>
+                ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {summaries.map((summary) => (
+                            <Paper
                                 key={summary.budget.id}
-                                className="rounded-2xl border p-5"
-                                style={{
-                                    backgroundColor: summary.isOverBudget ? theme.colors.expenseBg : theme.colors.bgHover,
-                                    borderColor: summary.isOverBudget ? `${theme.colors.expense}33` : theme.colors.border,
+                                variant="outlined"
+                                sx={{
+                                    p: 2.5,
+                                    borderRadius: 3,
+                                    bgcolor: summary.isOverBudget ? theme.colors.expenseBg : 'action.hover',
+                                    borderColor: summary.isOverBudget ? `${theme.colors.expense}44` : 'divider',
                                 }}
                             >
-                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h4 className="font-semibold text-lg" style={{ color: theme.colors.textPrimary }}>
-                                                    {summary.budget.name}
-                                                </h4>
-                                            <span
-                                                className="px-3 py-1 rounded-full text-xs font-semibold"
-                                                style={{
-                                                    backgroundColor: summary.isOverBudget ? theme.colors.bgCard : theme.colors.accentLight,
+                                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2 }}>
+                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+                                            <Typography variant="h6" fontWeight={700}>{summary.budget.name}</Typography>
+                                            <Chip
+                                                size="small"
+                                                label={summary.isOverBudget ? 'Melebihi Anggaran' : `${Math.min(summary.percentage, 100).toFixed(0)}% terpakai`}
+                                                sx={{
+                                                    bgcolor: summary.isOverBudget ? 'background.paper' : theme.colors.accentLight,
                                                     color: summary.isOverBudget ? theme.colors.expense : theme.colors.accent,
+                                                    fontWeight: 600,
+                                                    height: 22,
+                                                    fontSize: 11,
                                                 }}
-                                            >
-                                                {summary.isOverBudget ? 'Melebihi Anggaran' : `${Math.min(summary.percentage, 100).toFixed(0)}% terpakai`}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm mt-1" style={{ color: theme.colors.textMuted }}>
+                                            />
+                                        </Box>
+                                        <Typography variant="body2" color="text.secondary">
                                             Anggaran {formatRp(summary.budget.limitAmount)} • Terpakai {formatRp(summary.spent)} • Sisa {formatRp(summary.remaining)}
-                                        </p>
-                                        <div className="flex flex-wrap gap-2 mt-3">
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
                                             {summary.categories.map((category) => (
-                                                <span
+                                                <Chip
                                                     key={category.id}
-                                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
-                                                    style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.textSecondary }}
-                                                >
-                                                    <span
-                                                        className="w-2 h-2 rounded-full"
-                                                        style={{ backgroundColor: category.color }}
-                                                    />
-                                                    {category.name}
-                                                </span>
+                                                    size="small"
+                                                    icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: category.color, ml: 1 }} />}
+                                                    label={category.name}
+                                                    sx={{ height: 24, bgcolor: 'background.paper' }}
+                                                />
                                             ))}
-                                        </div>
-                                    </div>
+                                        </Box>
+                                    </Box>
 
-                                    <div className="flex gap-2 shrink-0">
-                                        <button
+                                    <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                                        <Button
+                                            variant="contained"
+                                            size="small"
                                             onClick={() => setActiveBudgetId(summary.budget.id)}
-                                            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
-                                            style={{ backgroundColor: theme.colors.accent }}
+                                            sx={{ borderRadius: 2, fontSize: 13 }}
                                         >
                                             Lihat Detail
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
                                             onClick={() => openEditForm(summary.budget)}
-                                            className="px-4 py-2.5 rounded-xl text-sm font-semibold"
-                                            style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.textPrimary }}
+                                            sx={{ borderRadius: 2, fontSize: 13 }}
                                         >
                                             Edit
-                                        </button>
-                                        <button
-                                            onClick={() => setBudgetToDelete(summary.budget)}
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            color="error"
                                             disabled={deletingBudgetId === summary.budget.id}
-                                            className="px-4 py-2.5 rounded-xl text-sm font-semibold"
-                                            style={{ backgroundColor: theme.colors.bgCard, color: theme.colors.expense }}
+                                            onClick={() => setBudgetToDelete(summary.budget)}
+                                            sx={{ borderRadius: 2, fontSize: 13 }}
                                         >
                                             {deletingBudgetId === summary.budget.id ? 'Menghapus...' : 'Hapus'}
-                                        </button>
-                                    </div>
-                                </div>
+                                        </Button>
+                                    </Box>
+                                </Box>
 
-                                <div className="mt-4">
-                                    <div className="flex items-center justify-between text-xs mb-2" style={{ color: theme.colors.textMuted }}>
-                                        <span>{Math.min(summary.percentage, 100).toFixed(0)}% terpakai</span>
-                                        <span>{summary.isOverBudget ? 'Perlu perhatian' : 'Masih aman'}</span>
-                                    </div>
-                                    <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.colors.bgCard }}>
-                                        <div
-                                            className="h-full rounded-full transition-all"
-                                            style={{
-                                                width: `${Math.min(summary.percentage, 100)}%`,
-                                                backgroundColor: summary.isOverBudget ? theme.colors.expense : theme.colors.accent,
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-                </div>
+                                <Box sx={{ mt: 2 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {Math.min(summary.percentage, 100).toFixed(0)}% terpakai
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {summary.isOverBudget ? 'Perlu perhatian' : 'Masih aman'}
+                                        </Typography>
+                                    </Box>
+                                    <LinearProgress
+                                        variant="determinate"
+                                        value={Math.min(summary.percentage, 100)}
+                                        sx={{
+                                            height: 8,
+                                            borderRadius: 4,
+                                            bgcolor: 'background.paper',
+                                            '& .MuiLinearProgress-bar': {
+                                                bgcolor: summary.isOverBudget ? theme.colors.expense : theme.colors.accent,
+                                                borderRadius: 4,
+                                            },
+                                        }}
+                                    />
+                                </Box>
+                            </Paper>
+                        ))}
+                    </Box>
+                )}
+            </Paper>
+
             {budgetFormModal}
             {deleteDialog}
-        </div>
+        </Box>
     );
 };
 

@@ -6,6 +6,10 @@
  */
 
 // Simulate the detectSimpleIntent function logic
+function isThisMonthPhrase(message) {
+    return /bulan\s+ini|bln\s+ini|bulan\s+ni|this\s+month|thins\s+month/i.test(message);
+}
+
 function detectSimpleIntent(message) {
     const lower = message.toLowerCase().trim();
     const currentYear = new Date().getFullYear();
@@ -60,7 +64,7 @@ function detectSimpleIntent(message) {
         if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
         else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
         else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-        else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+        else if (isThisMonthPhrase(lower)) time_range = 'this_month';
         else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
 
         if (time_range) {
@@ -69,7 +73,7 @@ function detectSimpleIntent(message) {
     }
 
     // Transaction details / list queries (check BEFORE expense/income queries for "detail pengeluaran")
-    if (/transaksi|trans\b|detail|rincian|apa\s+aja|apa\s+saja|list|tampilkan|lihat|show|tunjukkan/i.test(lower)) {
+    if (/transaksi|transaski|transsaksi|tranaksi|trans\b|detail|rincian|apa\s+aja|apa\s+saja|list|tampilkan|lihat|show|tunjukkan/i.test(lower)) {
         let time_range;
         
         // Check for "N hari terakhir" pattern first (e.g., "detail pengeluaran 7 hari terakhir") - maps to last_week
@@ -78,11 +82,18 @@ function detectSimpleIntent(message) {
         } else if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
         else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
         else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
-        else if (/bulan\s+ini|this\s+month/i.test(lower)) time_range = 'this_month';
+        else if (isThisMonthPhrase(lower)) time_range = 'this_month';
         else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
 
         // Extract category filter
         let category_filter;
+        let type_filter;
+
+        if (/\bpemasukan|income\b/i.test(lower)) {
+            type_filter = 'INCOME';
+        } else if (/\bpengeluaran|expense|expenses\b/i.test(lower)) {
+            type_filter = 'EXPENSE';
+        }
         const categoryMatch = lower.match(/kategori\s+(\w+)/i);
         if (categoryMatch) {
             category_filter = categoryMatch[1];
@@ -111,7 +122,7 @@ function detectSimpleIntent(message) {
         let sort_by;
 
         // Pattern for "tertinggi/terbesar" (highest by amount)
-        const highestMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|trans|pengeluaran)?\s*(?:tertinggi|terbesar|terbanyak)/i);
+        const highestMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|transaski|transsaksi|tranaksi|trans|pengeluaran|pemasukan)?\s*(?:tertinggi|terbesar|terbanyak|highest|biggest|largest)/i);
         if (highestMatch) {
             limit = parseInt(highestMatch[1], 10);
             sort_by = 'amount';
@@ -128,7 +139,7 @@ function detectSimpleIntent(message) {
 
         // Pattern for "terakhir" (recent by date) - only if not already matched
         if (!limit) {
-            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|trans|item|data)?\s*terakhir|last\s+(\d+)/i);
+            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|transaski|transsaksi|tranaksi|trans|item|data|pengeluaran|pemasukan)?\s*terakhir|last\s+(\d+)/i);
             if (recentMatch) {
                 const numStr = recentMatch.slice(1).find(v => v !== undefined);
                 if (numStr) {
@@ -144,8 +155,68 @@ function detectSimpleIntent(message) {
             parameters: {
                 time_range: specific_date ? undefined : (limit ? time_range : (time_range || 'this_week')),
                 category_filter,
+                type_filter,
                 limit,
                 specific_date,
+                sort_by
+            }
+        };
+    }
+
+    const hasTypedRankingPattern =
+        /\btop\s+\d+\b/i.test(lower) ||
+        /(?:^|\s)\d+\s+(?:pemasukan|pengeluaran|income|expense|expenses)\s+(?:terakhir|tertinggi|terbesar|terbanyak)\b/i.test(lower) ||
+        (/\b(?:pemasukan|pengeluaran|income|expense|expenses)\b/i.test(lower) &&
+            /\b(?:tertinggi|terbesar|terbanyak|highest|biggest|largest)\b/i.test(lower) &&
+            /\b\d+\b/.test(lower));
+
+    if (/\b(pemasukan|pengeluaran|income|expense|expenses)\b/i.test(lower) && hasTypedRankingPattern) {
+        let time_range;
+        if (/\d+\s+hari\s+ter[a-z]+/i.test(lower)) {
+            time_range = 'last_week';
+        } else if (/hari\s+ini|today/i.test(lower)) time_range = 'today';
+        else if (/kemarin|yesterday/i.test(lower)) time_range = 'yesterday';
+        else if (/minggu\s+ini|this\s+week/i.test(lower)) time_range = 'this_week';
+        else if (isThisMonthPhrase(lower)) time_range = 'this_month';
+        else if (/bulan\s+lalu|last\s+month/i.test(lower)) time_range = 'last_month';
+
+        const type_filter = /\b(pemasukan|income)\b/i.test(lower) ? 'INCOME' : 'EXPENSE';
+
+        let limit;
+        let sort_by;
+
+        const highestMatch = lower.match(/(?:^|\s)(\d+)\s+(?:pemasukan|pengeluaran|income|expense|expenses)?\s*(?:tertinggi|terbesar|terbanyak|highest|biggest|largest)/i);
+        if (highestMatch) {
+            limit = parseInt(highestMatch[1], 10);
+            sort_by = 'amount';
+        }
+
+        if (!limit) {
+            const topMatch = lower.match(/top\s+(\d+)/i);
+            if (topMatch) {
+                limit = parseInt(topMatch[1], 10);
+                sort_by = 'amount';
+            }
+        }
+
+        if (!limit) {
+            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:pemasukan|pengeluaran|income|expense|expenses)?\s*terakhir|last\s+(\d+)/i);
+            if (recentMatch) {
+                const numStr = recentMatch.slice(1).find(v => v !== undefined);
+                if (numStr) {
+                    limit = parseInt(numStr, 10);
+                    sort_by = 'date';
+                }
+            }
+        }
+
+        return {
+            intent: 'query_details',
+            confidence: 'high',
+            parameters: {
+                time_range,
+                type_filter,
+                limit,
                 sort_by
             }
         };
@@ -321,6 +392,36 @@ const testCases = [
         input: "top 10 transaksi",
         expected: { intent: "query_details", limit: 10, sort_by: "amount" }
     },
+    {
+        name: "Top 10 biggest trans on thins month",
+        input: "top 10 biggest trans on thins month",
+        expected: { intent: "query_details", limit: 10, sort_by: "amount", time_range: "this_month" }
+    },
+    {
+        name: "Top 10 transaksi bulan ini",
+        input: "top 10 transaksi bulan ini",
+        expected: { intent: "query_details", limit: 10, sort_by: "amount", time_range: "this_month" }
+    },
+    {
+        name: "10 trans terbesar bln ini",
+        input: "10 trans terbesar bln ini",
+        expected: { intent: "query_details", limit: 10, sort_by: "amount", time_range: "this_month" }
+    },
+    {
+        name: "Top 10 transaski bulan ini",
+        input: "top 10 transaski bulan ini",
+        expected: { intent: "query_details", limit: 10, sort_by: "amount", time_range: "this_month" }
+    },
+    {
+        name: "Tampilkan 10 pemasukan terakhir",
+        input: "tampilkan 10 pemasukan terakhir",
+        expected: { intent: "query_details", limit: 10, sort_by: "date", type_filter: "INCOME" }
+    },
+    {
+        name: "Top 10 pengeluaran bulan ini",
+        input: "top 10 pengeluaran bulan ini",
+        expected: { intent: "query_details", limit: 10, sort_by: "amount", time_range: "this_month", type_filter: "EXPENSE" }
+    },
 
     // ============ SPECIFIC DATE FEATURE ============
     {
@@ -425,6 +526,14 @@ for (const tc of testCases) {
             if (gotLower !== expectedLower) {
                 testPassed = false;
                 errors.push(`category_filter: expected "${tc.expected.category_filter}", got "${result.parameters.category_filter}"`);
+            }
+        }
+
+        // Check type_filter
+        if (tc.expected.type_filter !== undefined) {
+            if (result.parameters.type_filter !== tc.expected.type_filter) {
+                testPassed = false;
+                errors.push(`type_filter: expected "${tc.expected.type_filter}", got "${result.parameters.type_filter}"`);
             }
         }
     }
