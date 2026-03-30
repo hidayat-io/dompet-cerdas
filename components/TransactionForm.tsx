@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Dialog from '@mui/material/Dialog';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -8,17 +7,15 @@ import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
-import Fab from '@mui/material/Fab';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Divider from '@mui/material/Divider';
-import useMediaQuery from '@mui/material/useMediaQuery';
-import { useTheme as useMuiTheme } from '@mui/material/styles';
+import Paper from '@mui/material/Paper';
 import { Category, TransactionType, Transaction } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import ConfirmDialog from './ConfirmDialog';
 import CategoryFormModal from './CategoryFormModal';
+import FullScreenDialog from './FullScreenDialog';
 import { processFileForUpload } from '../utils/fileCompression';
 import Toast from './Toast';
 import { NotificationType } from './NotificationModal';
@@ -36,9 +33,6 @@ interface TransactionFormProps {
 
 const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
   const { theme } = useTheme();
-  const muiTheme = useMuiTheme();
-  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
-
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [displayAmount, setDisplayAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -201,35 +195,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const showImagePreview = (attachmentType === 'image' && attachmentPreview) || (existingAttachment?.type === 'image' && existingAttachment.url && !isAttachmentDeleted);
 
   const formContent = (
-    <Box component="form" id="transaction-form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <Box sx={{ bgcolor: 'primary.main', px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {isMobile && (
-            <IconButton size="small" onClick={onClose} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
-              <IconDisplay name="ArrowLeft" size={20} />
-            </IconButton>
-          )}
-          <Typography variant="h6" fontWeight={600} color="#fff">
-            {initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {initialData && onDelete && isMobile && (
-            <IconButton size="small" onClick={handleDelete} disabled={isSaving} sx={{ bgcolor: '#ef4444', color: '#fff', '&:hover': { bgcolor: '#dc2626' } }}>
-              <IconDisplay name="Trash2" size={18} />
-            </IconButton>
-          )}
-          {!isMobile && (
-            <IconButton size="small" onClick={onClose} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
-              <IconDisplay name="X" size={18} />
-            </IconButton>
-          )}
-        </Box>
-      </Box>
-
-      {/* Scrollable content */}
-      <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 } }}>
+    <Box component="form" id="transaction-form" onSubmit={handleSubmit}>
         {error && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
 
         {/* Type Toggle */}
@@ -264,15 +230,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         {/* Category */}
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="caption" fontWeight={700} textTransform="uppercase" letterSpacing="0.1em" color="text.disabled">Kategori</Typography>
+            <Typography variant="subtitle2" fontWeight={700}>Kategori</Typography>
             {onAddCategory && (
-              <Chip
-                label="Baru"
-                size="small"
-                icon={<IconDisplay name="Plus" size={12} style={{ color: theme.colors.accent }} />}
-                onClick={() => setShowCategoryModal(true)}
-                sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, height: 24, cursor: 'pointer' }}
-              />
+              <Button size="small" variant="outlined" startIcon={<IconDisplay name="Plus" size={14} />} onClick={() => setShowCategoryModal(true)}>
+                Kategori Baru
+              </Button>
             )}
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
@@ -292,7 +254,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 }}
               >
                 <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconDisplay name={cat.icon} size={16} style={{ color: '#fff' }} />
+                  <IconDisplay name={cat.icon} size={16} sx={{ color: '#fff' }} />
                 </Box>
                 <Typography variant="caption" fontWeight={600} textAlign="center" noWrap sx={{ width: '100%' }}>{cat.name}</Typography>
               </Box>
@@ -333,34 +295,46 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           disabled={isSaving}
           placeholder="Contoh: Makan siang, Gaji bulanan"
           sx={{ mb: 2 }}
+          slotProps={{
+            inputLabel: { shrink: true },
+            input: { notched: true },
+          }}
         />
 
         {/* Attachment */}
         <Box>
-          <Typography variant="caption" fontWeight={700} textTransform="uppercase" letterSpacing="0.1em" color="text.disabled" display="block" sx={{ mb: 1 }}>
-            Lampiran (opsional)
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+            Lampiran
           </Typography>
           <input type="file" ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileSelect} disabled={isSaving} style={{ display: 'none' }} />
           {!hasAttachment ? (
-            <Box
+            <Paper
               onClick={() => fileInputRef.current?.click()}
               sx={{
-                border: '2px dashed', borderColor: 'divider', borderRadius: 2, p: 2.5, textAlign: 'center', cursor: 'pointer',
-                bgcolor: 'action.hover', '&:hover': { borderColor: 'primary.main' },
+                border: '2px dashed',
+                borderColor: 'divider',
+                p: 3,
+                textAlign: 'center',
+                cursor: 'pointer',
+                bgcolor: 'action.hover',
+                '&:hover': { borderColor: 'primary.main' },
               }}
             >
-              <IconDisplay name="Camera" size={24} style={{ color: theme.colors.textMuted, marginBottom: 4 }} />
-              <Typography variant="body2" color="text.disabled">Tambah Foto atau PDF</Typography>
-            </Box>
+              <IconDisplay name="Camera" size={24} sx={{ color: theme.colors.textMuted, mb: 1 }} />
+              <Typography variant="body2" color="text.secondary">Tambah foto atau PDF</Typography>
+              <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
+                Maksimal 10MB. Format JPG, PNG, GIF, WEBP, PDF
+              </Typography>
+            </Paper>
           ) : (
-            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5, bgcolor: 'action.hover' }}>
+            <Paper sx={{ p: 1.5, bgcolor: 'action.hover' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, overflow: 'hidden' }}>
                   {showImagePreview ? (
                     <Box component="img" src={attachmentPreview || existingAttachment?.url} alt="Preview" sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1.5 }} />
                   ) : (
                     <Box sx={{ width: 48, height: 48, borderRadius: 1.5, bgcolor: theme.colors.expenseBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <IconDisplay name="FileText" size={24} style={{ color: theme.colors.expense }} />
+                      <IconDisplay name="FileText" size={24} sx={{ color: theme.colors.expense }} />
                     </Box>
                   )}
                   <Box sx={{ overflow: 'hidden' }}>
@@ -374,80 +348,55 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                   <IconDisplay name="X" size={18} />
                 </IconButton>
               </Box>
-            </Box>
+            </Paper>
           )}
-          <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
-            Maksimal 10MB. Format: JPG, PNG, GIF, WEBP, PDF
-          </Typography>
           {compressionMessage && (
             <Alert severity="success" sx={{ mt: 1, py: 0.5, fontSize: 12 }}>{compressionMessage}</Alert>
           )}
         </Box>
-      </Box>
-
-      {/* Desktop Footer */}
-      {!isMobile && (
-        <>
-          <Divider />
-          <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {initialData && onDelete && (
-              <Button
-                variant="contained"
-                color="error"
-                onClick={handleDelete}
-                disabled={isSaving}
-                startIcon={<IconDisplay name="Trash2" size={18} style={{ color: '#fff' }} />}
-                sx={{ fontWeight: 600 }}
-              >
-                Hapus
-              </Button>
-            )}
-            <Box sx={{ flex: 1 }} />
-            <Button
-              type="submit"
-              form="transaction-form"
-              variant="contained"
-              disabled={isSaving}
-              startIcon={isSaving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name={initialData ? 'Check' : 'Save'} size={18} style={{ color: '#fff' }} />}
-              sx={{ fontWeight: 600, minWidth: 120 }}
-            >
-              {isSaving ? 'Menyimpan...' : initialData ? 'Update' : 'Simpan'}
-            </Button>
-          </Box>
-        </>
-      )}
-
-      {/* Mobile FAB */}
-      {isMobile && (
-        <Fab
-          type="submit"
-          disabled={isSaving}
-          sx={{
-            position: 'fixed', bottom: 24, right: 24, zIndex: 50,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: '#fff', boxShadow: '0 10px 30px rgba(102,126,234,0.5)',
-            '&:disabled': { opacity: 0.6 },
-          }}
-        >
-          {isSaving ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : <IconDisplay name={initialData ? 'Check' : 'Save'} size={24} style={{ color: '#fff' }} />}
-        </Fab>
-      )}
     </Box>
+  );
+
+  const formActions = (
+    <>
+      {initialData && onDelete ? (
+        <Button
+          variant="outlined"
+          color="error"
+          onClick={handleDelete}
+          disabled={isSaving}
+          startIcon={<IconDisplay name="Trash2" size={18} />}
+        >
+          Hapus
+        </Button>
+      ) : null}
+      <Box sx={{ flex: 1 }} />
+      <Button variant="outlined" onClick={onClose} disabled={isSaving}>
+        Batal
+      </Button>
+      <Button
+        type="submit"
+        form="transaction-form"
+        variant="contained"
+        disabled={isSaving}
+        startIcon={isSaving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name={initialData ? 'Check' : 'Save'} size={18} sx={{ color: '#fff' }} />}
+      >
+        {isSaving ? 'Menyimpan...' : initialData ? 'Update' : 'Simpan'}
+      </Button>
+    </>
   );
 
   return (
     <>
-      <Dialog
+      <FullScreenDialog
         open
         onClose={onClose}
-        fullScreen={isMobile}
-        maxWidth="sm"
-        fullWidth={!isMobile}
-        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, overflow: 'hidden', height: isMobile ? '100%' : 'auto', maxHeight: isMobile ? '100%' : '90vh' } }}
+        title={initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}
+        description="Gunakan pola input yang sama untuk semua transaksi agar pencatatan tetap konsisten dan mudah dibaca."
+        actions={formActions}
       >
         {formContent}
-      </Dialog>
+      </FullScreenDialog>
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}

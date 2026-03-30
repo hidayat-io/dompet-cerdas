@@ -10,10 +10,14 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Grid from '@mui/material/Grid';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import InputAdornment from '@mui/material/InputAdornment';
+import FullScreenDialog from './FullScreenDialog';
+import PageHeader from './PageHeader';
 
 interface DebtManagerProps {
     debts: DebtRecord[];
@@ -292,80 +296,73 @@ const DebtManager: React.FC<DebtManagerProps> = ({
 
     // ── Form modal ──────────────────────────────────────────────────
     const formModal = (
-        <Dialog
+        <FullScreenDialog
             open={showForm}
             onClose={resetForm}
-            maxWidth="sm"
-            fullWidth
-            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-            PaperProps={{ sx: { borderRadius: 4 } }}
+            title={draft.debtId ? 'Ubah Catatan' : 'Catat Baru'}
+            description="Catat hutang atau piutang dengan format yang sederhana agar progres pembayarannya mudah dilacak."
+            actions={
+                <>
+                    <Button variant="outlined" onClick={resetForm}>
+                        Batal
+                    </Button>
+                    <Button
+                        type="submit"
+                        form="debt-form"
+                        variant="contained"
+                        disabled={!isDraftValid || saving}
+                        startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                    >
+                        {saving ? 'Menyimpan...' : 'Simpan Catatan'}
+                    </Button>
+                </>
+            }
         >
-            <Box sx={{ px: 3, pt: 3, pb: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
-                <Box>
-                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.16em' }} color="text.secondary">
-                        Hutang Piutang
-                    </Typography>
-                    <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
-                        {draft.debtId ? 'Ubah Catatan' : 'Catat Baru'}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Isi yang penting dulu. Detail tambahan tetap ada kalau memang dibutuhkan.
-                    </Typography>
-                </Box>
-                <IconButton onClick={resetForm} aria-label="Tutup" sx={{ flexShrink: 0 }}>
-                    <IconDisplay name="X" size={18} />
-                </IconButton>
-            </Box>
-
-            <DialogContent sx={{ px: 3, pb: 3 }}>
-                <Box component="form" onSubmit={handleSubmit}>
+            <Box component="form" id="debt-form" onSubmit={handleSubmit}>
                     {/* Kind selector */}
-                    <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                    <ToggleButtonGroup
+                        fullWidth
+                        exclusive
+                        value={draft.kind}
+                        onChange={(_, nextValue) => {
+                            if (nextValue) setDraft((c) => ({ ...c, kind: nextValue }));
+                        }}
+                        sx={{ mb: 3, p: 0.5, bgcolor: 'action.hover' }}
+                    >
                         {(['RECEIVABLE', 'DEBT'] as DebtKind[]).map((kindOption) => {
-                            const selected = draft.kind === kindOption;
                             const isReceivable = kindOption === 'RECEIVABLE';
                             return (
-                                <Grid size={{ xs: 12, sm: 6 }} key={kindOption}>
-                                    <Box
-                                        component="button"
-                                        type="button"
-                                        onClick={() => setDraft((c) => ({ ...c, kind: kindOption }))}
-                                        sx={{
-                                            width: '100%',
-                                            borderRadius: 6,
-                                            px: 2.5,
-                                            py: 2,
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                            bgcolor: selected ? theme.colors.accent : 'action.hover',
-                                            color: selected ? '#fff' : 'text.primary',
-                                            boxShadow: selected ? `0 16px 35px ${theme.colors.accent}25` : 'none',
-                                            transition: 'all 0.15s',
-                                        }}
-                                    >
+                                <ToggleButton
+                                    key={kindOption}
+                                    value={kindOption}
+                                    sx={{
+                                        flex: 1,
+                                        alignItems: 'flex-start',
+                                        justifyContent: 'flex-start',
+                                        px: 2,
+                                        py: 1.5,
+                                        textAlign: 'left',
+                                    }}
+                                >
+                                    <Box>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <Box sx={{
-                                                width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                bgcolor: selected ? 'rgba(255,255,255,0.18)' : 'background.paper',
-                                                color: selected ? '#fff' : 'text.secondary',
-                                            }}>
+                                            <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.paper', color: 'text.secondary' }}>
                                                 <IconDisplay name={isReceivable ? 'ArrowDown' : 'ArrowUp'} size={16} />
                                             </Box>
                                             <Box>
-                                                <Typography variant="body2" fontWeight={700} sx={{ color: 'inherit' }}>
+                                                <Typography variant="body2" fontWeight={700}>
                                                     {isReceivable ? 'Orang Pinjam ke Saya' : 'Saya Pinjam ke Orang'}
                                                 </Typography>
-                                                <Typography variant="caption" sx={{ color: selected ? 'rgba(255,255,255,0.82)' : 'text.secondary' }}>
+                                                <Typography variant="caption" color="text.secondary">
                                                     {getKindSummary(kindOption).helper}
                                                 </Typography>
                                             </Box>
                                         </Box>
                                     </Box>
-                                </Grid>
+                                </ToggleButton>
                             );
                         })}
-                    </Grid>
+                    </ToggleButtonGroup>
 
                     {/* Name */}
                     <TextField
@@ -378,23 +375,16 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                         sx={{ mb: 2 }}
                     />
 
-                    {/* Amount */}
-                    <Box sx={{ mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, px: 2, py: 1.5, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Typography variant="h6" fontWeight={600} color="text.secondary">Rp</Typography>
-                        <Box
-                            component="input"
-                            type="text"
-                            inputMode="numeric"
-                            value={draft.amount}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((c) => ({ ...c, amount: formatRupiahInput(e.target.value) }))}
-                            placeholder="0"
-                            sx={{
-                                flex: 1, border: 'none', bgcolor: 'transparent', outline: 'none',
-                                fontSize: '1.75rem', fontWeight: 700, fontFamily: 'inherit',
-                                color: 'text.primary',
-                            }}
-                        />
-                    </Box>
+                    <TextField
+                        label="Jumlah"
+                        fullWidth
+                        inputMode="numeric"
+                        value={draft.amount}
+                        onChange={(e) => setDraft((c) => ({ ...c, amount: formatRupiahInput(e.target.value) }))}
+                        placeholder="0"
+                        sx={{ mb: 2 }}
+                        slotProps={{ input: { startAdornment: <InputAdornment position="start">Rp</InputAdornment> } }}
+                    />
 
                     {/* Notes */}
                     <TextField
@@ -406,22 +396,15 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                         onChange={(e) => setDraft((c) => ({ ...c, notes: e.target.value }))}
                         placeholder="Untuk keperluan apa? Misalnya makan siang, bensin, patungan, atau titip beli sesuatu."
                         sx={{ mb: 2 }}
+                        slotProps={{
+                            inputLabel: { shrink: true },
+                            input: { notched: true },
+                        }}
                     />
 
-                    {/* Info box */}
-                    <Paper variant="outlined" sx={{ px: 2.5, py: 2, borderRadius: 3, mb: 2, bgcolor: 'action.hover' }}>
-                        <Box sx={{ display: 'flex', gap: 1.5 }}>
-                            <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: theme.colors.accentLight, color: theme.colors.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.25 }}>
-                                <IconDisplay name="Info" size={16} />
-                            </Box>
-                            <Box>
-                                <Typography variant="body2" fontWeight={700}>Pencatatan Aman</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.6 }}>
-                                    Catatan ini membantu kita melacak siapa yang masih perlu dibayar atau ditagih tanpa harus melihat transaksi satu per satu.
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </Paper>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        Catatan ini membantu melacak siapa yang masih perlu dibayar atau ditagih tanpa harus membuka transaksi satu per satu.
+                    </Alert>
 
                     {/* Advanced toggle */}
                     <Button
@@ -460,70 +443,44 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                         </Grid>
                     )}
 
-                    {/* Actions */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            fullWidth
-                            disabled={!isDraftValid || saving}
-                            startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
-                            sx={{ borderRadius: 99, py: 1.5, fontWeight: 700, fontSize: 16 }}
-                        >
-                            {saving ? 'Menyimpan...' : 'Simpan Catatan'}
-                        </Button>
-                        <Button fullWidth onClick={resetForm} sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                            Batal
-                        </Button>
-                    </Box>
-                </Box>
-            </DialogContent>
-        </Dialog>
+            </Box>
+        </FullScreenDialog>
     );
 
     // ── Payment modal ────────────────────────────────────────────────
     const paymentModal = (
-        <Dialog
+        <FullScreenDialog
             open={!!paymentDraft}
             onClose={() => setPaymentDraft(null)}
-            maxWidth="sm"
-            fullWidth
-            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-            PaperProps={{ sx: { borderRadius: 4 } }}
+            title="Catat Pembayaran"
+            description="Simpan nominal yang sudah dibayar agar sisa hutang atau piutang langsung terbarui."
+            actions={
+                <>
+                    <Button variant="outlined" onClick={() => setPaymentDraft(null)}>
+                        Batal
+                    </Button>
+                    <Button
+                        type="submit"
+                        form="payment-form"
+                        variant="contained"
+                        disabled={!isPaymentValid || savingPayment}
+                        startIcon={savingPayment ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                    >
+                        {savingPayment ? 'Menyimpan...' : 'Simpan Pembayaran'}
+                    </Button>
+                </>
+            }
         >
-            <Box sx={{ px: 3, pt: 3, pb: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
-                <Box>
-                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.16em' }} color="text.secondary">
-                        Hutang Piutang
-                    </Typography>
-                    <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>Catat Pembayaran</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Simpan nominal yang sudah dibayar. Catatan tambahan tetap opsional.
-                    </Typography>
-                </Box>
-                <IconButton onClick={() => setPaymentDraft(null)} aria-label="Tutup" sx={{ flexShrink: 0 }}>
-                    <IconDisplay name="X" size={18} />
-                </IconButton>
-            </Box>
-
-            <DialogContent sx={{ px: 3, pb: 3 }}>
-                <Box component="form" onSubmit={handleSavePayment}>
-                    {/* Amount */}
-                    <Box sx={{ mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, px: 2, py: 1.5, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Typography variant="h6" fontWeight={600} color="text.secondary">Rp</Typography>
-                        <Box
-                            component="input"
-                            type="text"
-                            inputMode="numeric"
-                            value={paymentDraft?.amount || ''}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentDraft((c) => c ? ({ ...c, amount: formatRupiahInput(e.target.value) }) : c)}
-                            sx={{
-                                flex: 1, border: 'none', bgcolor: 'transparent', outline: 'none',
-                                fontSize: '1.75rem', fontWeight: 700, fontFamily: 'inherit',
-                                color: 'text.primary',
-                            }}
-                        />
-                    </Box>
+            <Box component="form" id="payment-form" onSubmit={handleSavePayment}>
+                    <TextField
+                        label="Jumlah Dibayar"
+                        fullWidth
+                        inputMode="numeric"
+                        value={paymentDraft?.amount || ''}
+                        onChange={(e) => setPaymentDraft((c) => c ? ({ ...c, amount: formatRupiahInput(e.target.value) }) : c)}
+                        sx={{ mb: 2 }}
+                        slotProps={{ input: { startAdornment: <InputAdornment position="start">Rp</InputAdornment> } }}
+                    />
 
                     <TextField
                         label="Tanggal Bayar"
@@ -545,26 +502,13 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                         onChange={(e) => setPaymentDraft((c) => c ? ({ ...c, note: e.target.value }) : c)}
                         placeholder="Opsional"
                         sx={{ mb: 3 }}
+                        slotProps={{
+                            inputLabel: { shrink: true },
+                            input: { notched: true },
+                        }}
                     />
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            fullWidth
-                            disabled={!isPaymentValid || savingPayment}
-                            startIcon={savingPayment ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
-                            sx={{ borderRadius: 99, py: 1.5, fontWeight: 700, fontSize: 16 }}
-                        >
-                            {savingPayment ? 'Menyimpan...' : 'Simpan Pembayaran'}
-                        </Button>
-                        <Button fullWidth onClick={() => setPaymentDraft(null)} sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                            Batal
-                        </Button>
-                    </Box>
-                </Box>
-            </DialogContent>
-        </Dialog>
+            </Box>
+        </FullScreenDialog>
     );
 
     const deleteDialog = (
@@ -792,24 +736,20 @@ const DebtManager: React.FC<DebtManagerProps> = ({
         <Box sx={{ pb: { xs: 10, md: 0 } }}>
             {/* Header */}
             <Paper variant="outlined" sx={{ p: { xs: 3, md: 4 }, borderRadius: 4, mb: 3, boxShadow: isDark ? 0 : 4 }}>
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'flex-start' }, justifyContent: 'space-between', gap: 3, mb: 3 }}>
-                    <Box>
-                        <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.16em' }} color="text.secondary">
-                            Hutang Piutang
-                        </Typography>
-                        <Typography variant="h4" fontWeight={700} sx={{ mt: 0.5 }}>Ringkas, jelas, dan gampang dipantau</Typography>
-                        <Typography variant="body1" color="text.secondary" sx={{ mt: 1, lineHeight: 1.7, maxWidth: 600 }}>
-                            Kita fokus ke yang paling penting: siapa yang terlibat, berapa nominalnya, dan masih sisa berapa sampai selesai.
-                        </Typography>
-                    </Box>
-                    <Button
-                        variant="contained"
-                        onClick={() => openCreateForm()}
-                        sx={{ borderRadius: 99, px: 3, py: 1.5, fontWeight: 700, flexShrink: 0 }}
-                    >
-                        + Tambah Catatan
-                    </Button>
-                </Box>
+                <PageHeader
+                    eyebrow="Hutang Piutang"
+                    title="Ringkas, jelas, dan gampang dipantau"
+                    description="Kita fokus ke yang paling penting: siapa yang terlibat, berapa nominalnya, dan masih sisa berapa sampai selesai."
+                    actions={
+                        <Button
+                            variant="contained"
+                            onClick={() => openCreateForm()}
+                            sx={{ px: 3, py: 1.5, flexShrink: 0 }}
+                        >
+                            + Tambah Catatan
+                        </Button>
+                    }
+                />
 
                 {/* Summary cards */}
                 <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -838,7 +778,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                     <Chip
                         size="small"
-                        icon={<IconDisplay name="AlertCircle" size={13} style={{ color: summary.overdueCount > 0 ? theme.colors.expense : undefined }} />}
+                        icon={<IconDisplay name="AlertCircle" size={13} sx={{ color: summary.overdueCount > 0 ? theme.colors.expense : undefined }} />}
                         label={summary.overdueCount > 0 ? `${summary.overdueCount} catatan lewat jatuh tempo` : 'Belum ada yang lewat jatuh tempo'}
                     />
                     <Chip size="small" icon={<IconDisplay name="RefreshCw" size={13} />} label="Data otomatis menyesuaikan saat ada pembayaran baru" />

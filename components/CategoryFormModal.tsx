@@ -1,8 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import DialogTitle from '@mui/material/DialogTitle';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -16,11 +12,14 @@ import Grid from '@mui/material/Grid';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
+import Alert from '@mui/material/Alert';
+import Paper from '@mui/material/Paper';
 import { Category, IconName, TransactionType } from '../types';
 import { AVAILABLE_ICONS, COLORS } from '../constants';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import { checkCategorySimilarity, SimilarityResult } from '../utils/categoryValidation';
+import FullScreenDialog from './FullScreenDialog';
 
 interface CategoryFormModalProps {
     isOpen: boolean;
@@ -123,90 +122,75 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     const typeColor = newCatType === 'INCOME' ? incomeColor : expenseColor;
     const typeBg = newCatType === 'INCOME' ? theme.colors.incomeBg : theme.colors.expenseBg;
 
+    const actions = (
+        <>
+            <Button variant="outlined" onClick={handleClose}>
+                Batal
+            </Button>
+            {warning ? (
+                <Button
+                    variant="contained"
+                    color="warning"
+                    onClick={() => handleSubmit(true)}
+                    disabled={isSaving}
+                >
+                    Tetap Simpan
+                </Button>
+            ) : null}
+            <Button
+                variant="contained"
+                disabled={!name.trim() || isSaving}
+                onClick={() => handleSubmit(undefined, false)}
+                startIcon={isSaving
+                    ? <CircularProgress size={16} sx={{ color: '#fff' }} />
+                    : <IconDisplay name={editingCategory ? 'Check' : 'Save'} size={18} sx={{ color: '#fff' }} />
+                }
+            >
+                {isSaving ? 'Menyimpan...' : editingCategory ? 'Update' : 'Simpan'}
+            </Button>
+        </>
+    );
+
     return (
-        <Dialog
+        <FullScreenDialog
             open={isOpen}
             onClose={handleClose}
-            maxWidth="sm"
-            fullWidth
-            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-            PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
+            title={editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
+            description="Gunakan kategori yang ringkas dan konsisten supaya transaksi, anggaran, dan ringkasan tetap rapi."
+            actions={actions}
         >
-            <DialogTitle
-                sx={{
-                    bgcolor: 'primary.main',
-                    px: 3,
-                    py: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                }}
-            >
-                <Typography variant="h6" fontWeight={700} color="#fff">
-                    {editingCategory ? 'Edit Kategori' : 'Buat Kategori Baru'}
-                </Typography>
-                <IconButton
-                    onClick={handleClose}
-                    size="small"
-                    sx={{ color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                >
-                    <IconDisplay name="X" size={20} />
-                </IconButton>
-            </DialogTitle>
-
-            {/* Warning Overlay */}
-            {warning && (
-                <Box
-                    sx={{
-                        position: 'absolute',
-                        inset: 0,
-                        zIndex: 20,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        p: 2,
-                        bgcolor: 'rgba(255,255,255,0.85)',
-                        backdropFilter: 'blur(4px)',
-                    }}
-                >
-                    <Box sx={{ bgcolor: 'background.paper', borderRadius: 3, p: 3, maxWidth: 360, width: '100%', boxShadow: 8 }}>
-                        <Box sx={{ width: 48, height: 48, bgcolor: '#fff7ed', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
-                            <IconDisplay name="AlertTriangle" size={24} style={{ color: '#f59e0b' }} />
-                        </Box>
-                        <Typography variant="h6" fontWeight={700} textAlign="center" gutterBottom>Perhatian!</Typography>
-                        <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 2 }}>{warning.message}</Typography>
-                        <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 1.5, mb: 2, maxHeight: 120, overflowY: 'auto' }}>
-                            {warning.conflictingCategories.map((cat) => (
-                                <Box key={cat.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
-                                    <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                        <IconDisplay name={cat.icon} size={12} style={{ color: '#fff' }} />
-                                    </Box>
-                                    <Typography variant="body2">{cat.name}</Typography>
-                                    <Typography variant="caption" color="text.disabled" sx={{ ml: 'auto' }}>
-                                        {cat.type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
-                                    </Typography>
-                                </Box>
-                            ))}
-                        </Box>
-                        <Typography variant="caption" color="text.disabled" display="block" textAlign="center" sx={{ mb: 2 }}>
-                            Apakah Anda yakin ingin tetap menyimpan?
+            <Box component="form" id="category-form" onSubmit={(e) => handleSubmit(e)}>
+                {warning ? (
+                    <Alert
+                        severity="warning"
+                        sx={{ mb: 3 }}
+                        action={
+                            <IconButton size="small" onClick={() => setWarning(null)} color="inherit">
+                                <IconDisplay name="X" size={16} />
+                            </IconButton>
+                        }
+                    >
+                        <Typography variant="body2" fontWeight={600} sx={{ mb: warning.conflictingCategories.length ? 1 : 0 }}>
+                            {warning.message}
                         </Typography>
-                        <Box sx={{ display: 'flex', gap: 1.5 }}>
-                            <Button fullWidth variant="outlined" onClick={() => setWarning(null)}>Batal</Button>
-                            <Button
-                                fullWidth
-                                variant="contained"
-                                onClick={() => handleSubmit(true)}
-                                sx={{ bgcolor: '#f59e0b', '&:hover': { bgcolor: '#d97706' } }}
-                            >
-                                Tetap Simpan
-                            </Button>
-                        </Box>
-                    </Box>
-                </Box>
-            )}
+                        {warning.conflictingCategories.length ? (
+                            <Paper sx={{ p: 1.5, bgcolor: 'background.paper' }}>
+                                {warning.conflictingCategories.map((cat) => (
+                                    <Box key={cat.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+                                        <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                            <IconDisplay name={cat.icon} size={12} sx={{ color: '#fff' }} />
+                                        </Box>
+                                        <Typography variant="body2">{cat.name}</Typography>
+                                        <Typography variant="caption" color="text.disabled" sx={{ ml: 'auto' }}>
+                                            {cat.type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
+                                        </Typography>
+                                    </Box>
+                                ))}
+                            </Paper>
+                        ) : null}
+                    </Alert>
+                ) : null}
 
-            <DialogContent sx={{ p: 3 }}>
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                     <Grid size={{ xs: 12, sm: 8 }}>
                         <TextField
@@ -321,7 +305,7 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         Preview:
                     </Typography>
                     <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <IconDisplay name={icon} size={16} style={{ color: '#fff' }} />
+                        <IconDisplay name={icon} size={16} sx={{ color: '#fff' }} />
                     </Box>
                     <Typography variant="body2" fontWeight={600}>
                         {name || 'Nama Kategori'}
@@ -332,26 +316,8 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         sx={{ ml: 'auto', bgcolor: typeBg, color: typeColor, fontWeight: 600, height: 20, fontSize: 11 }}
                     />
                 </Box>
-            </DialogContent>
-
-            <DialogActions sx={{ px: 3, pb: 3 }}>
-                <Button variant="outlined" onClick={handleClose} sx={{ borderRadius: 2 }}>
-                    Batal
-                </Button>
-                <Button
-                    variant="contained"
-                    disabled={!name.trim() || isSaving}
-                    onClick={() => handleSubmit(undefined, false)}
-                    startIcon={isSaving
-                        ? <CircularProgress size={16} sx={{ color: '#fff' }} />
-                        : <IconDisplay name={editingCategory ? 'Check' : 'Save'} size={18} style={{ color: '#fff' }} />
-                    }
-                    sx={{ borderRadius: 2, minWidth: 120 }}
-                >
-                    {isSaving ? 'Menyimpan...' : editingCategory ? 'Update' : 'Simpan'}
-                </Button>
-            </DialogActions>
-        </Dialog>
+            </Box>
+        </FullScreenDialog>
     );
 };
 

@@ -132,7 +132,7 @@ const AuthLogin: React.FC = () => {
                         boxShadow: '0 8px 24px rgba(79,70,229,0.3)',
                     }}
                 >
-                    <IconDisplay name="Wallet" size={32} style={{ color: '#fff' }} />
+                    <IconDisplay name="Wallet" size={32} sx={{ color: '#fff' }} />
                 </Box>
 
                 <Typography variant="h4" fontWeight={700} gutterBottom>

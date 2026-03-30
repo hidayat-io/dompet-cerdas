@@ -10,8 +10,6 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Grid from '@mui/material/Grid';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
 import Chip from '@mui/material/Chip';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -20,9 +18,13 @@ import InputLabel from '@mui/material/InputLabel';
 import InputAdornment from '@mui/material/InputAdornment';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
+import FullScreenDialog from './FullScreenDialog';
+import PageHeader from './PageHeader';
 interface PlanManagerProps {
     plans: Plan[];
     categories: Category[];
@@ -79,32 +81,32 @@ type DeleteTarget =
 
 // Reusable type toggle component
 const TypeToggle: React.FC<{ value: TransactionType; onChange: (v: TransactionType) => void; incomeColor: string; expenseColor: string }> = ({ value, onChange, incomeColor, expenseColor }) => (
-    <Box sx={{ display: 'flex', p: 0.5, borderRadius: 2, bgcolor: 'action.hover' }}>
+    <ToggleButtonGroup
+        fullWidth
+        exclusive
+        value={value}
+        onChange={(_, nextValue) => {
+            if (nextValue) onChange(nextValue);
+        }}
+        sx={{ bgcolor: 'action.hover', p: 0.5 }}
+    >
         {(['EXPENSE', 'INCOME'] as TransactionType[]).map((type) => (
-            <Box
+            <ToggleButton
                 key={type}
-                component="button"
-                type="button"
-                onClick={() => onChange(type)}
+                value={type}
                 sx={{
-                    flex: 1,
-                    py: 1,
-                    border: 'none',
-                    borderRadius: 1.5,
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    fontFamily: 'inherit',
-                    transition: 'all 0.15s',
-                    bgcolor: value === type ? 'background.paper' : 'transparent',
                     color: value === type ? (type === 'EXPENSE' ? expenseColor : incomeColor) : 'text.secondary',
-                    boxShadow: value === type ? 1 : 0,
+                    '&.Mui-selected': {
+                        bgcolor: 'background.paper',
+                        color: type === 'EXPENSE' ? expenseColor : incomeColor,
+                        boxShadow: 1,
+                    },
                 }}
             >
                 {type === 'EXPENSE' ? 'Pengeluaran' : 'Pemasukan'}
-            </Box>
+            </ToggleButton>
         ))}
-    </Box>
+    </ToggleButtonGroup>
 );
 
 const PlanManager: React.FC<PlanManagerProps> = ({
@@ -436,7 +438,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {sortedItems.length === 0 ? (
                         <Box sx={{ textAlign: 'center', py: 6 }}>
-                            <IconDisplay name="CalendarDays" size={40} style={{ color: 'rgba(0,0,0,0.15)', marginBottom: 8 }} />
+                            <IconDisplay name="CalendarDays" size={40} sx={{ color: 'rgba(0,0,0,0.15)', marginBottom: 8 }} />
                             <Typography color="text.secondary">Belum ada item di rencana ini.</Typography>
                         </Box>
                     ) : (
@@ -464,7 +466,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                     flexShrink: 0,
                                                 }}
                                             >
-                                                <IconDisplay name={category?.icon || 'HelpCircle'} size={18} style={{ color: '#fff' }} />
+                                                <IconDisplay name={category?.icon || 'HelpCircle'} size={18} sx={{ color: '#fff' }} />
                                             </Box>
                                             <Box sx={{ minWidth: 0 }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -492,7 +494,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                         size="small"
                                                         variant="contained"
                                                         onClick={() => openApplyModal(item)}
-                                                        startIcon={<IconDisplay name="Save" size={14} style={{ color: '#fff' }} />}
+                                                        startIcon={<IconDisplay name="Save" size={14} sx={{ color: '#fff' }} />}
                                                         sx={{ borderRadius: 2, fontSize: 12, display: { xs: 'none', sm: 'flex' } }}
                                                     >
                                                         Jadikan Transaksi
@@ -549,51 +551,42 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                 </Box>
 
                 {/* Apply to transaction modal */}
-                <Dialog
+                <FullScreenDialog
                     open={applyModalOpen && !!itemToApply}
                     onClose={() => setApplyModalOpen(false)}
-                    maxWidth="xs"
-                    fullWidth
-                    slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-                    PaperProps={{ sx: { borderRadius: 3 } }}
+                    title="Jadikan Transaksi"
+                    description={`Item ${itemToApply?.name || ''} akan dicatat sebagai transaksi nyata. Pilih tanggal pencatatannya.`}
+                    actions={
+                        <>
+                            <Button variant="outlined" onClick={() => setApplyModalOpen(false)}>Batal</Button>
+                            <Button variant="contained" onClick={handleConfirmApply}>Simpan</Button>
+                        </>
+                    }
                 >
-                    <Box sx={{ px: 3, pt: 3, pb: 1 }}>
-                        <Typography variant="h6" fontWeight={700} gutterBottom>Jadikan Transaksi</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Item <strong>{itemToApply?.name}</strong> ({itemToApply ? formatRp(itemToApply.amount) : ''}) akan dicatat sebagai transaksi nyata. Pilih tanggalnya:
-                        </Typography>
-                    </Box>
-                    <DialogContent sx={{ px: 3, pb: 3, pt: 0 }}>
-                        <TextField
-                            type="date"
-                            fullWidth
-                            size="small"
-                            value={applyDate}
-                            onChange={(e) => setApplyDate(e.target.value)}
-                            slotProps={{ inputLabel: { shrink: true } }}
-                            sx={{ mb: 2 }}
-                        />
-                        <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end' }}>
-                            <Button variant="outlined" onClick={() => setApplyModalOpen(false)} sx={{ borderRadius: 2 }}>Batal</Button>
-                            <Button variant="contained" onClick={handleConfirmApply} sx={{ borderRadius: 2 }}>Simpan</Button>
-                        </Box>
-                    </DialogContent>
-                </Dialog>
+                    <TextField
+                        type="date"
+                        fullWidth
+                        size="small"
+                        value={applyDate}
+                        onChange={(e) => setApplyDate(e.target.value)}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                    />
+                </FullScreenDialog>
 
                 {/* Edit item modal */}
-                <Dialog
+                <FullScreenDialog
                     open={!!editingItem}
                     onClose={() => setEditingItem(null)}
-                    maxWidth="sm"
-                    fullWidth
-                    slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-                    PaperProps={{ sx: { borderRadius: 3 } }}
+                    title="Edit Item Rencana"
+                    description="Perbarui detail item agar rencana dan proyeksi saldo tetap akurat."
+                    actions={
+                        <>
+                            <Button variant="outlined" onClick={() => setEditingItem(null)}>Batal</Button>
+                            <Button type="submit" form="edit-plan-item-form" variant="contained">Simpan Perubahan</Button>
+                        </>
+                    }
                 >
-                    <Box sx={{ px: 3, pt: 3, pb: 1 }}>
-                        <Typography variant="h6" fontWeight={700}>Edit Item Rencana</Typography>
-                    </Box>
-                    <DialogContent sx={{ px: 3, pb: 3, pt: 1 }}>
-                        <Box component="form" onSubmit={handleUpdateItem} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box component="form" id="edit-plan-item-form" onSubmit={handleUpdateItem} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <TypeToggle value={editItemType} onChange={setEditItemType} incomeColor={theme.colors.income} expenseColor={theme.colors.expense} />
                             <TextField label="Nama Item" size="small" fullWidth value={editItemName} onChange={(e) => setEditItemName(e.target.value)} required />
                             <TextField
@@ -631,28 +624,23 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                     <MenuItem value="CANCELLED">Dibatalkan</MenuItem>
                                 </Select>
                             </FormControl>
-                            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', pt: 1 }}>
-                                <Button variant="outlined" onClick={() => setEditingItem(null)} sx={{ borderRadius: 2 }}>Batal</Button>
-                                <Button type="submit" variant="contained" sx={{ borderRadius: 2 }}>Simpan Perubahan</Button>
-                            </Box>
-                        </Box>
-                    </DialogContent>
-                </Dialog>
+                    </Box>
+                </FullScreenDialog>
 
                 {/* Add item modal */}
-                <Dialog
+                <FullScreenDialog
                     open={showAddModal}
                     onClose={() => setShowAddModal(false)}
-                    maxWidth="sm"
-                    fullWidth
-                    slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-                    PaperProps={{ sx: { borderRadius: 3 } }}
+                    title="Tambah Item Rencana"
+                    description="Tambahkan item pemasukan atau pengeluaran yang ingin direncanakan lebih dulu."
+                    actions={
+                        <>
+                            <Button variant="outlined" onClick={() => setShowAddModal(false)}>Batal</Button>
+                            <Button type="submit" form="add-plan-item-form" variant="contained">Tambah Item</Button>
+                        </>
+                    }
                 >
-                    <Box sx={{ px: 3, pt: 3, pb: 1 }}>
-                        <Typography variant="h6" fontWeight={700}>Tambah Item Rencana</Typography>
-                    </Box>
-                    <DialogContent sx={{ px: 3, pb: 3, pt: 1 }}>
-                        <Box component="form" onSubmit={handleAddItem} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box component="form" id="add-plan-item-form" onSubmit={handleAddItem} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <TypeToggle value={newItemType} onChange={setNewItemType} incomeColor={theme.colors.income} expenseColor={theme.colors.expense} />
                             <TextField
                                 label="Nama Item"
@@ -692,13 +680,8 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                 onChange={(e) => setNewItemPlannedDate(e.target.value)}
                                 slotProps={{ inputLabel: { shrink: true } }}
                             />
-                            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', pt: 1 }}>
-                                <Button variant="outlined" onClick={() => setShowAddModal(false)} sx={{ borderRadius: 2 }}>Batal</Button>
-                                <Button type="submit" variant="contained" sx={{ borderRadius: 2 }}>Tambah Item</Button>
-                            </Box>
-                        </Box>
-                    </DialogContent>
-                </Dialog>
+                    </Box>
+                </FullScreenDialog>
 
                 {deleteDialog}
             </Box>
@@ -709,14 +692,10 @@ const PlanManager: React.FC<PlanManagerProps> = ({
     return (
         <>
             <Box sx={{ pb: { xs: 10, md: 0 } }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={700}>Rencana</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Siapkan pemasukan dan pengeluaran berikutnya tanpa langsung mengubah saldo.
-                        </Typography>
-                    </Box>
-                </Box>
+                <PageHeader
+                    title="Rencana"
+                    description="Siapkan pemasukan dan pengeluaran berikutnya tanpa langsung mengubah saldo."
+                />
 
                 {/* Create plan form */}
                 <Card
@@ -748,7 +727,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                     {plans.length === 0 ? (
                         <Grid size={{ xs: 12 }}>
                             <Paper variant="outlined" sx={{ p: 6, borderRadius: 3, borderStyle: 'dashed', textAlign: 'center' }}>
-                                <IconDisplay name="CalendarDays" size={48} style={{ color: 'rgba(0,0,0,0.15)', marginBottom: 12 }} />
+                                <IconDisplay name="CalendarDays" size={48} sx={{ color: 'rgba(0,0,0,0.15)', marginBottom: 12 }} />
                                 <Typography fontWeight={600} color="text.secondary">Belum ada rencana.</Typography>
                                 <Typography variant="body2" color="text.disabled">Buat rencana keuanganmu sekarang.</Typography>
                             </Paper>

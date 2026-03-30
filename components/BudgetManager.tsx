@@ -11,10 +11,6 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Grid from '@mui/material/Grid';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import LinearProgress from '@mui/material/LinearProgress';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -30,6 +26,8 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
+import FullScreenDialog from './FullScreenDialog';
+import PageHeader from './PageHeader';
 
 interface BudgetManagerProps {
     budgets: Budget[];
@@ -228,31 +226,38 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
     const isFormValid = draft.name.trim() && Number(draft.limitAmount.replace(/\./g, '')) > 0 && draft.categoryIds.length > 0;
 
     const budgetFormModal = (
-        <Dialog
+        <FullScreenDialog
             open={showForm}
             onClose={resetForm}
-            maxWidth="md"
-            fullWidth
-            slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-            PaperProps={{ sx: { borderRadius: 3 } }}
+            title={draft.budgetId ? 'Edit Anggaran' : 'Anggaran Baru'}
+            description="Pilih kategori pengeluaran yang ingin dipantau, lalu tetapkan batas agar progres anggarannya mudah dibaca."
+            actions={
+                <>
+                    <Button variant="outlined" onClick={resetForm} disabled={saving}>
+                        Batal
+                    </Button>
+                    <Button
+                        type="submit"
+                        form="budget-form"
+                        variant="contained"
+                        disabled={saving || !isFormValid}
+                        startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                    >
+                        {saving ? 'Menyimpan...' : draft.budgetId ? 'Update Anggaran' : 'Simpan Anggaran'}
+                    </Button>
+                </>
+            }
         >
-            <DialogTitle sx={{ px: 3, pt: 3, pb: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
-                <Box>
-                    <Typography variant="h6" fontWeight={700}>
-                        {draft.budgetId ? 'Edit Anggaran' : 'Anggaran Baru'}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 400 }}>
-                        Pilih kategori yang ingin dipantau. Kategori yang sudah dipakai anggaran lain tidak akan muncul di sini.
-                    </Typography>
-                </Box>
-                <IconButton size="small" onClick={resetForm} sx={{ flexShrink: 0 }}>
-                    <IconDisplay name="X" size={18} />
-                </IconButton>
-            </DialogTitle>
+            <Box component="form" id="budget-form" onSubmit={handleSubmit}>
+                <Grid container spacing={2} sx={{ mb: 3, pt: 1 }}>
+                    <Grid size={{ xs: 12 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            Kategori yang sudah dipakai di anggaran lain untuk bulan ini tidak akan ditampilkan agar tidak bentrok.
+                        </Typography>
+                    </Grid>
+                </Grid>
 
-            <DialogContent sx={{ px: 3, pb: 3, pt: 1 }}>
-                <Box component="form" id="budget-form" onSubmit={handleSubmit}>
-                    <Grid container spacing={2} sx={{ mb: 3, pt: 1 }}>
+                <Grid container spacing={2} sx={{ mb: 3 }}>
                         <Grid size={{ xs: 12, md: 7 }}>
                             <TextField
                                 label="Nama Anggaran"
@@ -287,7 +292,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
 
                     {availableCategories.length === 0 ? (
                         <Card variant="outlined" sx={{ p: 4, borderRadius: 3, borderStyle: 'dashed', textAlign: 'center', mb: 3 }}>
-                            <IconDisplay name="Info" size={24} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
+                            <IconDisplay name="Info" size={24} sx={{ color: theme.colors.textMuted, mb: 1 }} />
                             <Typography variant="body2" color="text.secondary">
                                 Semua kategori pengeluaran di bulan ini sudah dipakai anggaran lain.
                             </Typography>
@@ -323,7 +328,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                                                             bgcolor: category.color,
                                                         }}
                                                     >
-                                                        <IconDisplay name={category.icon} size={16} style={{ color: '#fff' }} />
+                                                        <IconDisplay name={category.icon} size={16} sx={{ color: '#fff' }} />
                                                     </Avatar>
                                                     <Box sx={{ minWidth: 0 }}>
                                                         <Typography variant="body2" fontWeight={600} noWrap>{category.name}</Typography>
@@ -339,25 +344,8 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                             })}
                         </Grid>
                     )}
-                </Box>
-            </DialogContent>
-            
-            <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-                <Button variant="outlined" onClick={resetForm} sx={{ borderRadius: 2, fontWeight: 600 }}>
-                    Batal
-                </Button>
-                <Button
-                    type="submit"
-                    form="budget-form"
-                    variant="contained"
-                    disabled={saving || !isFormValid}
-                    startIcon={saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
-                    sx={{ borderRadius: 2, minWidth: 140, fontWeight: 600 }}
-                >
-                    {saving ? 'Menyimpan...' : draft.budgetId ? 'Update Anggaran' : 'Simpan Anggaran'}
-                </Button>
-            </DialogActions>
-        </Dialog>
+            </Box>
+        </FullScreenDialog>
     );
 
     const deleteDialog = (
@@ -498,7 +486,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
 
                     {activeBudgetTransactions.length === 0 ? (
                         <CardContent sx={{ pt: 2, pb: 6, textAlign: 'center' }}>
-                            <IconDisplay name="Receipt" size={48} style={{ color: 'rgba(0,0,0,0.1)', marginBottom: 16 }} />
+                            <IconDisplay name="Receipt" size={48} sx={{ color: 'rgba(0,0,0,0.1)', marginBottom: 16 }} />
                             <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
                                 Belum ada transaksi yang masuk ke anggaran ini.
                             </Typography>
@@ -513,7 +501,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                                     <ListItem alignItems="flex-start" sx={{ px: 3, py: 2 }}>
                                         <ListItemAvatar>
                                             <Avatar sx={{ bgcolor: category?.color || theme.colors.accent, width: 44, height: 44 }}>
-                                                <IconDisplay name={category?.icon || 'Receipt'} size={22} style={{ color: '#fff' }} />
+                                                <IconDisplay name={category?.icon || 'Receipt'} size={22} sx={{ color: '#fff' }} />
                                             </Avatar>
                                         </ListItemAvatar>
                                         <ListItemText 
@@ -555,15 +543,11 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
     // Main budget list view
     return (
         <Box sx={{ pb: { xs: 10, md: 0 } }}>
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-end' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
-                <Box>
-                    <Typography variant="h5" fontWeight={700}>Anggaran</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Buat anggaran yang memang ingin dipantau. Satu anggaran bisa berisi satu atau beberapa kategori.
-                    </Typography>
-                </Box>
-
-                <Box>
+            <PageHeader
+                title="Anggaran"
+                description="Buat anggaran yang memang ingin dipantau. Satu anggaran bisa berisi satu atau beberapa kategori."
+                actions={
+                    <Box>
                     <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.1em', color: 'text.secondary', display: 'block', mb: 1 }}>
                         Bulan Anggaran
                     </Typography>
@@ -595,8 +579,9 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                             <IconDisplay name="ArrowRight" size={18} />
                         </IconButton>
                     </Box>
-                </Box>
-            </Box>
+                    </Box>
+                }
+            />
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
@@ -648,7 +633,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                         <Button
                             fullWidth
                             variant="contained"
-                            startIcon={<IconDisplay name="Plus" size={18} style={{ color: '#fff' }} />}
+                            startIcon={<IconDisplay name="Plus" size={18} sx={{ color: '#fff' }} />}
                             onClick={openCreateForm}
                             sx={{ borderRadius: 2, fontWeight: 600 }}
                         >
@@ -659,7 +644,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
 
                 {summaries.length === 0 ? (
                     <Card variant="outlined" sx={{ p: 6, borderRadius: 3, borderStyle: 'dashed', textAlign: 'center' }}>
-                        <IconDisplay name="PiggyBank" size={40} style={{ color: 'rgba(0,0,0,0.15)', marginBottom: 12 }} />
+                        <IconDisplay name="PiggyBank" size={40} sx={{ color: 'rgba(0,0,0,0.15)', marginBottom: 12 }} />
                         <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
                             Belum ada anggaran di {getMonthLabel(selectedMonth)}.
                         </Typography>

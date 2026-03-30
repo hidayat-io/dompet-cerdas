@@ -14,6 +14,7 @@ import { FinancialAnalysisMode, FinancialAnalysisResult, getFinancialAdvice } fr
 import { Category, Transaction } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
+import PageHeader from './PageHeader';
 
 interface AiAdvisorProps {
   transactions: Transaction[];
@@ -84,7 +85,12 @@ const AiAdvisor: React.FC<AiAdvisorProps> = ({ transactions, categories, onShowN
   const isDark = theme.name === 'dark';
 
   return (
-    <Box className="animate-fade-in-up" sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <PageHeader
+        title="Analisis AI"
+        description="Jalankan insight keuangan dengan struktur tampilan yang sama seperti menu lain, lalu biarkan AI fokus pada data transaksi Anda."
+      />
+
       {/* Hero Banner */}
       <Paper
         elevation={0}
@@ -426,7 +432,7 @@ const AiAdvisor: React.FC<AiAdvisorProps> = ({ transactions, categories, onShowN
                         </Typography>
                       ),
                       strong: ({ children }) => (
-                        <strong style={{ color: theme.colors.textPrimary }}>{children}</strong>
+                        <Box component="strong" sx={{ color: theme.colors.textPrimary }}>{children}</Box>
                       ),
                       code: ({ children }) => (
                         <Box

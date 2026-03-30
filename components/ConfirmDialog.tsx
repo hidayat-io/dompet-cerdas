@@ -62,48 +62,25 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             maxWidth="xs"
             fullWidth
             slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-            PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
         >
-            {/* Colored Header */}
-            <Box
-                sx={{
-                    bgcolor: color,
-                    px: 3,
-                    py: 4,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    gap: 2,
-                }}
-            >
-                <Box
-                    sx={{
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        borderRadius: '50%',
-                        p: 1.5,
-                        display: 'flex',
-                    }}
-                >
-                    <IconDisplay name={displayIcon} size={32} style={{ color: '#fff' }} />
+            <DialogContent sx={{ pt: 3, textAlign: 'center' }}>
+                <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: `${color}18`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+                    <IconDisplay name={displayIcon} size={28} sx={{ color }} />
                 </Box>
-                <Typography variant="h6" fontWeight={700} color="#fff">
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
                     {title}
                 </Typography>
-            </Box>
-
-            {/* Body */}
-            <DialogContent sx={{ pt: 3, pb: 1, textAlign: 'center' }}>
                 {typeof message === 'string' ? (
-                    <Typography variant="body1" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary">
                         {message}
                     </Typography>
                 ) : (
-                    message
+                    <Box sx={{ textAlign: 'left' }}>
+                        {message}
+                    </Box>
                 )}
             </DialogContent>
 
-            {/* Actions */}
             <DialogActions sx={{ px: 3, pb: 3, gap: 1.5 }}>
                 <Button
                     fullWidth
@@ -120,7 +97,6 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     onClick={onConfirm}
                     disabled={isLoading}
                     sx={{
-                        borderRadius: 2,
                         py: 1.25,
                         fontWeight: 600,
                         bgcolor: color,
@@ -131,7 +107,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                         <CircularProgress size={18} sx={{ color: '#fff' }} />
                     ) : (
                         <>
-                            <IconDisplay name={displayIcon} size={18} style={{ color: '#fff', marginRight: 6 }} />
+                            <IconDisplay name={displayIcon} size={18} sx={{ color: '#fff', marginRight: 6 }} />
                             {confirmText}
                         </>
                     )}
@@ -176,7 +152,7 @@ export const Toast: React.FC<ToastProps> = ({
                 onClose={onClose}
                 severity={severity}
                 variant="filled"
-                sx={{ borderRadius: '999px', fontWeight: 600, alignItems: 'center' }}
+                sx={{ fontWeight: 600, alignItems: 'center' }}
             >
                 {message}
             </Alert>

@@ -17,22 +17,18 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import InputAdornment from '@mui/material/InputAdornment';
 import Grid from '@mui/material/Grid';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import Avatar from '@mui/material/Avatar';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import ListSubheader from '@mui/material/ListSubheader';
+import FullScreenDialog from './FullScreenDialog';
+import PageHeader from './PageHeader';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -60,31 +56,27 @@ const AttachmentModal: React.FC<{
   const [isLoading, setIsLoading] = useState(true);
 
   return (
-    <Dialog open onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}>
-      {/* Header */}
-      <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
-        <Typography variant="body2" fontWeight={600} noWrap sx={{ flex: 1, mr: 1 }}>
-          {name}
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton
-            component="a"
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            size="small"
-            title="Buka di tab baru"
-            sx={{ color: 'primary.main' }}
-          >
-            <IconDisplay name="Share" size={18} />
-          </IconButton>
-          <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>
-            <IconDisplay name="X" size={18} />
-          </IconButton>
-        </Box>
-      </Box>
-
-      <DialogContent sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400, bgcolor: 'background.default' }}>
+    <FullScreenDialog
+      open
+      onClose={onClose}
+      title={name}
+      description="Preview lampiran transaksi dalam tampilan yang konsisten dengan modal lain."
+      headerActions={
+        <IconButton
+          component="a"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          size="small"
+          title="Buka di tab baru"
+          sx={{ color: 'primary.main' }}
+        >
+          <IconDisplay name="Share" size={18} />
+        </IconButton>
+      }
+      contentSx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
         {isLoading && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <CircularProgress />
@@ -109,8 +101,8 @@ const AttachmentModal: React.FC<{
             sx={{ width: '100%', height: '70vh', border: '1px solid', borderColor: 'divider', borderRadius: 2, display: isLoading ? 'none' : 'block' }}
           />
         )}
-      </DialogContent>
-    </Dialog>
+      </Box>
+    </FullScreenDialog>
   );
 };
 
@@ -304,6 +296,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     setEndDate(formatDateLocal(new Date(selectedYear, monthIndex + 1, 0)));
   };
 
+  const todayKey = formatDateLocal(new Date());
+
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
     setStartDate(formatDateLocal(new Date(year, selectedMonthIndex, 1)));
@@ -376,20 +370,20 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
         </Grid>
 
         {/* Header + Filter Toggle */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, gap: 2 }}>
-          <Typography variant="h5" fontWeight={700} sx={{ display: { xs: 'none', md: 'block' } }}>
-            Riwayat Transaksi
-          </Typography>
-          <Button
-            variant="outlined"
-            onClick={() => setShowFilters(!showFilters)}
-            startIcon={<IconDisplay name="Filter" size={16} />}
-            endIcon={<IconDisplay name={showFilters ? 'ArrowUp' : 'ArrowDown'} size={14} />}
-            sx={{ borderRadius: 3, fontWeight: 600, ml: { xs: 0, md: 'auto' } }}
-          >
-            {getFilterLabel()}
-          </Button>
-        </Box>
+        <PageHeader
+          title="Riwayat Transaksi"
+          description="Lihat, cari, dan saring transaksi dengan pola tampilan yang sama seperti menu lainnya."
+          actions={
+            <Button
+              variant="outlined"
+              onClick={() => setShowFilters(!showFilters)}
+              startIcon={<IconDisplay name="Filter" size={16} />}
+              endIcon={<IconDisplay name={showFilters ? 'ArrowUp' : 'ArrowDown'} size={14} />}
+            >
+              {getFilterLabel()}
+            </Button>
+          }
+        />
 
         {/* Filter Panel */}
         {showFilters && (
@@ -663,7 +657,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
         {filteredTransactions.length === 0 && (
           <Card variant="outlined" sx={{ py: 8, borderRadius: 4, textAlign: 'center', mb: 2 }}>
             <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
-              <IconDisplay name="Search" size={32} style={{ color: 'var(--text-muted)' }} />
+              <IconDisplay name="Search" size={32} sx={{ color: theme.colors.textMuted }} />
             </Box>
             <Typography variant="h6" fontWeight={700} color="text.secondary">Tidak ada transaksi ditemukan</Typography>
             <Typography variant="body2" color="text.disabled" sx={{ mt: 1, px: 4 }}>
@@ -676,38 +670,67 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
 
         {/* Transactions grouped by date */}
         {filteredTransactions.length > 0 && (
-          <Card variant="outlined" sx={{ borderRadius: 4, overflow: 'hidden', mb: 2 }}>
-            <List disablePadding sx={{ bgcolor: 'background.paper' }}>
-              {Object.entries(groupedTransactions).map(([date, txs], groupIdx) => {
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+              {Object.entries(groupedTransactions).map(([date, txs]) => {
                 const transactionsForDate = txs as Transaction[];
                 const { dayDate, dayName, monthYear } = getDateParts(date);
                 const dailyTotal = calculateDailyTotal(transactionsForDate);
+                const isToday = date === todayKey;
 
                 return (
-                  <React.Fragment key={date}>
-                    {groupIdx > 0 && <Divider component="li" sx={{ borderBottomWidth: 4, borderColor: 'action.hover' }} />}
-                    <ListSubheader 
-                      component="li"
-                      disableSticky
-                      sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
+                  <Card
+                    key={date}
+                    variant="outlined"
+                    sx={{
+                      overflow: 'hidden',
+                      borderRadius: 4,
+                      borderColor: isToday ? 'primary.main' : 'divider',
+                      boxShadow: isToday ? `0 0 0 1px ${theme.colors.accent}22` : 'none',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        bgcolor: 'background.paper',
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
+                        gap: 2,
                         px: { xs: 2.5, md: 3 },
                         py: 2,
-                        lineHeight: 1
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        background: isToday
+                          ? `linear-gradient(135deg, ${theme.colors.accentLight} 0%, ${theme.colors.bgCard} 100%)`
+                          : 'linear-gradient(180deg, rgba(148,163,184,0.06) 0%, rgba(148,163,184,0.02) 100%)',
                       }}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography sx={{ fontSize: 32, fontWeight: 300, lineHeight: 1, letterSpacing: '-1px', color: 'text.primary' }}>
-                          {dayDate}
-                        </Typography>
+                        <Box
+                          sx={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: 3,
+                            bgcolor: isToday ? 'primary.main' : 'background.paper',
+                            color: isToday ? '#fff' : 'text.primary',
+                            border: '1px solid',
+                            borderColor: isToday ? 'primary.main' : 'divider',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: isToday ? `0 12px 24px ${theme.colors.accent}25` : 'none',
+                          }}
+                        >
+                          <Typography sx={{ fontSize: 30, fontWeight: 300, lineHeight: 1, letterSpacing: '-1px', color: 'inherit' }}>
+                            {dayDate}
+                          </Typography>
+                        </Box>
                         <Box>
-                          <Typography variant="subtitle2" fontWeight={700} color="text.primary" lineHeight={1.2}>{dayName}</Typography>
-                          <Typography variant="caption" color="text.secondary" fontWeight={500}>{monthYear}</Typography>
+                          <Typography variant="h6" fontWeight={700} color="text.primary" lineHeight={1.2}>
+                            {dayName}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                            {monthYear}
+                          </Typography>
                         </Box>
                       </Box>
                       <Chip
@@ -721,8 +744,9 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                           borderRadius: 2,
                         }}
                       />
-                    </ListSubheader>
+                    </Box>
 
+                    <List disablePadding sx={{ bgcolor: 'background.paper' }}>
                     {transactionsForDate.map((t, idx, arr) => {
                       const cat = categories.find(c => c.id === t.categoryId);
                       const isIncome = cat?.type === 'INCOME';
@@ -736,12 +760,15 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                         <React.Fragment key={t.id}>
                           <ListItemButton 
                             sx={{ 
-                              py: 2, 
+                              py: 2,
                               px: { xs: 2.5, md: 3 },
                               transition: 'all 0.2s',
                               transform: longPressedId === t.id ? 'scale(0.98)' : 'none',
                               opacity: longPressedId === t.id ? 0.7 : 1,
                               bgcolor: longPressedId === t.id ? theme.colors.accentLight : 'transparent',
+                              '&:hover': {
+                                bgcolor: 'action.hover',
+                              },
                             }}
                             onTouchStart={() => handleTouchStart(t)}
                             onTouchEnd={handleTouchEnd}
@@ -752,7 +779,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                           >
                             <ListItemAvatar>
                               <Avatar sx={{ bgcolor: cat?.color || theme.colors.bgHover, width: 44, height: 44 }}>
-                                <IconDisplay name={cat?.icon || 'HelpCircle'} size={22} style={{ color: '#fff' }} />
+                                <IconDisplay name={cat?.icon || 'HelpCircle'} size={22} sx={{ color: '#fff' }} />
                               </Avatar>
                             </ListItemAvatar>
                             <ListItemText 
@@ -792,15 +819,15 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                               {isIncome ? '+' : '-'}{formatRp(t.amount)}
                             </Typography>
                           </ListItemButton>
-                          {idx < arr.length - 1 && <Divider component="li" variant="inset" />}
+                          {idx < arr.length - 1 && <Divider component="li" variant="inset" sx={{ ml: { xs: 9, md: 10 } }} />}
                         </React.Fragment>
                       );
                     })}
-                  </React.Fragment>
+                    </List>
+                  </Card>
                 );
               })}
-            </List>
-          </Card>
+          </Box>
         )}
       </Box>
 

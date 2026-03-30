@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.7.0
+# DompetCerdas - Smart Expense Tracker v2.7.1
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -10,6 +10,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ### 🌐 Web Application
 - Multi-`Akun Keuangan` untuk pisah data pribadi, keluarga, bisnis, atau bersama
+- Kolaborasi sederhana untuk `Akun Keuangan` bersama: anggota, kode gabung, dan data shared lintas user
 - Dashboard with expense analytics
 - Manual transaction entry
 - Category management
@@ -37,13 +38,24 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - `Rencana` menggantikan `Simulasi`
 - `Anggaran` berbasis budget plan, bukan auto-render semua kategori
 - `Hutang Piutang` saat ini **tidak otomatis mempengaruhi saldo** karena masih diposisikan sebagai modul tracking terpisah dari transaksi
+- Dashboard sekarang punya toggle untuk menyembunyikan nominal saldo saat dibuka di depan orang lain
+- Riwayat transaksi sekarang dikelompokkan per hari dengan card terpisah agar perbedaan tanggal lebih mudah discan
 - Deploy hosting sekarang wajib lewat smoke check agar root `/` dan route SPA tetap aman setelah rilis
 
 ## Current Release
 
-- **Version**: `v2.7.0`
-- **Build Date**: `March 29, 2026`
-- **Status**: Internal testing build yang sudah mencakup phase 0 sampai phase 10
+- **Version**: `v2.7.1`
+- **Build Date**: `March 30, 2026`
+- **Status**: Internal testing build dengan standardisasi UI Material UI, full-screen form flow, dan polishing transaksi/dashboard
+
+## Changelog
+
+### v2.7.1 - March 30, 2026
+- Standardisasi UI lintas menu agar lebih konsisten berbasis Material UI, termasuk `PageHeader`, `FullScreenDialog`, confirm dialog, notification dialog, dan attachment preview.
+- Semua form utama dipindah ke pola full-screen agar pengalaman create/edit lebih seragam di transaksi, kategori, anggaran, rencana, hutang piutang, onboarding, dan penghapusan massal.
+- Riwayat transaksi diperjelas dengan grouping per hari berbasis card terpisah, header tanggal yang lebih kuat, dan pembersihan elemen header yang redundant.
+- Dashboard mendapat toggle untuk menyembunyikan nominal `Total Saldo`, dan form transaksi dibersihkan dari note lampiran yang duplikat serta glitch label `Catatan`.
+- Hosting frontend sudah dideploy dan diverifikasi lewat smoke check untuk `/` dan `/link-telegram`.
 
 ## Tech Stack
 
@@ -105,6 +117,14 @@ npm run deploy:hosting:safe
 - [deploy/DEPLOY_GUIDE.md](./deploy/DEPLOY_GUIDE.md) - Panduan deploy dan smoke check hosting
 - [TESTING.md](./TESTING.md) - Panduan test bot dan regression checklist
 
+## Workflow
+
+### Lakukan finishing
+- Cek dokumentasi yang relevan dan pastikan perubahan fitur, bug fix, atau polishing yang baru memang sudah tercatat.
+- Update versi app dan dokumentasi, lalu tulis changelog untuk versi terbaru.
+- Jalankan `git commit` dan `git push`.
+- Deploy bila perubahan belum dirilis.
+
 ## Environment Variables
 
 ### Web App (.env.local)
@@ -132,7 +152,7 @@ GEMINI_API_KEY=your_gemini_api_key
 - Phase 7: voice note Telegram dengan transkrip + preview + confirm
 - Phase 8: modul `Hutang Piutang` + redesign UX yang lebih sederhana
 - Phase 9: onboarding user baru, helper dashboard, dan panduan singkat
-- Phase 10: migrasi UI ke Material UI (MUI) — semua komponen pakai MUI, icons ke `@mui/icons-material`, hapus `lucide-react`
+- Phase 10: kolaborasi `Akun Keuangan` bersama dengan anggota, kode gabung, dan shared data lintas user
 
 ## License
 

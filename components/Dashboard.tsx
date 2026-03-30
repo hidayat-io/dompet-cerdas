@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer
 } from 'recharts';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
 import Chip from '@mui/material/Chip';
@@ -20,6 +21,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Avatar from '@mui/material/Avatar';
 import { Transaction, Category, Budget } from '../types';
 import IconDisplay from './IconDisplay';
+import PageHeader from './PageHeader';
 import { useTheme } from '../contexts/ThemeContext';
 import { getBudgetOverview, getBudgetSummaries, getMonthKey } from '../utils/budget';
 
@@ -49,6 +51,15 @@ const Dashboard: React.FC<DashboardProps> = ({
   onOpenOnboarding,
 }) => {
   const { theme } = useTheme();
+  const [hideBalance, setHideBalance] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('dompetcerdas_hide_balance') === 'true';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('dompetcerdas_hide_balance', hideBalance ? 'true' : 'false');
+  }, [hideBalance]);
 
   const totalIncome = transactions
     .filter(t => categories.find(c => c.id === t.categoryId)?.type === 'INCOME')
@@ -75,6 +86,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const formatRp = (val: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+  const formatSensitiveValue = (val: number) => hideBalance ? 'Rp ••••••' : formatRp(val);
 
   const currentDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -93,12 +105,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <Box sx={{ pb: { xs: 12, md: 0 } }}>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="caption" fontWeight={600} textTransform="uppercase" letterSpacing="0.14em" color="text.disabled">
-          {currentDate}
-        </Typography>
-        <Typography variant="h5" fontWeight={700}>Ringkasan Keuangan</Typography>
-      </Box>
+      <PageHeader
+        eyebrow={currentDate}
+        title="Ringkasan Keuangan"
+        description={`Pantau saldo, anggaran, dan aktivitas terbaru untuk ${activeAccountName} dalam satu pola tampilan yang konsisten.`}
+      />
 
       {/* Getting Started Card */}
       {showGettingStarted && (
@@ -107,7 +118,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
               <Box sx={{ maxWidth: 560 }}>
                 <Chip
-                  icon={<IconDisplay name="Sparkles" size={14} style={{ color: theme.colors.accent }} />}
+                  icon={<IconDisplay name="Sparkles" size={14} sx={{ color: theme.colors.accent }} />}
                   label="Mulai Dari Sini"
                   size="small"
                   sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', mb: 1.5 }}
@@ -172,32 +183,46 @@ const Dashboard: React.FC<DashboardProps> = ({
       >
         <Box sx={{ position: 'absolute', top: -20, right: -20, width: 140, height: 140, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)', filter: 'blur(24px)' }} />
         <CardContent sx={{ p: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, opacity: 0.9 }}>
-            <IconDisplay name="Wallet" size={20} style={{ color: '#c7d2fe' }} />
-            <Typography variant="overline" fontWeight={600} letterSpacing={1.5}>Total Saldo</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.9 }}>
+              <IconDisplay name="Wallet" size={20} sx={{ color: '#c7d2fe' }} />
+              <Typography variant="overline" fontWeight={600} letterSpacing={1.5}>Total Saldo</Typography>
+            </Box>
+            <IconButton
+              size="small"
+              onClick={() => setHideBalance((prev) => !prev)}
+              sx={{
+                color: '#fff',
+                bgcolor: 'rgba(255,255,255,0.12)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              }}
+              aria-label={hideBalance ? 'Tampilkan total saldo' : 'Sembunyikan total saldo'}
+            >
+              <IconDisplay name="Eye" size={18} sx={{ color: '#fff', opacity: hideBalance ? 0.7 : 1 }} />
+            </IconButton>
           </Box>
-          <Typography variant="h3" fontWeight={700} sx={{ mb: 4, letterSpacing: '-0.02em' }}>{formatRp(balance)}</Typography>
+          <Typography variant="h3" fontWeight={700} sx={{ mb: 4, letterSpacing: '-0.02em' }}>{formatSensitiveValue(balance)}</Typography>
           
           <Grid container spacing={2}>
             <Grid size={{ xs: 6 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)', borderRadius: 3, p: 2, border: '1px solid rgba(255,255,255,0.1)' }}>
                 <Avatar sx={{ width: 36, height: 36, bgcolor: 'rgba(96,165,250,0.2)' }}>
-                  <IconDisplay name="TrendingUp" size={18} style={{ color: '#93c5fd' }} />
+                  <IconDisplay name="TrendingUp" size={18} sx={{ color: '#93c5fd' }} />
                 </Avatar>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#c7d2fe', textTransform: 'uppercase', letterSpacing: 1, display: 'block' }}>Pemasukan</Typography>
-                  <Typography variant="subtitle1" fontWeight={700}>{formatRp(totalIncome)}</Typography>
+                  <Typography variant="subtitle1" fontWeight={700}>{formatSensitiveValue(totalIncome)}</Typography>
                 </Box>
               </Box>
             </Grid>
             <Grid size={{ xs: 6 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)', borderRadius: 3, p: 2, border: '1px solid rgba(255,255,255,0.1)' }}>
                 <Avatar sx={{ width: 36, height: 36, bgcolor: 'rgba(248,113,113,0.2)' }}>
-                  <IconDisplay name="TrendingDown" size={18} style={{ color: '#fca5a5' }} />
+                  <IconDisplay name="TrendingDown" size={18} sx={{ color: '#fca5a5' }} />
                 </Avatar>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#c7d2fe', textTransform: 'uppercase', letterSpacing: 1, display: 'block' }}>Pengeluaran</Typography>
-                  <Typography variant="subtitle1" fontWeight={700}>{formatRp(totalExpense)}</Typography>
+                  <Typography variant="subtitle1" fontWeight={700}>{formatSensitiveValue(totalExpense)}</Typography>
                 </Box>
               </Box>
             </Grid>
@@ -234,7 +259,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                  <IconDisplay name={card.icon} size={18} style={{ color: card.iconColor }} />
+                  <IconDisplay name={card.icon} size={18} sx={{ color: card.iconColor }} />
                   <Typography variant="overline" fontWeight={700} lineHeight={1} color="text.secondary">
                     {card.label}
                   </Typography>
@@ -278,7 +303,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <ListItem disableGutters sx={{ py: 1.5 }}>
                       <ListItemAvatar>
                         <Avatar sx={{ bgcolor: item.color, width: 36, height: 36 }}>
-                          <IconDisplay name={item.icon} size={18} style={{ color: '#fff' }} />
+                          <IconDisplay name={item.icon} size={18} sx={{ color: '#fff' }} />
                         </Avatar>
                       </ListItemAvatar>
                       <ListItemText 
@@ -294,7 +319,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </Box>
           ) : (
             <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'text.disabled' }}>
-              <IconDisplay name="PieChart" size={64} style={{ opacity: 0.15 }} />
+              <IconDisplay name="PieChart" size={64} sx={{ opacity: 0.15 }} />
               <Typography variant="body1" sx={{ mt: 2 }}>Belum ada pengeluaran tercatat.</Typography>
             </Box>
           )}
@@ -317,7 +342,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       <Card variant="outlined" sx={{ borderRadius: 4 }}>
         {transactions.length === 0 ? (
           <CardContent sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'text.disabled' }}>
-             <IconDisplay name="Inbox" size={48} style={{ opacity: 0.2 }} />
+             <IconDisplay name="Inbox" size={48} sx={{ opacity: 0.2 }} />
              <Typography variant="body2" sx={{ mt: 2 }}>Belum ada transaksi di bulan ini.</Typography>
           </CardContent>
         ) : (

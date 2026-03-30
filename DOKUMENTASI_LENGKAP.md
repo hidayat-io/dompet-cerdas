@@ -1,9 +1,10 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.7.0
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.7.1
 
 **Status**: ✅ Fully Documented
-**Last Updated**: March 29, 2026
-**Version**: 2.7.0
-**Live URL**: https://dompas.indoomega.my.id
+**Last Updated**: March 30, 2026
+**Version**: 2.7.1
+**Latest Test URL**: https://expensetracker-test-1.web.app
+**Custom Domain**: https://dompas.indoomega.my.id
 
 ---
 
@@ -16,8 +17,12 @@
 
 **Key Features**:
 - ✅ UI konsisten berbasis **Material UI** — semua komponen pakai MUI, dark/light mode via MUI ThemeProvider
+- ✅ Standardisasi layout lintas menu dengan `PageHeader`, `FullScreenDialog`, dan default MUI component overrides
 - ✅ Multi-`Akun Keuangan` untuk memisahkan data pribadi, keluarga, bisnis, atau bersama
+- ✅ Kolaborasi sederhana untuk akun bersama: anggota, kode gabung, dan shared data lintas user
 - ✅ Dashboard dengan pie chart breakdown
+- ✅ Toggle privasi untuk sembunyikan nominal saldo di dashboard
+- ✅ Riwayat transaksi per hari dalam card terpisah dengan header tanggal yang lebih jelas
 - ✅ Receipt scanning via Telegram (Vision API)
 - ✅ Natural language queries ("berapa pengeluaran hari ini?")
 - ✅ Preview + confirm sebelum transaksi Telegram disimpan
@@ -67,6 +72,8 @@ dompet_cerdas/
 │   ├── BudgetManager.tsx           # Anggaran berbasis budget plan
 │   ├── DebtManager.tsx             # Hutang Piutang
 │   ├── OnboardingModal.tsx         # Panduan singkat user baru
+│   ├── PageHeader.tsx              # Reusable page heading
+│   ├── FullScreenDialog.tsx        # Reusable full-screen dialog wrapper
 │   ├── TransactionList.tsx         # Transaction history with filters
 │   ├── TransactionForm.tsx         # Add/edit transaction modal
 │   ├── CategoryManager.tsx         # CRUD categories
@@ -167,6 +174,7 @@ dompet_cerdas/
 
 ### 1️⃣ Dashboard (Web App)
 - **Balance Summary**: Total income, expense, current balance
+- **Privacy Toggle**: Nominal saldo, pemasukan, dan pengeluaran bisa disembunyikan sementara dari dashboard
 - **Pie Chart**: Expense breakdown by category dengan persentase
 - **Recent Transactions**: Last 10 transactions grouped by date, newest first
 - **Getting Started Card**: Muncul saat akun masih kosong untuk membantu user baru mulai dari langkah yang paling aman
@@ -180,10 +188,11 @@ dompet_cerdas/
 
 ### 3️⃣ Transaksi (Transactions)
 - **CRUD**: Add, edit, delete transactions
+- **Full-Screen Form Flow**: Tambah dan edit transaksi memakai pola dialog full-screen yang seragam
 - **Attachments**: JPG, PNG, GIF, WEBP, PDF support dengan preview
 - **Image Compression**: Auto-compress images sebelum upload
 - **Filters**: By month, by date range, by category
-- **Grouping**: Grouped by date dengan smart sorting
+- **Grouping**: Riwayat dikelompokkan per hari dalam card terpisah dengan header tanggal yang lebih kuat
 - **Search**: Search by description
 - **Mobile UX**: Filter panel toggle pada mobile
 
@@ -202,7 +211,7 @@ dompet_cerdas/
 - **Icon Selection**: 150+ Material icons (`@mui/icons-material`)
 - **Color Picker**: 8 preset colors
 - **Type Classification**: Income or Expense
-- **Reusable Modal**: Consistent UX across app
+- **Reusable Modal**: Consistent UX across app dengan pola full-screen saat create/edit
 
 ### 6️⃣ Anggaran
 - **Budget Plan Bulanan**: User membuat anggaran yang ingin dipantau, bukan semua kategori sekaligus
@@ -229,7 +238,7 @@ dompet_cerdas/
 - **Riwayat Pembayaran**: Setiap pembayaran tersimpan dengan tanggal dan catatan
 - **Status Sederhana**: Belum lunas, bayar sebagian, dan lunas
 - **Jatuh Tempo**: Tampilkan catatan yang sudah lewat jatuh tempo
-- **Modal Form**: Tambah, edit, catat pembayaran, dan tandai lunas via popup modal
+- **Modal Form**: Tambah, edit, catat pembayaran, dan tandai lunas via full-screen dialog
 - **Separate Tracking**: Saat ini modul ini **tidak otomatis mengubah saldo** karena masih diposisikan sebagai tracker terpisah dari transaksi utama
 
 ### 9️⃣ Excel Export
@@ -480,6 +489,15 @@ firebase deploy --only firestore:indexes # indexes
 4. smoke check route SPA `/link-telegram`
 5. verifikasi asset JS/CSS utama bisa diakses
 
+### Workflow Standard: Lakukan finishing
+
+Kalau instruksi yang dipakai adalah `Lakukan finishing`, artinya langkah berikut wajib dijalankan:
+
+1. cek dokumentasi yang relevan dan pastikan perubahan terbaru sudah tercatat
+2. update versi app dan dokumentasi, lalu tambahkan changelog untuk versi terbaru
+3. `git commit` dan `git push`
+4. deploy bila perubahan belum dirilis
+
 ---
 
 ## 🗺️ Phase Summary
@@ -506,8 +524,10 @@ Berikut ringkasan implementasi phase yang sudah selesai:
    Modul tracking hutang/piutang dengan redesign UX lebih sederhana.
 10. **Phase 9 - Polish, Onboarding, and Adoption**
     Onboarding user baru, helper dashboard, dan panduan singkat di Settings.
-11. **Phase 10 - Material UI Migration**
-    Seluruh komponen dimigrasikan ke MUI (`@mui/material`, `@mui/icons-material`). Tailwind className dan inline styles diganti dengan `sx` prop dan MUI components. `lucide-react` dihapus dari dependencies. ThemeContext dibungkus MUI ThemeProvider.
+11. **Phase 10 - Collaboration**
+    Akun bersama sekarang benar-benar shared lintas user, punya daftar anggota, kode gabung, dan akses data yang sama untuk transaksi, kategori, rencana, anggaran, dan hutang piutang.
+12. **Phase 11 - UI Standardization & Finishing Workflow**
+    Standardisasi Material UI lintas menu, pola full-screen form, grouping transaksi per hari, toggle privasi saldo dashboard, dan SOP `Lakukan finishing` untuk dokumentasi, versioning, git, serta deploy.
 
 ### Telegram Webhook Setup
 
@@ -830,11 +850,21 @@ firebase functions:log
 
 ---
 
+## 🧾 Changelog
+
+### v2.7.1 - March 30, 2026
+- Standardisasi UI lintas menu agar lebih konsisten berbasis Material UI, termasuk `PageHeader`, `FullScreenDialog`, confirm dialog, notification dialog, dan attachment preview.
+- Semua form utama dipindah ke pola full-screen agar pengalaman create/edit lebih seragam di transaksi, kategori, anggaran, rencana, hutang piutang, onboarding, dan beberapa aksi pengaturan.
+- Riwayat transaksi diperjelas dengan grouping per hari berbasis card terpisah, header tanggal yang lebih kuat, serta penghapusan elemen header yang redundant.
+- Dashboard mendapat toggle untuk menyembunyikan nominal `Total Saldo`, dan form transaksi dibersihkan dari note lampiran duplikat serta glitch label `Catatan`.
+- Workflow `Lakukan finishing` sekarang resmi jadi standar untuk sinkronisasi dokumentasi, bump versi, git, dan deploy setelah fitur atau bug fix selesai.
+
 ## 🔄 Version History
 
 | Version | Date | Highlights |
 |---------|------|-----------|
-| **v2.7.0** | Mar 29, 2026 | Migrasi UI ke Material UI — semua komponen MUI, icons ke `@mui/icons-material`, hapus `lucide-react` |
+| **v2.7.1** | Mar 30, 2026 | Standardisasi UI Material UI, full-screen form flow, grouping transaksi per hari, hide saldo dashboard, dan SOP finishing |
+| **v2.7.0** | Mar 29, 2026 | Kolaborasi akun bersama: anggota, kode gabung, dan shared data lintas user |
 | **v2.6.0** | Mar 28, 2026 | Akun Keuangan, Rencana, Anggaran, Telegram multi-input + voice, Hutang Piutang, onboarding |
 | **v2.2.2** | Feb 2, 2026 | Document upload support, caption parsing, compression |
 | **v2.2.1** | Jan 30, 2026 | Gemini model fix, list categories, smarter NLU |
@@ -857,6 +887,6 @@ firebase functions:log
 
 ---
 
-**Last Updated**: March 29, 2026
+**Last Updated**: March 30, 2026
 **Status**: ✅ Internal Testing Ready
 **Support**: Check documentation or Firebase console logs

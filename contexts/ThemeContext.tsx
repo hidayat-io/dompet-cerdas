@@ -157,7 +157,104 @@ function buildMuiTheme(t: Theme) {
             borderRadius: 12,
         },
         components: {
+            MuiAppBar: {
+                styleOverrides: {
+                    root: {
+                        backgroundImage: 'none',
+                        boxShadow: 'none',
+                    },
+                },
+            },
             MuiButton: {
+                styleOverrides: {
+                    root: {
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        borderRadius: 10,
+                    },
+                },
+            },
+            MuiCard: {
+                defaultProps: {
+                    variant: 'outlined',
+                },
+                styleOverrides: {
+                    root: {
+                        borderRadius: 16,
+                    },
+                },
+            },
+            MuiChip: {
+                styleOverrides: {
+                    root: {
+                        borderRadius: 999,
+                        fontWeight: 600,
+                    },
+                },
+            },
+            MuiDialog: {
+                defaultProps: {
+                    fullWidth: true,
+                },
+                styleOverrides: {
+                    paper: {
+                        backgroundImage: 'none',
+                    },
+                },
+            },
+            MuiDialogTitle: {
+                styleOverrides: {
+                    root: {
+                        padding: '16px 24px',
+                    },
+                },
+            },
+            MuiDialogContent: {
+                styleOverrides: {
+                    root: {
+                        padding: '24px',
+                    },
+                },
+            },
+            MuiDialogActions: {
+                styleOverrides: {
+                    root: {
+                        padding: '16px 24px',
+                    },
+                },
+            },
+            MuiFormControl: {
+                defaultProps: {
+                    fullWidth: true,
+                    size: 'small',
+                },
+            },
+            MuiIconButton: {
+                styleOverrides: {
+                    root: {
+                        borderRadius: 10,
+                    },
+                },
+            },
+            MuiOutlinedInput: {
+                styleOverrides: {
+                    root: {
+                        borderRadius: 12,
+                    },
+                },
+            },
+            MuiPaper: {
+                defaultProps: {
+                    variant: 'outlined',
+                },
+                styleOverrides: {
+                    root: {
+                        backgroundImage: 'none',
+                        borderRadius: 16,
+                    },
+                },
+            },
+            MuiTab: {
                 styleOverrides: {
                     root: {
                         textTransform: 'none',
@@ -165,10 +262,19 @@ function buildMuiTheme(t: Theme) {
                     },
                 },
             },
-            MuiPaper: {
+            MuiTabs: {
                 styleOverrides: {
                     root: {
-                        backgroundImage: 'none',
+                        minHeight: 40,
+                    },
+                },
+            },
+            MuiToggleButton: {
+                styleOverrides: {
+                    root: {
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        borderRadius: 10,
                     },
                 },
             },

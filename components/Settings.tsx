@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTheme, themes } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
 import { Toast } from './ConfirmDialog';
-import { Transaction, Category, FinancialAccount, AccountType } from '../types';
+import { Transaction, Category, FinancialAccount, AccountType, SharedAccountMember } from '../types';
 import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
 import { APP_VERSION, APP_BUILD_DATE } from '../constants';
 import { getAccountTypeLabel, sanitizeAccountNameForFilename } from '../utils/accountLabels';
@@ -16,12 +16,12 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Grid from '@mui/material/Grid';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
 import Switch from '@mui/material/Switch';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
+import PageHeader from './PageHeader';
+import FullScreenDialog from './FullScreenDialog';
 
 interface SettingsProps {
     accounts: FinancialAccount[];
@@ -29,9 +29,13 @@ interface SettingsProps {
     activeAccountName: string | null;
     telegramLinked: boolean;
     telegramDefaultAccountId: string | null;
+    activeSharedInviteCode: string | null;
+    sharedAccountMembers: SharedAccountMember[];
     onOpenOnboarding: () => void;
     onUpdateTelegramAccount: (accountId: string) => Promise<void>;
     onCreateAccount: (name: string, type: AccountType) => Promise<void>;
+    onGenerateSharedInviteCode: () => Promise<void>;
+    onJoinSharedAccount: (code: string) => Promise<void>;
     onSwitchAccount: (accountId: string) => Promise<void>;
     onDeleteAllTransactions: () => Promise<void>;
     transactionCount: number;
@@ -45,9 +49,13 @@ const Settings: React.FC<SettingsProps> = ({
     activeAccountName,
     telegramLinked,
     telegramDefaultAccountId,
+    activeSharedInviteCode,
+    sharedAccountMembers,
     onOpenOnboarding,
     onUpdateTelegramAccount,
     onCreateAccount,
+    onGenerateSharedInviteCode,
+    onJoinSharedAccount,
     onSwitchAccount,
     onDeleteAllTransactions,
     transactionCount,
@@ -61,6 +69,9 @@ const Settings: React.FC<SettingsProps> = ({
     const [newAccountName, setNewAccountName] = useState('');
     const [newAccountType, setNewAccountType] = useState<AccountType>('PERSONAL');
     const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+    const [joinCode, setJoinCode] = useState('');
+    const [isJoiningShared, setIsJoiningShared] = useState(false);
+    const [isGeneratingInviteCode, setIsGeneratingInviteCode] = useState(false);
 
     const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({
         show: false, message: '', type: 'success'
@@ -139,10 +150,56 @@ const Settings: React.FC<SettingsProps> = ({
 
     const activeAccount = accounts.find((a) => a.id === activeAccountId) || null;
     const telegramAccount = accounts.find((a) => a.id === telegramDefaultAccountId) || null;
+    const isSharedAccountActive = !!activeAccount?.sharedAccountId;
+
+    const handleGenerateInviteCode = async () => {
+        if (!isSharedAccountActive) return;
+        setIsGeneratingInviteCode(true);
+        try {
+            await onGenerateSharedInviteCode();
+        } catch (error) {
+            console.error('Error generating invite code:', error);
+            setToast({ show: true, message: 'Gagal membuat kode gabung. Silakan coba lagi.', type: 'error' });
+        } finally {
+            setIsGeneratingInviteCode(false);
+        }
+    };
+
+    const handleJoinSharedAccount = async () => {
+        if (!joinCode.trim()) {
+            setToast({ show: true, message: 'Masukkan kode gabung terlebih dahulu.', type: 'info' });
+            return;
+        }
+
+        setIsJoiningShared(true);
+        try {
+            await onJoinSharedAccount(joinCode);
+            setJoinCode('');
+        } catch (error) {
+            console.error('Error joining shared account:', error);
+            setToast({ show: true, message: 'Kode gabung tidak valid atau akun belum bisa diakses.', type: 'error' });
+        } finally {
+            setIsJoiningShared(false);
+        }
+    };
+
+    const handleCopyInviteCode = async () => {
+        if (!activeSharedInviteCode) return;
+        try {
+            await navigator.clipboard.writeText(activeSharedInviteCode);
+            setToast({ show: true, message: 'Kode gabung berhasil disalin.', type: 'success' });
+        } catch (error) {
+            console.error('Error copying invite code:', error);
+            setToast({ show: true, message: 'Gagal menyalin kode gabung.', type: 'error' });
+        }
+    };
 
     return (
         <Box sx={{ pb: { xs: 10, md: 0 } }}>
-            <Typography variant="h5" fontWeight={700} sx={{ mb: 3 }}>Pengaturan</Typography>
+            <PageHeader
+                title="Pengaturan"
+                description="Kelola akun keuangan, integrasi Telegram, tema, export, dan tindakan administratif dalam pola yang sama."
+            />
 
             {/* Financial Accounts */}
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
@@ -231,6 +288,124 @@ const Settings: React.FC<SettingsProps> = ({
                 </Grid>
             </Paper>
 
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Kolaborasi</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            Gabung ke akun bersama pakai kode, atau bagikan kode dari akun bersama yang sedang aktif.
+                        </Typography>
+                    </Box>
+                    <Chip
+                        label={isSharedAccountActive ? 'Akun bersama aktif' : 'Belum di akun bersama'}
+                        size="small"
+                        sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, flexShrink: 0 }}
+                    />
+                </Box>
+
+                <Grid container spacing={2} sx={{ mb: isSharedAccountActive ? 3 : 0 }}>
+                    <Grid size={{ xs: 12, md: 8 }}>
+                        <TextField
+                            label="Kode gabung"
+                            size="small"
+                            fullWidth
+                            placeholder="Contoh: AB12CD34"
+                            value={joinCode}
+                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            disabled={isJoiningShared}
+                            onClick={handleJoinSharedAccount}
+                            startIcon={isJoiningShared ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name="Users" size={16} />}
+                            sx={{ borderRadius: 2, height: 40 }}
+                        >
+                            {isJoiningShared ? 'Menghubungkan...' : 'Gabung Akun'}
+                        </Button>
+                    </Grid>
+                </Grid>
+
+                {isSharedAccountActive && (
+                    <>
+                        <Divider sx={{ mb: 3 }} />
+
+                        <Grid container spacing={2} sx={{ mb: 3 }}>
+                            <Grid size={{ xs: 12, md: 8 }}>
+                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary">
+                                        Kode Gabung Aktif
+                                    </Typography>
+                                    <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
+                                        {activeSharedInviteCode || 'Belum dibuat'}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                        Bagikan kode ini ke anggota lain supaya mereka bisa masuk ke akun bersama ini.
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <Box sx={{ display: 'grid', gap: 1.5 }}>
+                                    <Button
+                                        fullWidth
+                                        variant="contained"
+                                        disabled={isGeneratingInviteCode}
+                                        onClick={handleGenerateInviteCode}
+                                        startIcon={isGeneratingInviteCode ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name="RefreshCw" size={16} />}
+                                        sx={{ borderRadius: 2, height: 40 }}
+                                    >
+                                        {isGeneratingInviteCode ? 'Membuat...' : activeSharedInviteCode ? 'Buat Ulang Kode' : 'Buat Kode Gabung'}
+                                    </Button>
+                                    <Button
+                                        fullWidth
+                                        variant="outlined"
+                                        disabled={!activeSharedInviteCode}
+                                        onClick={handleCopyInviteCode}
+                                        startIcon={<IconDisplay name="Share" size={16} />}
+                                        sx={{ borderRadius: 2, height: 40 }}
+                                    >
+                                        Salin Kode
+                                    </Button>
+                                </Box>
+                            </Grid>
+                        </Grid>
+
+                        <Box>
+                            <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
+                                Anggota Akun Bersama
+                            </Typography>
+                            <Grid container spacing={1.5}>
+                                {sharedAccountMembers.map((member) => (
+                                    <Grid key={member.id} size={{ xs: 12, md: 6 }}>
+                                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                                <Box>
+                                                    <Typography variant="body1" fontWeight={700}>
+                                                        {member.displayName || member.email || 'Anggota'}
+                                                    </Typography>
+                                                    {member.email && (
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            {member.email}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                                <Chip
+                                                    size="small"
+                                                    label={member.role === 'OWNER' ? 'Pemilik' : 'Anggota'}
+                                                    sx={{ fontWeight: 600 }}
+                                                />
+                                            </Box>
+                                        </Paper>
+                                    </Grid>
+                                ))}
+                            </Grid>
+                        </Box>
+                    </>
+                )}
+            </Paper>
+
             {/* Telegram Account */}
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3 }}>
@@ -309,7 +484,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: theme.colors.accentLight }}>
-                            <IconDisplay name={isDark ? 'Moon' : 'Sun'} size={24} style={{ color: theme.colors.accent }} />
+                            <IconDisplay name={isDark ? 'Moon' : 'Sun'} size={24} sx={{ color: theme.colors.accent }} />
                         </Box>
                         <Box>
                             <Typography variant="h6" fontWeight={700}>Mode {isDark ? 'Gelap' : 'Terang'}</Typography>
@@ -337,7 +512,7 @@ const Settings: React.FC<SettingsProps> = ({
                         >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                                 <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: themes.light.colors.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <IconDisplay name="Sun" size={20} style={{ color: '#f59e0b' }} />
+                                    <IconDisplay name="Sun" size={20} sx={{ color: '#f59e0b' }} />
                                 </Box>
                                 <Typography fontWeight={600} sx={{ color: themes.light.colors.textPrimary }}>Terang</Typography>
                             </Box>
@@ -366,7 +541,7 @@ const Settings: React.FC<SettingsProps> = ({
                         >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                                 <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: themes.dark.colors.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <IconDisplay name="Moon" size={20} style={{ color: '#a78bfa' }} />
+                                    <IconDisplay name="Moon" size={20} sx={{ color: '#a78bfa' }} />
                                 </Box>
                                 <Typography fontWeight={600} sx={{ color: themes.dark.colors.textPrimary }}>Gelap</Typography>
                             </Box>
@@ -387,7 +562,7 @@ const Settings: React.FC<SettingsProps> = ({
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                     <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: theme.colors.incomeBg }}>
-                        <IconDisplay name="FileText" size={24} style={{ color: theme.colors.income }} />
+                        <IconDisplay name="FileText" size={24} sx={{ color: theme.colors.income }} />
                     </Box>
                     <Box>
                         <Typography variant="h6" fontWeight={700}>Ekspor ke Excel</Typography>
@@ -415,7 +590,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 }}
                             >
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <IconDisplay name={opt.icon} size={18} style={{ color: exportRange === opt.key ? theme.colors.accent : undefined }} />
+                                    <IconDisplay name={opt.icon} size={18} sx={{ color: exportRange === opt.key ? theme.colors.accent : undefined }} />
                                     <Box>
                                         <Typography variant="body2" fontWeight={600}>{opt.title}</Typography>
                                         <Typography variant="caption" color="text.secondary">{opt.sub}</Typography>
@@ -462,7 +637,7 @@ const Settings: React.FC<SettingsProps> = ({
                     onClick={handleExportExcel}
                     startIcon={isExporting
                         ? <CircularProgress size={18} sx={{ color: '#fff' }} />
-                        : <IconDisplay name="Download" size={20} style={{ color: '#fff' }} />
+                        : <IconDisplay name="Download" size={20} sx={{ color: '#fff' }} />
                     }
                     sx={{
                         borderRadius: 2,
@@ -484,7 +659,7 @@ const Settings: React.FC<SettingsProps> = ({
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3, borderColor: isDark ? '#991b1b' : '#fecaca' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                     <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: isDark ? '#7f1d1d' : '#fee2e2' }}>
-                        <IconDisplay name="AlertCircle" size={20} style={{ color: '#ef4444' }} />
+                        <IconDisplay name="AlertCircle" size={20} sx={{ color: '#ef4444' }} />
                     </Box>
                     <Box>
                         <Typography variant="h6" fontWeight={700} sx={{ color: '#ef4444' }}>Zona Berbahaya</Typography>
@@ -506,7 +681,7 @@ const Settings: React.FC<SettingsProps> = ({
                             variant="contained"
                             color="error"
                             disabled={transactionCount === 0}
-                            startIcon={<IconDisplay name="Trash2" size={16} style={{ color: '#fff' }} />}
+                            startIcon={<IconDisplay name="Trash2" size={16} sx={{ color: '#fff' }} />}
                             onClick={() => setShowDeleteConfirm(true)}
                             sx={{ borderRadius: 2, flexShrink: 0 }}
                         >
@@ -517,30 +692,41 @@ const Settings: React.FC<SettingsProps> = ({
             </Paper>
 
             {/* Delete Confirmation Modal */}
-            <Dialog
+            <FullScreenDialog
                 open={showDeleteConfirm}
                 onClose={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
-                maxWidth="sm"
-                fullWidth
-                slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
-                PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
+                title="Konfirmasi Penghapusan"
+                description="Tindakan ini akan menghapus semua transaksi secara permanen dan tidak bisa dibatalkan."
+                actions={
+                    <>
+                        <Button
+                            variant="outlined"
+                            onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            variant="contained"
+                            color="error"
+                            disabled={deleteConfirmText !== 'HAPUS SEMUA' || isDeleting}
+                            onClick={handleDeleteAll}
+                            startIcon={isDeleting
+                                ? <CircularProgress size={16} sx={{ color: '#fff' }} />
+                                : <IconDisplay name="Trash2" size={16} sx={{ color: '#fff' }} />
+                            }
+                        >
+                            {isDeleting ? 'Menghapus...' : 'Hapus Semua'}
+                        </Button>
+                    </>
+                }
             >
-                <Box sx={{ bgcolor: '#dc2626', px: 3, py: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 1.5 }}>
-                        <IconDisplay name="AlertCircle" size={24} style={{ color: '#fff' }} />
-                    </Box>
-                    <Box>
-                        <Typography variant="h6" fontWeight={700} sx={{ color: '#fff' }}>Konfirmasi Penghapusan</Typography>
-                        <Typography variant="body2" sx={{ color: '#fca5a5' }}>Tindakan ini tidak dapat dibatalkan</Typography>
-                    </Box>
-                </Box>
-                <DialogContent sx={{ px: 3, py: 3 }}>
+                <Box sx={{ maxWidth: 560 }}>
                     <Typography sx={{ mb: 2 }}>
                         Anda akan menghapus <strong>{transactionCount} transaksi</strong> secara permanen.
                         Data yang dihapus tidak dapat dikembalikan.
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        Ketik <strong style={{ color: '#ef4444' }}>HAPUS SEMUA</strong> untuk konfirmasi:
+                        Ketik <Box component="strong" sx={{ color: '#ef4444' }}>HAPUS SEMUA</Box> untuk konfirmasi:
                     </Typography>
                     <TextField
                         fullWidth
@@ -550,32 +736,8 @@ const Settings: React.FC<SettingsProps> = ({
                         onChange={(e) => setDeleteConfirmText(e.target.value)}
                         sx={{ mb: 3 }}
                     />
-                    <Box sx={{ display: 'flex', gap: 1.5 }}>
-                        <Button
-                            fullWidth
-                            variant="outlined"
-                            onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
-                            sx={{ borderRadius: 2 }}
-                        >
-                            Batal
-                        </Button>
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            color="error"
-                            disabled={deleteConfirmText !== 'HAPUS SEMUA' || isDeleting}
-                            onClick={handleDeleteAll}
-                            startIcon={isDeleting
-                                ? <CircularProgress size={16} sx={{ color: '#fff' }} />
-                                : <IconDisplay name="Trash2" size={16} style={{ color: '#fff' }} />
-                            }
-                            sx={{ borderRadius: 2 }}
-                        >
-                            {isDeleting ? 'Menghapus...' : 'Hapus Semua'}
-                        </Button>
-                    </Box>
-                </DialogContent>
-            </Dialog>
+                </Box>
+            </FullScreenDialog>
 
             {/* Toast */}
             <Toast

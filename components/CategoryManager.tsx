@@ -13,6 +13,7 @@ import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import ConfirmDialog from './ConfirmDialog';
 import CategoryFormModal from './CategoryFormModal';
+import PageHeader from './PageHeader';
 
 interface CategoryManagerProps {
   categories: Category[];
@@ -48,7 +49,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
           <Avatar sx={{ width: 40, height: 40, bgcolor: bgColor }}>
-            <IconDisplay name={type === 'INCOME' ? 'TrendingUp' : 'TrendingDown'} size={20} style={{ color }} />
+            <IconDisplay name={type === 'INCOME' ? 'TrendingUp' : 'TrendingDown'} size={20} sx={{ color }} />
           </Avatar>
           <Box>
             <Typography variant="h6" fontWeight={700} sx={{ color: 'text.primary', lineHeight: 1.2 }}>
@@ -95,7 +96,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
                         flexShrink: 0,
                       }}
                     >
-                      <IconDisplay name={cat.icon} size={24} style={{ color: '#fff' }} />
+                      <IconDisplay name={cat.icon} size={24} sx={{ color: '#fff' }} />
                     </Avatar>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography fontWeight={700} variant="subtitle2" noWrap>{cat.name}</Typography>
@@ -136,17 +137,19 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h5" fontWeight={700}>Master Kategori</Typography>
-        <Button
-          variant="contained"
-          startIcon={<IconDisplay name="Plus" size={18} style={{ color: '#fff' }} />}
-          onClick={() => setIsAdding(true)}
-          sx={{ borderRadius: 2, fontWeight: 600, px: 2.5 }}
-        >
-          Kategori Baru
-        </Button>
-      </Box>
+      <PageHeader
+        title="Master Kategori"
+        description="Kelola kategori pemasukan dan pengeluaran dengan pola kartu, aksi, dan label yang konsisten."
+        actions={
+          <Button
+            variant="contained"
+            startIcon={<IconDisplay name="Plus" size={18} sx={{ color: '#fff' }} />}
+            onClick={() => setIsAdding(true)}
+          >
+            Kategori Baru
+          </Button>
+        }
+      />
 
       <CategoryFormModal
         isOpen={isAdding || editingCategory !== null}
