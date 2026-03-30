@@ -1,4 +1,5 @@
 import React from 'react';
+import type { SxProps, Theme } from '@mui/material';
 import type { SvgIconProps } from '@mui/material/SvgIcon';
 
 // Finance & Money
@@ -528,15 +529,15 @@ interface IconDisplayProps {
   name: string;
   className?: string;
   size?: number;
-  style?: React.CSSProperties;
+  sx?: SxProps<Theme>;
 }
 
-const IconDisplay: React.FC<IconDisplayProps> = ({ name, className, size = 20, style }) => {
+const IconDisplay: React.FC<IconDisplayProps> = ({ name, className, size = 20, sx }) => {
   const IconComponent = iconMap[name] ?? HelpOutline;
   return (
     <IconComponent
       className={className}
-      style={{ fontSize: size, ...style }}
+      sx={{ fontSize: size, ...sx as object }}
     />
   );
 };

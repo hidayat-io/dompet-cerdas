@@ -20,6 +20,10 @@ import Switch from '@mui/material/Switch';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import PageHeader from './PageHeader';
 import FullScreenDialog from './FullScreenDialog';
 
@@ -37,6 +41,7 @@ interface SettingsProps {
     onGenerateSharedInviteCode: () => Promise<void>;
     onJoinSharedAccount: (code: string) => Promise<void>;
     onSwitchAccount: (accountId: string) => Promise<void>;
+    onDeleteAccount: (accountId: string) => Promise<void>;
     onDeleteAllTransactions: () => Promise<void>;
     transactionCount: number;
     transactions: Transaction[];
@@ -57,6 +62,7 @@ const Settings: React.FC<SettingsProps> = ({
     onGenerateSharedInviteCode,
     onJoinSharedAccount,
     onSwitchAccount,
+    onDeleteAccount,
     onDeleteAllTransactions,
     transactionCount,
     transactions,
@@ -69,6 +75,9 @@ const Settings: React.FC<SettingsProps> = ({
     const [newAccountName, setNewAccountName] = useState('');
     const [newAccountType, setNewAccountType] = useState<AccountType>('PERSONAL');
     const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+    const [showAddAccountDialog, setShowAddAccountDialog] = useState(false);
+    const [accountToDelete, setAccountToDelete] = useState<FinancialAccount | null>(null);
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false);
     const [joinCode, setJoinCode] = useState('');
     const [isJoiningShared, setIsJoiningShared] = useState(false);
     const [isGeneratingInviteCode, setIsGeneratingInviteCode] = useState(false);
@@ -140,6 +149,7 @@ const Settings: React.FC<SettingsProps> = ({
             await onCreateAccount(newAccountName, newAccountType);
             setNewAccountName('');
             setNewAccountType('PERSONAL');
+            setShowAddAccountDialog(false);
         } catch (error) {
             console.error('Error creating account:', error);
             setToast({ show: true, message: 'Gagal membuat Akun Keuangan. Silakan coba lagi.', type: 'error' });
@@ -148,9 +158,29 @@ const Settings: React.FC<SettingsProps> = ({
         }
     };
 
+    const handleDeleteAccount = async () => {
+        if (!accountToDelete) return;
+
+        setIsDeletingAccount(true);
+        try {
+            await onDeleteAccount(accountToDelete.id);
+            setAccountToDelete(null);
+        } catch (error) {
+            console.error('Error deleting account:', error);
+            setToast({ show: true, message: 'Gagal menghapus Akun Keuangan. Silakan coba lagi.', type: 'error' });
+        } finally {
+            setIsDeletingAccount(false);
+        }
+    };
+
     const activeAccount = accounts.find((a) => a.id === activeAccountId) || null;
     const telegramAccount = accounts.find((a) => a.id === telegramDefaultAccountId) || null;
     const isSharedAccountActive = !!activeAccount?.sharedAccountId;
+    const getAccountDeleteBlockReason = (account: FinancialAccount) => {
+        if (accounts.length <= 1) return 'Minimal harus ada satu akun yang tersisa.';
+        if (account.type === 'SHARED' || account.sharedAccountId) return 'Akun bersama belum bisa dihapus dari sini.';
+        return null;
+    };
 
     const handleGenerateInviteCode = async () => {
         if (!isSharedAccountActive) return;
@@ -203,89 +233,83 @@ const Settings: React.FC<SettingsProps> = ({
 
             {/* Financial Accounts */}
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h6" fontWeight={700}>Akun Keuangan</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            Pisahkan transaksi untuk kebutuhan pribadi, keluarga, bisnis, atau keuangan bersama.
+                            Tampilkan daftar akun yang ada dulu. Tambah akun hanya saat memang dibutuhkan.
                         </Typography>
                     </Box>
-                    <Chip
-                        label={`Aktif: ${activeAccount?.name || '-'}`}
-                        size="small"
-                        sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, flexShrink: 0 }}
-                    />
+                    <Button
+                        variant="contained"
+                        onClick={() => setShowAddAccountDialog(true)}
+                        startIcon={<IconDisplay name="Plus" size={16} sx={{ color: '#fff' }} />}
+                        sx={{ borderRadius: 2, flexShrink: 0 }}
+                    >
+                        Tambah Akun
+                    </Button>
                 </Box>
 
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                    <Grid size={{ xs: 12, md: 9 }}>
-                        <FormControl fullWidth size="small">
-                            <InputLabel>Ganti Akun</InputLabel>
-                            <Select
-                                label="Ganti Akun"
-                                value={activeAccountId || ''}
-                                onChange={(e) => onSwitchAccount(e.target.value)}
-                            >
-                                {accounts.map((account) => (
-                                    <MenuItem key={account.id} value={account.id}>
-                                        {account.name} • {getAccountTypeLabel(account.type)}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
-                            <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary">
-                                Total Akun
-                            </Typography>
-                            <Typography variant="h4" fontWeight={700}>{accounts.length}</Typography>
-                            {activeAccount && (
-                                <Typography variant="caption" color="text.secondary">
-                                    Tipe aktif: {getAccountTypeLabel(activeAccount.type)}
-                                </Typography>
-                            )}
-                        </Paper>
-                    </Grid>
-                </Grid>
+                <Box sx={{ display: 'grid', gap: 1.5 }}>
+                    {accounts.map((account) => {
+                        const isActive = account.id === activeAccountId;
+                        const isTelegramDefault = telegramLinked && account.id === telegramDefaultAccountId;
+                        const deleteBlockReason = getAccountDeleteBlockReason(account);
 
-                <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, md: 5 }}>
-                        <TextField
-                            label="Nama Akun Keuangan baru"
-                            size="small"
-                            fullWidth
-                            value={newAccountName}
-                            onChange={(e) => setNewAccountName(e.target.value)}
-                        />
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 4 }}>
-                        <FormControl fullWidth size="small">
-                            <InputLabel>Tipe</InputLabel>
-                            <Select
-                                label="Tipe"
-                                value={newAccountType}
-                                onChange={(e) => setNewAccountType(e.target.value as AccountType)}
-                            >
-                                {(['PERSONAL', 'FAMILY', 'BUSINESS', 'SHARED'] as AccountType[]).map((type) => (
-                                    <MenuItem key={type} value={type}>{getAccountTypeLabel(type)}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            disabled={isCreatingAccount}
-                            onClick={handleCreateAccount}
-                            startIcon={isCreatingAccount ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
-                            sx={{ borderRadius: 2, height: 40 }}
-                        >
-                            {isCreatingAccount ? 'Membuat...' : 'Tambah Akun'}
-                        </Button>
-                    </Grid>
-                </Grid>
+                        return (
+                            <Paper key={account.id} variant="outlined" sx={{ p: 2.25, borderRadius: 2.5 }}>
+                                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2 }}>
+                                    <Box sx={{ minWidth: 0 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 0.75 }}>
+                                            <Typography variant="subtitle1" fontWeight={700}>
+                                                {account.name}
+                                            </Typography>
+                                            <Chip size="small" label={getAccountTypeLabel(account.type)} />
+                                            {isActive && (
+                                                <Chip
+                                                    size="small"
+                                                    label="Sedang dipakai"
+                                                    sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600 }}
+                                                />
+                                            )}
+                                            {isTelegramDefault && (
+                                                <Chip size="small" variant="outlined" label="Default Telegram" />
+                                            )}
+                                        </Box>
+
+                                        <Typography variant="body2" color="text.secondary">
+                                            {account.role === 'OWNER' ? 'Pemilik akun ini.' : 'Anda bergabung sebagai anggota.'}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                            {deleteBlockReason || 'Akun ini bisa dihapus selama belum punya transaksi.'}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+                                        {!isActive && (
+                                            <Button
+                                                variant="outlined"
+                                                onClick={() => onSwitchAccount(account.id)}
+                                                sx={{ borderRadius: 2 }}
+                                            >
+                                                Pakai
+                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="text"
+                                            color="error"
+                                            disabled={!!deleteBlockReason}
+                                            onClick={() => setAccountToDelete(account)}
+                                            sx={{ borderRadius: 2 }}
+                                        >
+                                            Hapus
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            </Paper>
+                        );
+                    })}
+                </Box>
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
@@ -690,6 +714,99 @@ const Settings: React.FC<SettingsProps> = ({
                     </Box>
                 </Paper>
             </Paper>
+
+            <Dialog
+                open={showAddAccountDialog}
+                onClose={() => {
+                    if (isCreatingAccount) return;
+                    setShowAddAccountDialog(false);
+                    setNewAccountName('');
+                    setNewAccountType('PERSONAL');
+                }}
+                fullWidth
+                maxWidth="xs"
+            >
+                <DialogTitle>Tambah Akun Keuangan</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'grid', gap: 2, pt: 1 }}>
+                        <TextField
+                            label="Nama akun"
+                            value={newAccountName}
+                            onChange={(e) => setNewAccountName(e.target.value)}
+                            placeholder="Contoh: Rumah Tangga"
+                            autoFocus
+                        />
+                        <FormControl fullWidth>
+                            <InputLabel>Tipe</InputLabel>
+                            <Select
+                                label="Tipe"
+                                value={newAccountType}
+                                onChange={(e) => setNewAccountType(e.target.value as AccountType)}
+                            >
+                                {(['PERSONAL', 'FAMILY', 'BUSINESS', 'SHARED'] as AccountType[]).map((type) => (
+                                    <MenuItem key={type} value={type}>{getAccountTypeLabel(type)}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        variant="outlined"
+                        onClick={() => {
+                            setShowAddAccountDialog(false);
+                            setNewAccountName('');
+                            setNewAccountType('PERSONAL');
+                        }}
+                    >
+                        Batal
+                    </Button>
+                    <Button
+                        variant="contained"
+                        disabled={isCreatingAccount}
+                        onClick={handleCreateAccount}
+                        startIcon={isCreatingAccount ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                    >
+                        {isCreatingAccount ? 'Membuat...' : 'Tambah Akun'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={!!accountToDelete}
+                onClose={() => {
+                    if (isDeletingAccount) return;
+                    setAccountToDelete(null);
+                }}
+                fullWidth
+                maxWidth="xs"
+            >
+                <DialogTitle>Hapus Akun Keuangan</DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ pt: 1 }}>
+                        {accountToDelete
+                            ? <>Akun <strong>{accountToDelete.name}</strong> hanya bisa dihapus kalau belum punya transaksi.</>
+                            : null}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                        Kalau akun ini sudah punya transaksi, hapus dulu semua transaksi di akun tersebut. Kalau masih kosong, akun akan dihapus beserta data pendukungnya.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="outlined" onClick={() => setAccountToDelete(null)}>
+                        Batal
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        disabled={isDeletingAccount}
+                        onClick={handleDeleteAccount}
+                        startIcon={isDeletingAccount ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                    >
+                        {isDeletingAccount ? 'Menghapus...' : 'Hapus Akun'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Delete Confirmation Modal */}
             <FullScreenDialog

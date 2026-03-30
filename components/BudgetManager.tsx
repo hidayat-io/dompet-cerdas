@@ -547,69 +547,70 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                 title="Anggaran"
                 description="Buat anggaran yang memang ingin dipantau. Satu anggaran bisa berisi satu atau beberapa kategori."
                 actions={
-                    <Box>
-                    <Typography variant="caption" fontWeight={700} textTransform="uppercase" sx={{ letterSpacing: '0.1em', color: 'text.secondary', display: 'block', mb: 1 }}>
-                        Bulan Anggaran
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton
-                            onClick={() => {
-                                setSelectedMonth((m) => shiftMonth(m, -1));
-                                setShowForm(false);
-                                setDraft(emptyDraft);
-                            }}
-                            aria-label="Bulan sebelumnya"
-                            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
-                        >
-                            <IconDisplay name="ArrowLeft" size={18} />
-                        </IconButton>
-                        <Paper variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: 2, minWidth: 180, textAlign: 'center' }}>
-                            <Typography variant="body1" fontWeight={600}>{getMonthLabel(selectedMonth)}</Typography>
-                            <Typography variant="caption" color="text.secondary">{selectedMonth}</Typography>
-                        </Paper>
-                        <IconButton
-                            onClick={() => {
-                                setSelectedMonth((m) => shiftMonth(m, 1));
-                                setShowForm(false);
-                                setDraft(emptyDraft);
-                            }}
-                            aria-label="Bulan berikutnya"
-                            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
-                        >
-                            <IconDisplay name="ArrowRight" size={18} />
-                        </IconButton>
-                    </Box>
-                    </Box>
+                    <Paper variant="outlined" sx={{ px: 1, py: 0.75, borderRadius: 999 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <IconButton
+                                size="small"
+                                onClick={() => {
+                                    setSelectedMonth((m) => shiftMonth(m, -1));
+                                    setShowForm(false);
+                                    setDraft(emptyDraft);
+                                }}
+                                aria-label="Bulan sebelumnya"
+                            >
+                                <IconDisplay name="ArrowLeft" size={18} />
+                            </IconButton>
+                            <Box sx={{ minWidth: 140, textAlign: 'center', px: 1 }}>
+                                <Typography variant="body1" fontWeight={700}>{getMonthLabel(selectedMonth)}</Typography>
+                                <Typography variant="caption" color="text.secondary">Bulan aktif</Typography>
+                            </Box>
+                            <IconButton
+                                size="small"
+                                onClick={() => {
+                                    setSelectedMonth((m) => shiftMonth(m, 1));
+                                    setShowForm(false);
+                                    setDraft(emptyDraft);
+                                }}
+                                aria-label="Bulan berikutnya"
+                            >
+                                <IconDisplay name="ArrowRight" size={18} />
+                            </IconButton>
+                        </Box>
+                    </Paper>
                 }
             />
 
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-                {[
-                    { label: 'Total Anggaran', value: formatRp(overview.totalBudget), color: 'text.primary' as const },
-                    { label: 'Sudah Terpakai', value: formatRp(overview.totalSpent), color: theme.colors.expense },
-                    { label: 'Sisa Anggaran', value: formatRp(overview.remaining), color: overview.remaining >= 0 ? theme.colors.income : theme.colors.expense },
-                    {
-                        label: 'Status',
-                        value: overview.overBudgetCount > 0 ? `${overview.overBudgetCount} lewat` : 'Aman',
-                        color: overview.overBudgetCount > 0 ? theme.colors.expense : 'text.primary' as const,
-                        sub: `${overview.activeBudgetCount} anggaran aktif di ${getMonthLabel(selectedMonth)}`,
-                    },
-                ].map((stat) => (
-                    <Grid size={{ xs: 6, md: 3 }} key={stat.label}>
-                        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-                            <Typography variant="caption" fontWeight={700} textTransform="uppercase" color="text.secondary" display="block">
-                                {stat.label}
-                            </Typography>
-                            <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5, color: stat.color }}>
-                                {stat.value}
-                            </Typography>
-                            {stat.sub && (
-                                <Typography variant="caption" color="text.secondary">{stat.sub}</Typography>
-                            )}
-                        </Paper>
-                    </Grid>
-                ))}
-            </Grid>
+            <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 3, mb: 3 }}>
+                <Grid container spacing={2}>
+                    {[
+                        { label: 'Total Anggaran', value: formatRp(overview.totalBudget), color: 'text.primary' as const },
+                        { label: 'Sudah Terpakai', value: formatRp(overview.totalSpent), color: theme.colors.expense },
+                        { label: 'Sisa Anggaran', value: formatRp(overview.remaining), color: overview.remaining >= 0 ? theme.colors.income : theme.colors.expense },
+                        {
+                            label: 'Status',
+                            value: overview.overBudgetCount > 0 ? `${overview.overBudgetCount} lewat` : 'Aman',
+                            color: overview.overBudgetCount > 0 ? theme.colors.expense : 'text.primary' as const,
+                            sub: `${overview.activeBudgetCount} anggaran aktif`,
+                        },
+                    ].map((stat) => (
+                        <Grid size={{ xs: 6, md: 3 }} key={stat.label}>
+                            <Box sx={{ px: 0.5 }}>
+                                <Typography variant="overline" fontWeight={700} color="text.secondary" sx={{ lineHeight: 1.2 }}>
+                                    {stat.label}
+                                </Typography>
+                                <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5, color: stat.color }}>
+                                    {stat.value}
+                                </Typography>
+                                {stat.sub && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                        {stat.sub}
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Grid>
+                    ))}
+                </Grid>
+            </Paper>
 
             <Card variant="outlined" sx={{ p: 3, borderRadius: 4 }}>
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
@@ -619,9 +620,8 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                             Pemakaian bulan ini dihitung dari transaksi di {getMonthLabel(selectedMonth)}. Saat pindah bulan, pemakaian mulai dari 0 lagi.
                         </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, flexShrink: 0, minWidth: { md: 220 } }}>
+                    <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap', flexShrink: 0 }}>
                         <Button
-                            fullWidth
                             variant="outlined"
                             disabled={copying || previousMonthBudgetCount === 0}
                             startIcon={copying ? <CircularProgress size={16} /> : undefined}
@@ -631,7 +631,6 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                             {copying ? 'Menyalin...' : `Salin ${getMonthLabel(previousMonth)}`}
                         </Button>
                         <Button
-                            fullWidth
                             variant="contained"
                             startIcon={<IconDisplay name="Plus" size={18} sx={{ color: '#fff' }} />}
                             onClick={openCreateForm}

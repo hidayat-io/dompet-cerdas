@@ -6,7 +6,7 @@ import {
   DocumentReference,
   Firestore,
 } from 'firebase/firestore';
-import { AccountType, DebtRecord, FinancialAccount } from '../types';
+import { AccountType, DebtRecord, FinancialAccount, SharedAccount, SharedAccountMember } from '../types';
 
 export type AccountScopedCollectionName = 'categories' | 'transactions' | 'plans' | 'budgets' | 'simulations' | 'debts';
 
@@ -30,6 +30,15 @@ export const getAccountsCollectionRef = (db: Firestore, userId: string): Collect
 
 export const getAccountDocRef = (db: Firestore, userId: string, accountId: string): DocumentReference<FinancialAccount> =>
   doc(db, 'users', userId, 'accounts', accountId) as DocumentReference<FinancialAccount>;
+
+export const getSharedAccountsCollectionRef = (db: Firestore): CollectionReference<SharedAccount> =>
+  collection(db, 'sharedAccounts') as CollectionReference<SharedAccount>;
+
+export const getSharedAccountDocRef = (db: Firestore, sharedAccountId: string): DocumentReference<SharedAccount> =>
+  doc(db, 'sharedAccounts', sharedAccountId) as DocumentReference<SharedAccount>;
+
+export const getSharedAccountMembersCollectionRef = (db: Firestore, sharedAccountId: string): CollectionReference<SharedAccountMember> =>
+  collection(db, 'sharedAccounts', sharedAccountId, 'members') as CollectionReference<SharedAccountMember>;
 
 export const getAccountScopedCollectionRef = <T>(
   db: Firestore,
@@ -57,14 +66,35 @@ export const getLegacySimulationsCollectionRef = (db: Firestore, userId: string,
 export const getDebtsCollectionRef = (db: Firestore, userId: string, accountId: string) =>
   getAccountScopedCollectionRef<DebtRecord>(db, userId, accountId, 'debts');
 
+export const getScopedCollectionRefForAccount = <T>(
+  db: Firestore,
+  userId: string,
+  account: Pick<FinancialAccount, 'id' | 'sharedAccountId'>,
+  collectionName: AccountScopedCollectionName
+): CollectionReference<T> => (
+  account.sharedAccountId
+    ? collection(db, 'sharedAccounts', account.sharedAccountId, collectionName)
+    : collection(db, 'users', userId, 'accounts', account.id, collectionName)
+) as CollectionReference<T>;
+
+export const getScopedStoragePath = (
+  userId: string,
+  account: Pick<FinancialAccount, 'id' | 'sharedAccountId'>,
+  fileName: string
+) => account.sharedAccountId
+  ? `sharedAccounts/${account.sharedAccountId}/attachments/${fileName}`
+  : `users/${userId}/accounts/${account.id}/attachments/${fileName}`;
+
 export const createAccountPayload = (
   name: string,
   type: AccountType = DEFAULT_ACCOUNT_TYPE,
-  now = new Date().toISOString()
+  now = new Date().toISOString(),
+  extra: Partial<Omit<FinancialAccount, 'id' | 'name' | 'type' | 'role' | 'createdAt' | 'updatedAt'>> = {}
 ): Omit<FinancialAccount, 'id'> => ({
   name,
   type,
   role: 'OWNER',
   createdAt: now,
   updatedAt: now,
+  ...extra,
 });

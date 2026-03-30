@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.7.1
+# DompetCerdas - Smart Expense Tracker v2.7.2
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -40,15 +40,22 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - `Hutang Piutang` saat ini **tidak otomatis mempengaruhi saldo** karena masih diposisikan sebagai modul tracking terpisah dari transaksi
 - Dashboard sekarang punya toggle untuk menyembunyikan nominal saldo saat dibuka di depan orang lain
 - Riwayat transaksi sekarang dikelompokkan per hari dengan card terpisah agar perbedaan tanggal lebih mudah discan
+- Pengaturan akun, daftar rencana, dan ringkasan anggaran sekarang diarahkan ke layout yang lebih minimal dan lebih mudah discan
 - Deploy hosting sekarang wajib lewat smoke check agar root `/` dan route SPA tetap aman setelah rilis
 
 ## Current Release
 
-- **Version**: `v2.7.1`
+- **Version**: `v2.7.2`
 - **Build Date**: `March 30, 2026`
-- **Status**: Internal testing build dengan standardisasi UI Material UI, full-screen form flow, dan polishing transaksi/dashboard
+- **Status**: Internal testing build dengan simplifikasi visual untuk akun, rencana, dan anggaran agar lebih minimal, rapi, dan mudah dipakai
 
 ## Changelog
+
+### v2.7.2 - March 30, 2026
+- UI `Akun Keuangan` disederhanakan menjadi daftar akun yang lebih mudah discan, dengan alur `Tambah Akun` via popup kecil dan aksi `Pakai` yang lebih langsung.
+- Hapus akun sekarang dibatasi lebih aman: akun hanya bisa dihapus jika belum punya transaksi, akun terakhir tidak bisa dihapus, dan akun bersama belum dihapus dari menu ini.
+- Halaman `Rencana` dirapikan dengan flow pembuatan rencana via popup, card daftar rencana yang lebih tenang, dan pengurangan elemen visual yang terasa bertumpuk.
+- Halaman `Anggaran` dibuat lebih minimal dengan kontrol bulan yang lebih compact, summary strip yang lebih ringan, dan action area yang tidak saling berebut perhatian.
 
 ### v2.7.1 - March 30, 2026
 - Standardisasi UI lintas menu agar lebih konsisten berbasis Material UI, termasuk `PageHeader`, `FullScreenDialog`, confirm dialog, notification dialog, dan attachment preview.

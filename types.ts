@@ -1,13 +1,36 @@
 export type TransactionType = 'INCOME' | 'EXPENSE';
 export type AccountType = 'PERSONAL' | 'FAMILY' | 'BUSINESS' | 'SHARED';
-export type AccountRole = 'OWNER';
+export type AccountRole = 'OWNER' | 'MEMBER';
 
 export interface FinancialAccount {
   id: string;
   name: string;
   type: AccountType;
   role: AccountRole;
+  ownerUserId?: string;
+  sharedAccountId?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedAccount {
+  id: string;
+  name: string;
+  type: 'SHARED';
+  ownerUserId: string;
+  inviteCode?: string | null;
+  inviteCodeUpdatedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedAccountMember {
+  id: string;
+  userId: string;
+  role: AccountRole;
+  email?: string | null;
+  displayName?: string | null;
+  joinedAt: string;
   updatedAt: string;
 }
 
@@ -35,6 +58,8 @@ export interface Transaction {
   description: string;
   categoryId: string;
   createdAt?: string; // ISO timestamp for sorting
+  createdByUserId?: string;
+  createdByName?: string;
   // New structured attachment
   attachment?: Attachment;
   // Legacy fields (optional) for backward compatibility

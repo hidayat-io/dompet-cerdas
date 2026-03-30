@@ -8,7 +8,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth, db, storage, firebaseApp } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
-import { AccountType, Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, Transaction } from './types';
+import { AccountType, Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, SharedAccountMember, Transaction } from './types';
 import Dashboard from './components/Dashboard';
 import BudgetManager from './components/BudgetManager';
 import TransactionList from './components/TransactionList';
@@ -52,15 +52,21 @@ import Container from '@mui/material/Container';
 import Snackbar from '@mui/material/Snackbar';
 
 import {
+  AccountScopedCollectionName,
   DEFAULT_ACCOUNT_NAME,
   DEFAULT_ACCOUNT_TYPE,
   createAccountPayload,
+  getAccountDocRef,
   getAccountsCollectionRef,
   getBudgetsCollectionRef,
   getCategoriesCollectionRef,
   getDebtsCollectionRef,
   getLegacySimulationsCollectionRef,
   getPlansCollectionRef,
+  getScopedCollectionRefForAccount,
+  getScopedStoragePath,
+  getSharedAccountDocRef,
+  getSharedAccountMembersCollectionRef,
   getTransactionsCollectionRef,
   getUserDocRef
 } from './services/accountService';
@@ -174,10 +180,16 @@ function App() {
   const [accountLoading, setAccountLoading] = useState(true);
   const [telegramDefaultAccountId, setTelegramDefaultAccountId] = useState<string | null>(null);
   const [telegramLinked, setTelegramLinked] = useState(false);
+  const [sharedAccountMembers, setSharedAccountMembers] = useState<SharedAccountMember[]>([]);
+  const [activeSharedInviteCode, setActiveSharedInviteCode] = useState<string | null>(null);
 
   const normalizedBudgets = useMemo(
     () => budgets.map((budget) => getNormalizedBudget(budget, categories)),
     [budgets, categories]
+  );
+  const activeAccount = useMemo(
+    () => accounts.find((account) => account.id === activeAccountId) || null,
+    [accounts, activeAccountId]
   );
 
   // Notification State
@@ -195,6 +207,11 @@ function App() {
 
   const closeNotification = () => {
     setNotification(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const getActiveScopedCollection = <T,>(collectionName: AccountScopedCollectionName) => {
+    if (!user || !activeAccount) return null;
+    return getScopedCollectionRefForAccount<T>(db, user.uid, activeAccount, collectionName);
   };
 
   // --- Auth Listener ---
@@ -272,8 +289,13 @@ function App() {
       const userSnap = await getDoc(userRef);
       const userMeta = (userSnap.data() || {}) as UserMeta;
       const accountsSnap = await getDocs(accountsRef);
+      const existingAccounts = accountsSnap.docs.map((accountDoc) => ({
+        id: accountDoc.id,
+        ...(accountDoc.data() as Omit<FinancialAccount, 'id'>)
+      }));
 
       let resolvedAccountId = userMeta.activeAccountId;
+      let resolvedAccount: FinancialAccount | null = null;
 
       if (accountsSnap.empty) {
         const now = new Date().toISOString();
@@ -288,18 +310,26 @@ function App() {
         }, { merge: true });
         await batch.commit();
         resolvedAccountId = defaultAccountRef.id;
-      } else if (!resolvedAccountId || !accountsSnap.docs.some((accountDoc) => accountDoc.id === resolvedAccountId)) {
-        resolvedAccountId = accountsSnap.docs[0].id;
+        resolvedAccount = {
+          id: defaultAccountRef.id,
+          ...createAccountPayload(DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_TYPE, now)
+        };
+      } else if (!resolvedAccountId || !existingAccounts.some((account) => account.id === resolvedAccountId)) {
+        resolvedAccountId = existingAccounts[0].id;
         await setDoc(userRef, {
           activeAccountId: resolvedAccountId,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       }
 
-      if (resolvedAccountId) {
-        const targetCategoriesRef = getCategoriesCollectionRef(db, user.uid, resolvedAccountId);
-        const targetTransactionsRef = getTransactionsCollectionRef(db, user.uid, resolvedAccountId);
-        const targetPlansRef = getPlansCollectionRef(db, user.uid, resolvedAccountId);
+      if (!resolvedAccount && resolvedAccountId) {
+        resolvedAccount = existingAccounts.find((account) => account.id === resolvedAccountId) || null;
+      }
+
+      if (resolvedAccountId && resolvedAccount && !resolvedAccount.sharedAccountId) {
+        const targetCategoriesRef = getScopedCollectionRefForAccount<Category>(db, user.uid, resolvedAccount, 'categories');
+        const targetTransactionsRef = getScopedCollectionRefForAccount<Transaction>(db, user.uid, resolvedAccount, 'transactions');
+        const targetPlansRef = getScopedCollectionRefForAccount<Plan>(db, user.uid, resolvedAccount, 'plans');
         const accountLegacySimulationsRef = getLegacySimulationsCollectionRef(db, user.uid, resolvedAccountId);
 
         const [
@@ -432,9 +462,40 @@ function App() {
     return () => unsubscribe();
   }, [user]);
 
+  useEffect(() => {
+    if (!activeAccount?.sharedAccountId) {
+      setSharedAccountMembers([]);
+      setActiveSharedInviteCode(null);
+      return;
+    }
+
+    const sharedAccountRef = getSharedAccountDocRef(db, activeAccount.sharedAccountId);
+    const membersRef = query(getSharedAccountMembersCollectionRef(db, activeAccount.sharedAccountId));
+
+    const unsubSharedAccount = onSnapshot(sharedAccountRef, (snapshot) => {
+      const data = snapshot.data();
+      setActiveSharedInviteCode(typeof data?.inviteCode === 'string' ? data.inviteCode : null);
+    });
+
+    const unsubMembers = onSnapshot(membersRef, (snapshot) => {
+      const members = snapshot.docs
+        .map((memberDoc) => ({
+          id: memberDoc.id,
+          ...(memberDoc.data() as Omit<SharedAccountMember, 'id'>)
+        }))
+        .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt));
+      setSharedAccountMembers(members);
+    });
+
+    return () => {
+      unsubSharedAccount();
+      unsubMembers();
+    };
+  }, [activeAccount?.sharedAccountId]);
+
   // --- Firestore Listeners ---
   useEffect(() => {
-    if (!user || !activeAccountId) {
+    if (!user || !activeAccount) {
       setCategories([]);
       setTransactions([]);
       setPlans([]);
@@ -443,31 +504,41 @@ function App() {
       return;
     }
 
-    const catQuery = query(getCategoriesCollectionRef(db, user.uid, activeAccountId));
+    const categoriesRef = getActiveScopedCollection<Category>('categories');
+    const transactionsRef = getActiveScopedCollection<Transaction>('transactions');
+    const plansRef = getActiveScopedCollection<Plan>('plans');
+    const budgetsRef = getActiveScopedCollection<Budget>('budgets');
+    const debtsRef = getActiveScopedCollection<DebtRecord>('debts');
+
+    if (!categoriesRef || !transactionsRef || !plansRef || !budgetsRef || !debtsRef) {
+      return;
+    }
+
+    const catQuery = query(categoriesRef);
     const unsubCat = onSnapshot(catQuery, (snapshot) => {
       const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category));
       setCategories(data);
     });
 
-    const txQuery = query(getTransactionsCollectionRef(db, user.uid, activeAccountId));
+    const txQuery = query(transactionsRef);
     const unsubTx = onSnapshot(txQuery, (snapshot) => {
       const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
       setTransactions(data);
     });
 
-    const planQuery = query(getPlansCollectionRef(db, user.uid, activeAccountId));
+    const planQuery = query(plansRef);
     const unsubPlans = onSnapshot(planQuery, (snapshot) => {
       const data = snapshot.docs.map((planDoc) => normalizePlan(planDoc.id, planDoc.data() as Partial<Plan>));
       setPlans(data);
     });
 
-    const budgetQuery = query(getBudgetsCollectionRef(db, user.uid, activeAccountId));
+    const budgetQuery = query(budgetsRef);
     const unsubBudgets = onSnapshot(budgetQuery, (snapshot) => {
       const data = snapshot.docs.map((budgetDoc) => ({ id: budgetDoc.id, ...(budgetDoc.data() as Partial<Budget>) } as Budget));
       setBudgets(data);
     });
 
-    const debtQuery = query(getDebtsCollectionRef(db, user.uid, activeAccountId));
+    const debtQuery = query(debtsRef);
     const unsubDebts = onSnapshot(debtQuery, (snapshot) => {
       const data = snapshot.docs.map((debtDoc) => normalizeDebtRecord(debtDoc.id, debtDoc.data() as Partial<DebtRecord>));
       setDebts(data);
@@ -480,7 +551,7 @@ function App() {
       unsubBudgets();
       unsubDebts();
     };
-  }, [user, activeAccountId]);
+  }, [user, activeAccount]);
 
   // --- CRUD Handlers (Firestore) ---
 
@@ -490,6 +561,13 @@ function App() {
     const trimmedName = name.trim();
     if (!trimmedName) {
       showNotification('warning', 'Nama Akun Wajib Diisi', 'Isi nama Akun Keuangan terlebih dahulu.', true);
+      return;
+    }
+
+    if (type === 'SHARED') {
+      const callable = httpsCallable(functions, 'createSharedAccount');
+      await callable({ name: trimmedName });
+      showNotification('success', 'Akun Bersama Dibuat', `Akun Keuangan bersama "${trimmedName}" siap dipakai bareng.`, true);
       return;
     }
 
@@ -511,6 +589,34 @@ function App() {
 
     await batch.commit();
     showNotification('success', 'Akun Ditambahkan', `Akun Keuangan "${trimmedName}" siap digunakan.`, true);
+  };
+
+  const generateSharedInviteCode = async () => {
+    if (!activeAccountId || !activeAccount?.sharedAccountId) return;
+
+    const callable = httpsCallable(functions, 'createSharedInviteCode');
+    const response = await callable({ accountId: activeAccountId });
+    const data = response.data as { code?: string };
+
+    if (data.code) {
+      setActiveSharedInviteCode(data.code);
+      showNotification('success', 'Kode Gabung Diperbarui', `Kode gabung baru: ${data.code}`, true);
+    }
+  };
+
+  const joinSharedAccount = async (rawCode: string) => {
+    if (!user) return;
+
+    const code = rawCode.trim().toUpperCase();
+    if (!code) {
+      showNotification('warning', 'Kode Belum Diisi', 'Masukkan kode gabung terlebih dahulu.', true);
+      return;
+    }
+
+    const callable = httpsCallable(functions, 'joinSharedAccountByCode');
+    const response = await callable({ code });
+    const data = response.data as { name?: string };
+    showNotification('success', 'Berhasil Gabung', `Sekarang kamu bergabung ke akun bersama "${data.name || 'Keuangan Bersama'}".`, true);
   };
 
   const switchAccount = async (accountId: string) => {
@@ -536,6 +642,65 @@ function App() {
     }
   };
 
+  const deleteAccount = async (accountId: string) => {
+    if (!user) return;
+
+    const targetAccount = accounts.find((account) => account.id === accountId);
+    if (!targetAccount) return;
+
+    if (accounts.length <= 1) {
+      showNotification('warning', 'Akun Terakhir Tidak Bisa Dihapus', 'Minimal harus ada satu Akun Keuangan yang tersisa.', true);
+      return;
+    }
+
+    if (targetAccount.type === 'SHARED' || targetAccount.sharedAccountId) {
+      showNotification('warning', 'Akun Bersama Belum Bisa Dihapus', 'Untuk saat ini akun bersama belum bisa dihapus dari halaman ini.', true);
+      return;
+    }
+
+    const transactionsSnap = await getDocs(getTransactionsCollectionRef(db, user.uid, targetAccount.id));
+    if (!transactionsSnap.empty) {
+      showNotification('warning', 'Akun Tidak Bisa Dihapus', 'Akun ini sudah punya transaksi. Hapus semua transaksi di akun tersebut terlebih dahulu.', true);
+      return;
+    }
+
+    const fallbackAccount = accounts.find((account) => account.id !== targetAccount.id) || null;
+    const now = new Date().toISOString();
+    const collectionsToClear = [
+      getCategoriesCollectionRef(db, user.uid, targetAccount.id),
+      getPlansCollectionRef(db, user.uid, targetAccount.id),
+      getBudgetsCollectionRef(db, user.uid, targetAccount.id),
+      getLegacySimulationsCollectionRef(db, user.uid, targetAccount.id),
+      getDebtsCollectionRef(db, user.uid, targetAccount.id),
+    ];
+
+    for (const collectionRef of collectionsToClear) {
+      const snapshot = await getDocs(collectionRef);
+      await Promise.all(snapshot.docs.map((itemDoc) => deleteDoc(itemDoc.ref)));
+    }
+
+    await deleteDoc(getAccountDocRef(db, user.uid, targetAccount.id));
+
+    const userMetaUpdate: Partial<UserMeta> = {
+      updatedAt: now,
+    };
+
+    if (activeAccountId === targetAccount.id && fallbackAccount) {
+      userMetaUpdate.activeAccountId = fallbackAccount.id;
+    }
+
+    await setDoc(getUserDocRef(db, user.uid), userMetaUpdate, { merge: true });
+
+    if (telegramDefaultAccountId === targetAccount.id && fallbackAccount) {
+      await setDoc(doc(db, 'users', user.uid, 'telegram_link', 'main'), {
+        defaultAccountId: fallbackAccount.id,
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    showNotification('success', 'Akun Dihapus', `Akun Keuangan "${targetAccount.name}" berhasil dihapus.`, true);
+  };
+
   const addTransaction = async (
     amount: number,
     categoryId: string,
@@ -543,7 +708,7 @@ function App() {
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' }
   ) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
     let attachmentData = null;
 
@@ -553,7 +718,7 @@ function App() {
         // Create ref
         const fileExt = attachment.file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const storageRef = ref(storage, `users/${user.uid}/accounts/${activeAccountId}/attachments/${fileName}`);
+        const storageRef = ref(storage, getScopedStoragePath(user.uid, activeAccount, fileName));
 
         // Upload
         const snapshot = await uploadBytes(storageRef, attachment.file);
@@ -572,11 +737,16 @@ function App() {
       }
     }
 
-    await addDoc(getTransactionsCollectionRef(db, user.uid, activeAccountId), {
+    const transactionsRef = getActiveScopedCollection<Transaction>('transactions');
+    if (!transactionsRef) return;
+
+    await addDoc(transactionsRef as any, {
       amount,
       categoryId,
       date,
       description,
+      createdByUserId: user.uid,
+      createdByName: user.displayName || user.email || 'Member',
       createdAt: new Date().toISOString(),
       attachment: attachmentData
     });
@@ -590,9 +760,12 @@ function App() {
     description: string,
     attachment?: { file: File; type: 'image' | 'pdf' } | null
   ) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
-    const txRef = doc(getTransactionsCollectionRef(db, user.uid, activeAccountId), id);
+    const transactionsRef = getActiveScopedCollection<Transaction>('transactions');
+    if (!transactionsRef) return;
+
+    const txRef = doc(transactionsRef, id);
     const txSnap = await getDoc(txRef);
     if (!txSnap.exists()) return;
 
@@ -645,7 +818,7 @@ function App() {
       try {
         const fileExt = attachment.file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const storageRef = ref(storage, `users/${user.uid}/accounts/${activeAccountId}/attachments/${fileName}`);
+        const storageRef = ref(storage, getScopedStoragePath(user.uid, activeAccount, fileName));
 
         const snapshot = await uploadBytes(storageRef, attachment.file);
         const url = await getDownloadURL(snapshot.ref);
@@ -675,7 +848,7 @@ function App() {
 
 
   const deleteTransaction = async (id: string) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
     // Check for attachment to delete from storage
     const tx = transactions.find(t => t.id === id);
@@ -702,7 +875,10 @@ function App() {
       }
     }
 
-    await deleteDoc(doc(getTransactionsCollectionRef(db, user.uid, activeAccountId), id));
+    const transactionsRef = getActiveScopedCollection<Transaction>('transactions');
+    if (!transactionsRef) return;
+
+    await deleteDoc(doc(transactionsRef, id));
   };
 
   const refreshCategoryCache = async () => {
@@ -715,34 +891,42 @@ function App() {
   };
 
   const addCategory = async (cat: Omit<Category, 'id'>): Promise<string | undefined> => {
-    if (!user || !activeAccountId) return;
-    const docRef = await addDoc(getCategoriesCollectionRef(db, user.uid, activeAccountId), cat);
+    if (!user || !activeAccount) return;
+    const categoriesRef = getActiveScopedCollection<Category>('categories');
+    if (!categoriesRef) return;
+    const docRef = await addDoc(categoriesRef, cat);
     await refreshCategoryCache();
     return docRef.id;
   };
 
   const updateCategory = async (id: string, cat: Omit<Category, 'id'>) => {
-    if (!user || !activeAccountId) return;
-    const catRef = doc(getCategoriesCollectionRef(db, user.uid, activeAccountId), id);
+    if (!user || !activeAccount) return;
+    const categoriesRef = getActiveScopedCollection<Category>('categories');
+    if (!categoriesRef) return;
+    const catRef = doc(categoriesRef, id);
     await updateDoc(catRef, cat);
     await refreshCategoryCache();
   };
 
   const deleteCategory = async (id: string) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
     const isUsed = transactions.some(t => t.categoryId === id);
     if (isUsed) {
       showNotification('error', 'Tidak Dapat Dihapus', 'Kategori ini tidak bisa dihapus karena masih digunakan dalam transaksi.', true);
       return;
     }
-    await deleteDoc(doc(getCategoriesCollectionRef(db, user.uid, activeAccountId), id));
+    const categoriesRef = getActiveScopedCollection<Category>('categories');
+    if (!categoriesRef) return;
+    await deleteDoc(doc(categoriesRef, id));
     await refreshCategoryCache();
   };
 
   // --- Plan Handlers (Firestore) ---
   const createPlan = async (title: string) => {
-    if (!user || !activeAccountId) return;
-    await addDoc(getPlansCollectionRef(db, user.uid, activeAccountId), {
+    if (!user || !activeAccount) return;
+    const plansRef = getActiveScopedCollection<Plan>('plans');
+    if (!plansRef) return;
+    await addDoc(plansRef as any, {
       title,
       items: [],
       createdAt: new Date().toISOString()
@@ -750,15 +934,19 @@ function App() {
   };
 
   const deletePlan = async (id: string) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
     try {
-      await deleteDoc(doc(getPlansCollectionRef(db, user.uid, activeAccountId), id));
+      const plansRef = getActiveScopedCollection<Plan>('plans');
+      if (!plansRef) return;
+      await deleteDoc(doc(plansRef, id));
     } catch (e) { console.error(e); }
   };
 
   const addPlanItem = async (planId: string, item: Omit<PlanItem, 'id'>) => {
-    if (!user || !activeAccountId) return;
-    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    if (!user || !activeAccount) return;
+    const plansRef = getActiveScopedCollection<Plan>('plans');
+    if (!plansRef) return;
+    const planRef = doc(plansRef, planId);
     const plan = plans.find((entry) => entry.id === planId);
     if (plan) {
       const newItem: PlanItem = { ...item, id: Date.now().toString() };
@@ -768,8 +956,10 @@ function App() {
   };
 
   const updatePlanItem = async (planId: string, itemId: string, updatedItem: Omit<PlanItem, 'id'>) => {
-    if (!user || !activeAccountId) return;
-    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    if (!user || !activeAccount) return;
+    const plansRef = getActiveScopedCollection<Plan>('plans');
+    if (!plansRef) return;
+    const planRef = doc(plansRef, planId);
     const plan = plans.find((entry) => entry.id === planId);
     if (plan) {
       const updatedItems = plan.items.map((item) =>
@@ -780,14 +970,18 @@ function App() {
   };
 
   const updatePlanSettings = async (planId: string, useCurrentMonthBalance: boolean) => {
-    if (!user || !activeAccountId) return;
-    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    if (!user || !activeAccount) return;
+    const plansRef = getActiveScopedCollection<Plan>('plans');
+    if (!plansRef) return;
+    const planRef = doc(plansRef, planId);
     await setDoc(planRef, { useCurrentMonthBalance }, { merge: true });
   };
 
   const deletePlanItem = async (planId: string, itemId: string) => {
-    if (!user || !activeAccountId) return;
-    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    if (!user || !activeAccount) return;
+    const plansRef = getActiveScopedCollection<Plan>('plans');
+    if (!plansRef) return;
+    const planRef = doc(plansRef, planId);
     const plan = plans.find((entry) => entry.id === planId);
     if (plan) {
       const updatedItems = plan.items.filter((item) => item.id !== itemId);
@@ -796,8 +990,10 @@ function App() {
   };
 
   const updatePlanItemStatus = async (planId: string, itemId: string, status: PlanItemStatus) => {
-    if (!user || !activeAccountId) return;
-    const planRef = doc(getPlansCollectionRef(db, user.uid, activeAccountId), planId);
+    if (!user || !activeAccount) return;
+    const plansRef = getActiveScopedCollection<Plan>('plans');
+    if (!plansRef) return;
+    const planRef = doc(plansRef, planId);
     const plan = plans.find((entry) => entry.id === planId);
     if (!plan) return;
 
@@ -821,11 +1017,14 @@ function App() {
     categoryIds: string[];
     limitAmount: number;
   }) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
-    const budgetId = payload.budgetId || doc(getBudgetsCollectionRef(db, user.uid, activeAccountId)).id;
+    const budgetsRef = getActiveScopedCollection<Budget>('budgets');
+    if (!budgetsRef) return;
+
+    const budgetId = payload.budgetId || doc(budgetsRef).id;
     const now = new Date().toISOString();
-    await setDoc(doc(getBudgetsCollectionRef(db, user.uid, activeAccountId), budgetId), {
+    await setDoc(doc(budgetsRef, budgetId) as any, {
       month: payload.month,
       name: payload.name.trim(),
       categoryIds: payload.categoryIds,
@@ -837,13 +1036,15 @@ function App() {
   };
 
   const deleteBudget = async (budgetId: string) => {
-    if (!user || !activeAccountId) return;
-    await deleteDoc(doc(getBudgetsCollectionRef(db, user.uid, activeAccountId), budgetId));
+    if (!user || !activeAccount) return;
+    const budgetsRef = getActiveScopedCollection<Budget>('budgets');
+    if (!budgetsRef) return;
+    await deleteDoc(doc(budgetsRef, budgetId));
     showNotification('success', 'Anggaran Dihapus', 'Anggaran berhasil dihapus.', true);
   };
 
   const copyBudgetsFromPreviousMonth = async (targetMonth: string) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
     const previousMonth = getPreviousMonthKey(targetMonth);
     const sourceBudgets = normalizedBudgets.filter((budget) => budget.month === previousMonth);
@@ -862,8 +1063,10 @@ function App() {
     const batch = writeBatch(db);
     const now = new Date().toISOString();
     copyCandidates.forEach((budget) => {
-      const budgetRef = doc(getBudgetsCollectionRef(db, user.uid, activeAccountId));
-      batch.set(budgetRef, {
+      const budgetsRef = getActiveScopedCollection<Budget>('budgets');
+      if (!budgetsRef) return;
+      const budgetRef = doc(budgetsRef);
+      batch.set(budgetRef as any, {
         month: targetMonth,
         name: budget.name,
         categoryIds: budget.categoryIds,
@@ -886,13 +1089,16 @@ function App() {
     dueDate?: string;
     notes?: string;
   }) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
-    const debtId = payload.debtId || doc(getDebtsCollectionRef(db, user.uid, activeAccountId)).id;
+    const debtsRef = getActiveScopedCollection<DebtRecord>('debts');
+    if (!debtsRef) return;
+
+    const debtId = payload.debtId || doc(debtsRef).id;
     const now = new Date().toISOString();
     const existingDebt = debts.find((entry) => entry.id === debtId);
 
-    await setDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId), {
+    await setDoc(doc(debtsRef, debtId), {
       id: debtId,
       kind: payload.kind,
       personName: payload.personName.trim(),
@@ -918,13 +1124,15 @@ function App() {
   };
 
   const deleteDebt = async (debtId: string) => {
-    if (!user || !activeAccountId) return;
-    await deleteDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId));
+    if (!user || !activeAccount) return;
+    const debtsRef = getActiveScopedCollection<DebtRecord>('debts');
+    if (!debtsRef) return;
+    await deleteDoc(doc(debtsRef, debtId));
     showNotification('success', 'Catatan Dihapus', 'Catatan hutang piutang berhasil dihapus.', true);
   };
 
   const recordDebtPayment = async (debtId: string, payload: { amount: number; date: string; note?: string }) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
     const currentDebt = debts.find((entry) => entry.id === debtId);
     if (!currentDebt) return;
@@ -940,7 +1148,10 @@ function App() {
       ...(payload.note ? { note: payload.note } : {}),
     };
 
-    await updateDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId), {
+    const debtsRef = getActiveScopedCollection<DebtRecord>('debts');
+    if (!debtsRef) return;
+
+    await updateDoc(doc(debtsRef, debtId), {
       paidAmount: nextPaidAmount,
       remainingAmount: nextRemainingAmount,
       status: nextStatus,
@@ -952,12 +1163,15 @@ function App() {
   };
 
   const markDebtAsPaid = async (debtId: string) => {
-    if (!user || !activeAccountId) return;
+    if (!user || !activeAccount) return;
 
     const currentDebt = debts.find((entry) => entry.id === debtId);
     if (!currentDebt) return;
 
-    await updateDoc(doc(getDebtsCollectionRef(db, user.uid, activeAccountId), debtId), {
+    const debtsRef = getActiveScopedCollection<DebtRecord>('debts');
+    if (!debtsRef) return;
+
+    await updateDoc(doc(debtsRef, debtId), {
       paidAmount: currentDebt.amount,
       remainingAmount: 0,
       status: 'PAID',
@@ -973,8 +1187,10 @@ function App() {
 
   // Delete all transactions
   const deleteAllTransactions = async () => {
-    if (!user || !activeAccountId) return;
-    const txQuery = query(getTransactionsCollectionRef(db, user.uid, activeAccountId));
+    if (!user || !activeAccount) return;
+    const transactionsRef = getActiveScopedCollection<Transaction>('transactions');
+    if (!transactionsRef) return;
+    const txQuery = query(transactionsRef);
     const snapshot = await getDocs(txQuery);
     const batch = writeBatch(db);
     snapshot.docs.forEach((document) => {
@@ -1006,7 +1222,6 @@ function App() {
   const formatBalance = (val: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
-  const activeAccount = accounts.find((account) => account.id === activeAccountId) || null;
   const onboardingStorageKey = user && activeAccountId
     ? `dompetcerdas_onboarding_seen_${user.uid}_${activeAccountId}`
     : null;
@@ -1464,10 +1679,15 @@ function App() {
                 activeAccountName={activeAccount?.name || null}
                 telegramLinked={telegramLinked}
                 telegramDefaultAccountId={telegramDefaultAccountId}
+                activeSharedInviteCode={activeSharedInviteCode}
+                sharedAccountMembers={sharedAccountMembers}
                 onOpenOnboarding={openOnboarding}
                 onUpdateTelegramAccount={updateTelegramDefaultAccount}
                 onCreateAccount={createAccount}
+                onGenerateSharedInviteCode={generateSharedInviteCode}
+                onJoinSharedAccount={joinSharedAccount}
                 onSwitchAccount={switchAccount}
+                onDeleteAccount={deleteAccount}
                 onDeleteAllTransactions={deleteAllTransactions}
                 transactionCount={transactions.length}
                 transactions={transactions}
@@ -1614,4 +1834,3 @@ function App() {
 }
 
 export default App;
-

@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.7.1
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.7.2
 
 **Status**: ✅ Fully Documented
 **Last Updated**: March 30, 2026
-**Version**: 2.7.1
+**Version**: 2.7.2
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -20,9 +20,11 @@
 - ✅ Standardisasi layout lintas menu dengan `PageHeader`, `FullScreenDialog`, dan default MUI component overrides
 - ✅ Multi-`Akun Keuangan` untuk memisahkan data pribadi, keluarga, bisnis, atau bersama
 - ✅ Kolaborasi sederhana untuk akun bersama: anggota, kode gabung, dan shared data lintas user
+- ✅ Pengaturan `Akun Keuangan` sekarang lebih simple: daftar akun, popup tambah akun, dan guard hapus akun kosong
 - ✅ Dashboard dengan pie chart breakdown
 - ✅ Toggle privasi untuk sembunyikan nominal saldo di dashboard
 - ✅ Riwayat transaksi per hari dalam card terpisah dengan header tanggal yang lebih jelas
+- ✅ Halaman `Rencana` dan `Anggaran` dirapikan ke layout yang lebih minimal dan lebih mudah discan
 - ✅ Receipt scanning via Telegram (Vision API)
 - ✅ Natural language queries ("berapa pengeluaran hari ini?")
 - ✅ Preview + confirm sebelum transaksi Telegram disimpan
@@ -185,6 +187,8 @@ dompet_cerdas/
 - **Active Account Context**: Semua transaksi, kategori, rencana, anggaran, dan hutang piutang scoped ke akun aktif
 - **Telegram Default Account**: Bot Telegram punya akun default sendiri yang bisa berbeda dari akun aktif web
 - **Migration Support**: User lama otomatis dibuatkan akun default `Pribadi`
+- **Simplified Settings UI**: Daftar akun tampil langsung, tambah akun lewat popup kecil, dan perpindahan akun cukup satu klik
+- **Delete Guard**: Akun biasa hanya bisa dihapus kalau belum punya transaksi; akun terakhir tidak bisa dihapus; akun bersama belum dihapus dari menu ini
 
 ### 3️⃣ Transaksi (Transactions)
 - **CRUD**: Add, edit, delete transactions
@@ -198,6 +202,7 @@ dompet_cerdas/
 
 ### 4️⃣ Rencana
 - **Multiple Plans**: Buat beberapa rencana sekaligus
+- **Minimal Plan Entry**: Pembuatan rencana utama sekarang lewat popup singkat agar halaman daftar tetap bersih
 - **Edit Items**: Full edit dengan modal form
 - **Tanggal Rencana**: Set tanggal rencana per item bila diperlukan
 - **Status Item**: Direncanakan, Sudah Dicatat, atau Dibatalkan
@@ -215,6 +220,8 @@ dompet_cerdas/
 
 ### 6️⃣ Anggaran
 - **Budget Plan Bulanan**: User membuat anggaran yang ingin dipantau, bukan semua kategori sekaligus
+- **Minimal Overview**: Ringkasan anggaran bulanan diringkas jadi summary strip yang lebih ringan daripada blok statistik besar
+- **Compact Month Switcher**: Kontrol pindah bulan dibuat lebih kecil dan fokus ke konteks bulan aktif
 - **Multi-Kategori**: Satu anggaran bisa berisi satu atau beberapa kategori
 - **Progress Tracking**: Lihat sudah terpakai, sisa anggaran, dan anggaran yang melebihi batas
 - **Copy Previous Month**: Salin anggaran bulan lalu ke bulan aktif
@@ -852,6 +859,12 @@ firebase functions:log
 
 ## 🧾 Changelog
 
+### v2.7.2 - March 30, 2026
+- UI `Akun Keuangan` disederhanakan menjadi daftar akun yang lebih mudah discan, dengan popup tambah akun dan aksi yang lebih jelas.
+- Hapus akun sekarang aman secara aturan: akun biasa hanya bisa dihapus saat belum punya transaksi, akun terakhir tidak bisa dihapus, dan akun bersama belum dihapus dari menu ini.
+- Halaman `Rencana` dirapikan dengan flow pembuatan via popup dan card daftar yang lebih minimal.
+- Halaman `Anggaran` dibuat lebih ringan dengan month switcher compact, summary strip, dan action area yang lebih rapi.
+
 ### v2.7.1 - March 30, 2026
 - Standardisasi UI lintas menu agar lebih konsisten berbasis Material UI, termasuk `PageHeader`, `FullScreenDialog`, confirm dialog, notification dialog, dan attachment preview.
 - Semua form utama dipindah ke pola full-screen agar pengalaman create/edit lebih seragam di transaksi, kategori, anggaran, rencana, hutang piutang, onboarding, dan beberapa aksi pengaturan.
@@ -863,6 +876,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.7.2** | Mar 30, 2026 | Simplifikasi visual Akun Keuangan, Rencana, dan Anggaran; guard hapus akun lebih aman |
 | **v2.7.1** | Mar 30, 2026 | Standardisasi UI Material UI, full-screen form flow, grouping transaksi per hari, hide saldo dashboard, dan SOP finishing |
 | **v2.7.0** | Mar 29, 2026 | Kolaborasi akun bersama: anggota, kode gabung, dan shared data lintas user |
 | **v2.6.0** | Mar 28, 2026 | Akun Keuangan, Rencana, Anggaran, Telegram multi-input + voice, Hutang Piutang, onboarding |
