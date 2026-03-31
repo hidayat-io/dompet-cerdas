@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
@@ -192,6 +192,27 @@ function buildMuiTheme(t: Theme) {
                     },
                 },
             },
+            MuiCssBaseline: {
+                styleOverrides: {
+                    body: {
+                        margin: 0,
+                    },
+                    '::-webkit-scrollbar': {
+                        width: 8,
+                        height: 8,
+                    },
+                    '::-webkit-scrollbar-track': {
+                        background: 'transparent',
+                    },
+                    '::-webkit-scrollbar-thumb': {
+                        background: t.name === 'dark' ? 'rgba(148, 163, 184, 0.32)' : 'rgba(0, 0, 0, 0.15)',
+                        borderRadius: 4,
+                    },
+                    '::-webkit-scrollbar-thumb:hover': {
+                        background: t.name === 'dark' ? 'rgba(148, 163, 184, 0.48)' : 'rgba(0, 0, 0, 0.25)',
+                    },
+                },
+            },
             MuiDialog: {
                 defaultProps: {
                     fullWidth: true,
@@ -322,27 +343,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     const toggleTheme = () => {
         setTheme(isDark ? 'light' : 'dark');
     };
-
-    // Apply theme to document
-    useEffect(() => {
-        const root = document.documentElement;
-
-        // Set CSS variables
-        Object.entries(theme.colors).forEach(([key, value]) => {
-            root.style.setProperty(`--${key}`, value);
-        });
-
-        // Set body and html background
-        document.body.style.backgroundColor = theme.colors.bgPrimary;
-        document.body.style.color = theme.colors.textPrimary;
-
-        // Add/remove dark class for any native dark mode CSS
-        if (isDark) {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-    }, [theme, isDark]);
 
     const muiTheme = buildMuiTheme(theme);
 

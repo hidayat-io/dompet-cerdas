@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.7.2
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.0
 
 **Status**: ✅ Fully Documented
 **Last Updated**: March 30, 2026
-**Version**: 2.7.2
+**Version**: 2.8.0
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -155,8 +155,8 @@ dompet_cerdas/
 | **Frontend** | React | 19.x | UI framework |
 | **Build** | Vite | 6.x | Build tool & dev server |
 | **Language** | TypeScript | 5.8 | Type safety |
-| **UI Library** | Material UI (MUI) | 6.x | Component library, theming, sx prop |
-| **Icons** | @mui/icons-material | 6.x | 150+ Material icons |
+| **UI Library** | Material UI (MUI) | 7.x | Component library, theming, sx prop |
+| **Icons** | Material Symbols (web font) | Latest | 150+ Material-style icons tanpa JS bundle besar |
 | **Charts** | Recharts | 3.x | Expense pie chart |
 | **Auth** | Firebase Auth | 12.x | Google sign-in |
 | **Database** | Firestore | 12.x | Real-time NoSQL DB |
@@ -213,7 +213,7 @@ dompet_cerdas/
 ### 5️⃣ Master Kategori (Categories)
 - **CRUD**: Add, edit, delete categories
 - **Separated Views**: Income vs Expense categories
-- **Icon Selection**: 150+ Material icons (`@mui/icons-material`)
+- **Icon Selection**: 150+ Material-style icons via Material Symbols web font
 - **Color Picker**: 8 preset colors
 - **Type Classification**: Income or Expense
 - **Reusable Modal**: Consistent UX across app dengan pola full-screen saat create/edit
@@ -651,7 +651,9 @@ AI Advisor: 30s cooldown, 10/hour, 50/day per user
 ## 📊 Performance & Optimization
 
 ### Build Output
-- ~1.75MB JS bundle (termasuk MUI + ExcelJS)
+- Initial app shell ~85KB JS + lazy-loaded feature chunks
+- Vendor chunks dipisah (React, Firebase, MUI, charts, ExcelJS)
+- Dashboard chart dipindah ke chunk lazy terpisah agar statistik utama tampil lebih cepat
 - Committed `dist/` folder for low-RAM server deployment
 - Vite cache for fast development rebuilds
 
@@ -671,7 +673,13 @@ AI Advisor: 30s cooldown, 10/hour, 50/day per user
 - Manifest.json configured
 - App icons: 512x512, 192x192, apple touch icon
 - Installable to home screen
-- Service worker ready (basic assets caching)
+- Service worker with precache + runtime cache
+- Offline fallback page for navigation failures
+- Firestore persistent local cache for offline reads
+- Update prompt when new service worker is ready
+- Pending sync indicator, reconnect toast, dan sync completed toast
+- Offline attachment upload queue dengan retry saat koneksi kembali
+- Conflict warning untuk edit transaksi lintas tab/perangkat
 
 ---
 
@@ -760,7 +768,7 @@ firebase functions:log
 |------|----------|
 | Add new feature | `App.tsx` for state, `components/` for UI |
 | Change theme colors | `contexts/ThemeContext.tsx` |
-| Add new icon | Tambah nama icon di `constants.ts` AVAILABLE_ICONS (string nama `@mui/icons-material`) |
+| Add new icon | Tambah nama icon di `constants.ts` AVAILABLE_ICONS lalu map ke simbol di `components/IconDisplay.tsx` |
 | Modify database queries | `App.tsx` or service files in `services/` |
 | Update AI advisor | `functions/src/services/advisorService.ts` |
 | Change NLU logic | `functions/src/services/nluService.ts` |
@@ -807,9 +815,24 @@ firebase functions:log
 ## 🚨 Known Issues
 
 1. **Firestore Index**: Collection group query memerlukan index (auto-created, 5-15 min to build)
-2. **Large Bundle**: ~1.75MB JS bundle (MUI + ExcelJS; consider code splitting)
+2. **Large Vendor Chunks**: Firebase + ExcelJS masih besar, walau initial app shell sudah di-split
 3. **Single Currency**: Only IDR (Indonesian Rupiah)
-4. **Limited Offline**: Basic asset caching, full PWA planned
+4. **Conflict Handling Scope**: Conflict warning baru matang di transaksi; modul lain masih mengandalkan last-write-wins Firestore
+
+---
+
+## 🗂️ Upcoming Feature TODO
+
+1. **Attachment Queue Polish**
+   Tambah progress/retry detail per item, dukungan penggantian lampiran berulang sebelum reconnect, dan indikator yang lebih kaya di UI.
+2. **Conflict UX Expansion**
+   Bawa warning conflict ke kategori, anggaran, rencana, dan hutang piutang agar perilaku multi-device lebih konsisten.
+3. **Performance Round 2**
+   Audit lanjutan untuk `firebase-firestore`, `exceljs`, dan dependency besar lain jika target berikutnya adalah mobile low-end.
+4. **Shared Account Offline Strategy**
+   Definisikan fallback offline yang lebih tegas untuk operasi berbasis Cloud Functions seperti join shared account atau generate invite.
+5. **Release QA / E2E**
+   Jalankan browser QA penuh untuk skenario multi-tab, offline-online, attachment retry, dan service worker update sebelum rilis publik penuh.
 
 ---
 
@@ -859,6 +882,13 @@ firebase functions:log
 
 ## 🧾 Changelog
 
+### v2.8.0 - March 30, 2026
+- Fondasi PWA diselesaikan dengan service worker, offline fallback, prompt update versi, dan Firestore local persistence.
+- Initial load dirapikan lewat chunk splitting, lazy screen loading, pemecahan runtime Firebase, dan pemindahan chart dashboard ke lazy chunk terpisah.
+- Sistem icon dipindah ke Material Symbols web font sehingga bundle icon JS besar tidak lagi ikut dibawa.
+- Offline UX dipoles dengan indikator sync, reconnect toast, queue cleanup storage, attachment upload queue berbasis IndexedDB, dan retry otomatis saat koneksi kembali.
+- Edit transaksi sekarang punya warning conflict lintas tab/perangkat agar perubahan tidak tertimpa diam-diam.
+
 ### v2.7.2 - March 30, 2026
 - UI `Akun Keuangan` disederhanakan menjadi daftar akun yang lebih mudah discan, dengan popup tambah akun dan aksi yang lebih jelas.
 - Hapus akun sekarang aman secara aturan: akun biasa hanya bisa dihapus saat belum punya transaksi, akun terakhir tidak bisa dihapus, dan akun bersama belum dihapus dari menu ini.
@@ -876,6 +906,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.0** | Mar 30, 2026 | Fondasi PWA/offline, attachment retry, conflict warning transaksi, lazy loading dashboard, dan optimasi bundle |
 | **v2.7.2** | Mar 30, 2026 | Simplifikasi visual Akun Keuangan, Rencana, dan Anggaran; guard hapus akun lebih aman |
 | **v2.7.1** | Mar 30, 2026 | Standardisasi UI Material UI, full-screen form flow, grouping transaksi per hari, hide saldo dashboard, dan SOP finishing |
 | **v2.7.0** | Mar 29, 2026 | Kolaborasi akun bersama: anggota, kode gabung, dan shared data lintas user |
@@ -901,6 +932,6 @@ firebase functions:log
 
 ---
 
-**Last Updated**: March 30, 2026
+**Last Updated**: March 31, 2026
 **Status**: ✅ Internal Testing Ready
 **Support**: Check documentation or Firebase console logs

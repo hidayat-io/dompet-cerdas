@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme, themes } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
-import { Toast } from './ConfirmDialog';
+import Toast from './Toast';
 import { Transaction, Category, FinancialAccount, AccountType, SharedAccountMember } from '../types';
 import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
 import { APP_VERSION, APP_BUILD_DATE } from '../constants';

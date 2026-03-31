@@ -11,6 +11,11 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+
+    function isSharedMember(sharedAccountId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/sharedAccounts/$(sharedAccountId)/members/$(request.auth.uid));
+    }
     
     // Link tokens - Cloud Functions only (Admin SDK bypasses rules)
     match /link_tokens/{token} {
@@ -69,6 +74,40 @@ service cloud.firestore {
       // Telegram link
       match /telegram_link/{linkId} {
         allow read, write: if isOwner(userId);
+      }
+    }
+
+    match /sharedAccounts/{sharedAccountId} {
+      allow read: if isSharedMember(sharedAccountId);
+      allow write: if false;
+
+      match /members/{memberId} {
+        allow read: if isSharedMember(sharedAccountId);
+        allow write: if false;
+      }
+
+      match /categories/{categoryId} {
+        allow read, write: if isSharedMember(sharedAccountId);
+      }
+
+      match /transactions/{transactionId} {
+        allow read, write: if isSharedMember(sharedAccountId);
+      }
+
+      match /plans/{planId} {
+        allow read, write: if isSharedMember(sharedAccountId);
+      }
+
+      match /budgets/{budgetId} {
+        allow read, write: if isSharedMember(sharedAccountId);
+      }
+
+      match /debts/{debtId} {
+        allow read, write: if isSharedMember(sharedAccountId);
+      }
+
+      match /simulations/{simulationId} {
+        allow read, write: if isSharedMember(sharedAccountId);
       }
     }
     

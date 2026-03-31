@@ -29,10 +29,12 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import FullScreenDialog from './FullScreenDialog';
 import PageHeader from './PageHeader';
+import type { OfflineAttachmentUploadJob } from '../services/offlineAttachmentQueue';
 
 interface TransactionListProps {
   transactions: Transaction[];
   categories: Category[];
+  pendingAttachmentUploads?: Record<string, OfflineAttachmentUploadJob>;
   onDelete: (id: string) => void;
   onUpdate?: (
     id: string,
@@ -131,7 +133,7 @@ const generateYearOptions = (): number[] => {
 
 type FilterMode = 'month' | 'range';
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, pendingAttachmentUploads = {}, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
   const { theme } = useTheme();
 
   const [viewingAttachment, setViewingAttachment] = useState<{
@@ -755,6 +757,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                         : t.attachment
                         ? { url: t.attachment.url, name: t.attachment.name, type: t.attachment.type }
                         : null;
+                      const pendingAttachmentUpload = pendingAttachmentUploads[t.id];
 
                       return (
                         <React.Fragment key={t.id}>
@@ -807,6 +810,20 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                                       }}
                                     />
                                   )}
+                                  {pendingAttachmentUpload && (
+                                    <Chip
+                                      size="small"
+                                      icon={<IconDisplay name="Loader" size={12} />}
+                                      label="Menunggu upload"
+                                      sx={{
+                                        height: 20,
+                                        fontSize: 10,
+                                        color: theme.colors.accent,
+                                        bgcolor: theme.colors.accentLight,
+                                        '& .MuiChip-label': { px: 1 },
+                                      }}
+                                    />
+                                  )}
                                 </Box>
                               }
                               sx={{ m: 0, pr: 2 }}
@@ -836,6 +853,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
         <TransactionForm
           categories={categories}
           initialData={editingTransaction}
+          latestData={transactions.find((transaction) => transaction.id === editingTransaction.id) || editingTransaction}
           onUpdate={onUpdate}
           onDelete={onDelete}
           onAddCategory={onAddCategory}

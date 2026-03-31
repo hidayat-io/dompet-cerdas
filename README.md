@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.7.2
+# DompetCerdas - Smart Expense Tracker v2.8.0
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -20,6 +20,9 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - Onboarding ringan untuk user baru, helper dashboard, dan panduan singkat di Settings
 - AI financial advisor with 3 analysis modes and backend quota
 - Excel export with date range selection
+- PWA installable dengan offline shell, sync indicator, dan update flow yang lebih rapi
+- Attachment upload queue saat offline dengan retry otomatis saat koneksi kembali
+- Warning conflict untuk edit transaksi lintas tab/perangkat
 
 ### 🤖 Telegram Bot (@dompas_bot)
 - **Receipt Scanning**: Upload photos, AI extracts data automatically
@@ -42,14 +45,22 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - Riwayat transaksi sekarang dikelompokkan per hari dengan card terpisah agar perbedaan tanggal lebih mudah discan
 - Pengaturan akun, daftar rencana, dan ringkasan anggaran sekarang diarahkan ke layout yang lebih minimal dan lebih mudah discan
 - Deploy hosting sekarang wajib lewat smoke check agar root `/` dan route SPA tetap aman setelah rilis
+- Dashboard chart sekarang lazy-loaded, dan status sync/offline lebih jelas untuk penggunaan mobile/PWA
 
 ## Current Release
 
-- **Version**: `v2.7.2`
+- **Version**: `v2.8.0`
 - **Build Date**: `March 30, 2026`
-- **Status**: Internal testing build dengan simplifikasi visual untuk akun, rencana, dan anggaran agar lebih minimal, rapi, dan mudah dipakai
+- **Status**: Release candidate dengan PWA/offline yang lebih matang, attachment retry, conflict warning transaksi, dan optimasi performa dashboard
 
 ## Changelog
+
+### v2.8.0 - March 30, 2026
+- Fondasi PWA diselesaikan dengan service worker, offline fallback, prompt update versi, dan Firestore local persistence.
+- Initial load dirapikan lewat chunk splitting, lazy screen loading, pemecahan runtime Firebase, dan pemindahan chart dashboard ke lazy chunk terpisah.
+- Sistem icon dipindah ke Material Symbols web font sehingga bundle icon JS besar tidak lagi ikut dibawa.
+- Offline UX dipoles dengan indikator sync, reconnect toast, queue cleanup storage, attachment upload queue berbasis IndexedDB, dan retry otomatis saat koneksi kembali.
+- Edit transaksi sekarang punya warning conflict lintas tab/perangkat agar perubahan tidak tertimpa diam-diam.
 
 ### v2.7.2 - March 30, 2026
 - UI `Akun Keuangan` disederhanakan menjadi daftar akun yang lebih mudah discan, dengan alur `Tambah Akun` via popup kecil dan aksi `Pakai` yang lebih langsung.
@@ -69,7 +80,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 | Component | Technology |
 |-----------|------------|
 | Frontend | React 19, TypeScript, Vite |
-| UI Library | **Material UI (MUI)** v6, `@mui/icons-material` |
+| UI Library | **Material UI (MUI)** v7 + Material Symbols web font |
 | Hosting | **Firebase Hosting** (CDN Global) |
 | Backend | Firebase Functions (Node.js 22) |
 | Database | Firestore |
@@ -123,6 +134,14 @@ npm run deploy:hosting:safe
 - [docs/TELEGRAM_INTEGRATION.md](./docs/TELEGRAM_INTEGRATION.md) - Dokumentasi teknis integrasi bot Telegram
 - [deploy/DEPLOY_GUIDE.md](./deploy/DEPLOY_GUIDE.md) - Panduan deploy dan smoke check hosting
 - [TESTING.md](./TESTING.md) - Panduan test bot dan regression checklist
+
+## Upcoming Feature TODO
+
+- Attachment replacement queue yang lebih lengkap untuk kasus edit berulang sebelum reconnect, termasuk progress/retry detail per item.
+- Conflict resolution UX untuk modul selain transaksi: kategori, anggaran, rencana, dan hutang piutang.
+- Audit lanjutan untuk `firebase-firestore`, `exceljs`, dan sisa chunk besar lain kalau ingin mengejar mobile low-end.
+- Offline write sync yang lebih cerdas untuk operasi berbasis Cloud Functions atau shared account, termasuk fallback queue yang lebih eksplisit.
+- QA browser/E2E pass untuk skenario multi-tab, offline-online, attachment retry, dan update service worker sebelum rilis publik penuh.
 
 ## Workflow
 

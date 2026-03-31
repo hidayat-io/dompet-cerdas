@@ -1,7 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import {
-  PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer
-} from 'recharts';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -13,8 +10,6 @@ import Divider from '@mui/material/Divider';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardActionArea from '@mui/material/CardActionArea';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemText from '@mui/material/ListItemText';
@@ -24,6 +19,8 @@ import IconDisplay from './IconDisplay';
 import PageHeader from './PageHeader';
 import { useTheme } from '../contexts/ThemeContext';
 import { getBudgetOverview, getBudgetSummaries, getMonthKey } from '../utils/budget';
+
+const DashboardExpenseChart = lazy(() => import('./DashboardExpenseChart'));
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -277,46 +274,19 @@ const Dashboard: React.FC<DashboardProps> = ({
         <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
           <Typography variant="h6" fontWeight={700} mb={3}>Statistik Pengeluaran</Typography>
           {expenseByCategory.length > 0 ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <Box sx={{ height: 240, position: 'relative' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={expenseByCategory} cx="50%" cy="50%" innerRadius={70} outerRadius={90} paddingAngle={4} dataKey="value" stroke="none">
-                      {expenseByCategory.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip
-                      formatter={(value: number) => formatRp(value)}
-                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', backgroundColor: theme.colors.bgCard, color: theme.colors.textPrimary }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                  <Typography variant="caption" color="text.secondary" textTransform="uppercase" fontWeight={600} letterSpacing={1}>Total Keluar</Typography>
-                  <Typography variant="h6" fontWeight={800}>{formatRp(totalExpense)}</Typography>
+            <Suspense
+              fallback={(
+                <Box sx={{ height: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, color: 'text.secondary' }}>
+                  <IconDisplay name="PieChart" size={40} sx={{ opacity: 0.3 }} />
+                  <Typography variant="body2">Menyiapkan grafik pengeluaran...</Typography>
                 </Box>
-              </Box>
-              <List disablePadding>
-                {expenseByCategory.slice(0, 4).map((item, idx, arr) => (
-                  <React.Fragment key={idx}>
-                    <ListItem disableGutters sx={{ py: 1.5 }}>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: item.color, width: 36, height: 36 }}>
-                          <IconDisplay name={item.icon} size={18} sx={{ color: '#fff' }} />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText 
-                        primary={<Typography variant="subtitle2" fontWeight={700}>{item.name}</Typography>} 
-                        secondary={<Typography variant="caption" color="text.secondary">{((item.value / totalExpense) * 100).toFixed(1)}%</Typography>}
-                      />
-                      <Typography variant="subtitle2" fontWeight={700}>{formatRp(item.value)}</Typography>
-                    </ListItem>
-                    {idx < arr.length - 1 && <Divider component="li" />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </Box>
+              )}
+            >
+              <DashboardExpenseChart
+                expenseByCategory={expenseByCategory}
+                totalExpense={totalExpense}
+              />
+            </Suspense>
           ) : (
             <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'text.disabled' }}>
               <IconDisplay name="PieChart" size={64} sx={{ opacity: 0.15 }} />

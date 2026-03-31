@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline • DompetCerdas</title>
+  <meta name="theme-color" content="#4F46E5" />
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top, rgba(79, 70, 229, 0.12), transparent 45%),
+        #f8fafc;
+    }
+
+    main {
+      width: min(100%, 420px);
+      padding: 28px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(99, 102, 241, 0.12);
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 1.5rem;
+      line-height: 1.2;
+    }
+
+    p {
+      margin: 0 0 12px;
+      line-height: 1.6;
+      color: #475569;
+    }
+
+    button {
+      margin-top: 8px;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 999px;
+      background: #4f46e5;
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Anda sedang offline</h1>
+    <p>DompetCerdas masih bisa membuka shell aplikasi yang sudah pernah dimuat, tapi data terbaru membutuhkan koneksi internet.</p>
+    <p>Coba sambungkan lagi internet, lalu refresh halaman ini.</p>
+    <button type="button" onclick="window.location.reload()">Coba Lagi</button>
+  </main>
+</body>
+</html>

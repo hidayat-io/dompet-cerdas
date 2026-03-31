@@ -1,7 +1,12 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
-import { getStorage, FirebaseStorage } from "firebase/storage";
+import {
+    Firestore,
+    getFirestore,
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
+} from "firebase/firestore";
 
 // --- KONFIGURASI FIREBASE (PRODUCTION) ---
 // PENTING: authDomain menggunakan custom domain untuk menghindari
@@ -20,7 +25,6 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let authInstance: Auth;
 let dbInstance: Firestore;
-let storageInstance: FirebaseStorage;
 let googleProviderInstance: GoogleAuthProvider;
 
 // --- INITIALIZATION ---
@@ -34,8 +38,16 @@ try {
 
     // Setup Services
     authInstance = getAuth(app);
-    dbInstance = getFirestore(app);
-    storageInstance = getStorage(app);
+    try {
+        dbInstance = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager(),
+            }),
+        });
+    } catch (firestoreInitError) {
+        console.warn("Firestore persistence fallback:", firestoreInitError);
+        dbInstance = getFirestore(app);
+    }
     googleProviderInstance = new GoogleAuthProvider();
 
 } catch (criticalError) {
@@ -45,6 +57,5 @@ try {
 // --- EXPORTS ---
 export const auth = authInstance!;
 export const db = dbInstance!;
-export const storage = storageInstance!;
 export const googleProvider = googleProviderInstance!;
 export const firebaseApp = app!;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, firebaseApp } from '../firebase';
+import { auth } from '../firebase';
+import { callCloudFunction } from '../services/firebaseRuntime';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -55,14 +55,11 @@ const LinkTelegram: React.FC = () => {
             setMessage('Memvalidasi token...');
             setMessage('Menghubungkan akun Telegram...');
 
-            const functions = getFunctions(firebaseApp, 'asia-southeast1');
-            const linkTelegram = httpsCallable(functions, 'linkTelegram');
-
             console.log('Calling linkTelegram function:', { userId: user.uid });
-            const result = await linkTelegram({ token });
-            const telegramId = (result.data as { telegramId?: number })?.telegramId;
-            const accountName = (result.data as { accountName?: string })?.accountName;
-            console.log('linkTelegram response:', result.data);
+            const result = await callCloudFunction<{ token: string }, { telegramId?: number; accountName?: string }>('linkTelegram', { token });
+            const telegramId = result?.telegramId;
+            const accountName = result?.accountName;
+            console.log('linkTelegram response:', result);
             if (accountName) setLinkedAccountName(accountName);
 
             try {

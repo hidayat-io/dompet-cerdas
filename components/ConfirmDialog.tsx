@@ -6,8 +6,6 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import Snackbar from '@mui/material/Snackbar';
-import Alert from '@mui/material/Alert';
 import IconDisplay from './IconDisplay';
 import { IconName } from '../types';
 
@@ -114,49 +112,6 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 </Button>
             </DialogActions>
         </Dialog>
-    );
-};
-
-// Inline Toast — dipakai di beberapa tempat via named export
-interface ToastProps {
-    isOpen: boolean;
-    onClose: () => void;
-    message: string;
-    type?: 'success' | 'error' | 'info';
-    duration?: number;
-}
-
-export const Toast: React.FC<ToastProps> = ({
-    isOpen,
-    onClose,
-    message,
-    type = 'success',
-    duration = 1600,
-}) => {
-    React.useEffect(() => {
-        if (isOpen && duration > 0) {
-            const timer = setTimeout(onClose, duration);
-            return () => clearTimeout(timer);
-        }
-    }, [isOpen, duration, onClose]);
-
-    const severity = type === 'error' ? 'error' : type === 'info' ? 'info' : 'success';
-
-    return (
-        <Snackbar
-            open={isOpen}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            sx={{ bottom: { xs: 96, md: 32 } }}
-        >
-            <Alert
-                onClose={onClose}
-                severity={severity}
-                variant="filled"
-                sx={{ fontWeight: 600, alignItems: 'center' }}
-            >
-                {message}
-            </Alert>
-        </Snackbar>
     );
 };
 

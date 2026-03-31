@@ -5,6 +5,8 @@ const getDb = () => admin.firestore();
 export interface AccountContext {
     userId: string;
     accountId?: string;
+    sharedAccountId?: string;
+    role?: 'OWNER' | 'MEMBER';
     usesLegacyPaths: boolean;
 }
 
@@ -19,9 +21,12 @@ export async function getAccountContext(userId: string, preferredAccountId?: str
         const accountSnap = await accountRef.get();
 
         if (accountSnap.exists) {
+            const accountData = accountSnap.data() as { sharedAccountId?: string; role?: 'OWNER' | 'MEMBER' };
             return {
                 userId,
                 accountId: resolvedAccountId,
+                sharedAccountId: accountData.sharedAccountId,
+                role: accountData.role,
                 usesLegacyPaths: false,
             };
         }
@@ -37,28 +42,36 @@ export function getCategoriesCollection(context: AccountContext) {
     const userRef = getDb().collection('users').doc(context.userId);
     return context.usesLegacyPaths
         ? userRef.collection('categories')
-        : userRef.collection('accounts').doc(context.accountId!).collection('categories');
+        : context.sharedAccountId
+            ? getDb().collection('sharedAccounts').doc(context.sharedAccountId).collection('categories')
+            : userRef.collection('accounts').doc(context.accountId!).collection('categories');
 }
 
 export function getTransactionsCollection(context: AccountContext) {
     const userRef = getDb().collection('users').doc(context.userId);
     return context.usesLegacyPaths
         ? userRef.collection('transactions')
-        : userRef.collection('accounts').doc(context.accountId!).collection('transactions');
+        : context.sharedAccountId
+            ? getDb().collection('sharedAccounts').doc(context.sharedAccountId).collection('transactions')
+            : userRef.collection('accounts').doc(context.accountId!).collection('transactions');
 }
 
 export function getPlansCollection(context: AccountContext) {
     const userRef = getDb().collection('users').doc(context.userId);
     return context.usesLegacyPaths
         ? userRef.collection('simulations')
-        : userRef.collection('accounts').doc(context.accountId!).collection('plans');
+        : context.sharedAccountId
+            ? getDb().collection('sharedAccounts').doc(context.sharedAccountId).collection('plans')
+            : userRef.collection('accounts').doc(context.accountId!).collection('plans');
 }
 
 export function getLegacySimulationsCollection(context: AccountContext) {
     const userRef = getDb().collection('users').doc(context.userId);
     return context.usesLegacyPaths
         ? userRef.collection('simulations')
-        : userRef.collection('accounts').doc(context.accountId!).collection('simulations');
+        : context.sharedAccountId
+            ? getDb().collection('sharedAccounts').doc(context.sharedAccountId).collection('simulations')
+            : userRef.collection('accounts').doc(context.accountId!).collection('simulations');
 }
 
 export async function getScopedCollections(userId: string, preferredAccountId?: string) {

@@ -1,6 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { firebaseApp } from "../firebase";
+import { callCloudFunction } from "./firebaseRuntime";
 import { Category, Transaction } from "../types";
 
 const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
@@ -65,14 +64,10 @@ export const getFinancialAdvice = async (
   _categories: Category[],
   mode: FinancialAnalysisMode = "HEALTH"
 ): Promise<FinancialAnalysisResult> => {
-  const functions = getFunctions(firebaseApp, "asia-southeast1");
-  const analyzeFinancialData = httpsCallable<{ mode: FinancialAnalysisMode }, FinancialAnalysisResult>(
-    functions,
-    "analyzeFinancialData"
+  return callCloudFunction<{ mode: FinancialAnalysisMode }, FinancialAnalysisResult>(
+    "analyzeFinancialData",
+    { mode }
   );
-
-  const response = await analyzeFinancialData({ mode });
-  return response.data;
 };
 
 export const validateCategoryWithAI = async (

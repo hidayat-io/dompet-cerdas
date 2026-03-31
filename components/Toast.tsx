@@ -3,6 +3,7 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 
 interface ToastProps {
+    isOpen?: boolean;
     message: string;
     type?: 'success' | 'error' | 'info';
     duration?: number;
@@ -10,23 +11,24 @@ interface ToastProps {
 }
 
 const Toast: React.FC<ToastProps> = ({
+    isOpen = true,
     message,
     type = 'success',
     duration = 1600,
     onClose
 }) => {
     useEffect(() => {
-        if (duration > 0) {
+        if (isOpen && duration > 0) {
             const timer = setTimeout(onClose, duration);
             return () => clearTimeout(timer);
         }
-    }, [duration, onClose]);
+    }, [isOpen, duration, onClose]);
 
     const severity = type === 'error' ? 'error' : type === 'info' ? 'info' : 'success';
 
     return (
         <Snackbar
-            open
+            open={isOpen}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             sx={{ bottom: { xs: 96, md: 32 } }}
         >

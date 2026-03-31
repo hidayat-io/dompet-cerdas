@@ -10,6 +10,9 @@ import Chip from '@mui/material/Chip';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Paper from '@mui/material/Paper';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import { Category, TransactionType, Transaction } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
@@ -23,6 +26,7 @@ import { NotificationType } from './NotificationModal';
 interface TransactionFormProps {
   categories: Category[];
   initialData?: Transaction;
+  latestData?: Transaction | null;
   onAdd?: (amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' }) => Promise<void>;
   onUpdate?: (id: string, amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' } | null) => Promise<void>;
   onDelete?: (id: string) => void;
@@ -31,7 +35,42 @@ interface TransactionFormProps {
   onShowNotification?: (type: NotificationType, title: string, message: string, autoClose?: boolean) => void;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
+const getTransactionAttachmentSummary = (transaction?: Transaction | null) => {
+  if (!transaction) return 'none';
+
+  if (transaction.attachment) {
+    return JSON.stringify({
+      name: transaction.attachment.name,
+      type: transaction.attachment.type,
+      path: transaction.attachment.path,
+      url: transaction.attachment.url,
+    });
+  }
+
+  if (transaction.attachmentUrl || transaction.attachmentName || transaction.attachmentType) {
+    return JSON.stringify({
+      name: transaction.attachmentName || null,
+      type: transaction.attachmentType || null,
+      url: transaction.attachmentUrl || null,
+    });
+  }
+
+  return 'none';
+};
+
+const getTransactionSnapshot = (transaction?: Transaction | null) => {
+  if (!transaction) return '';
+
+  return JSON.stringify({
+    amount: transaction.amount,
+    categoryId: transaction.categoryId,
+    date: transaction.date,
+    description: transaction.description,
+    attachment: getTransactionAttachmentSummary(transaction),
+  });
+};
+
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, latestData, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
   const { theme } = useTheme();
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [displayAmount, setDisplayAmount] = useState('');
@@ -57,22 +96,56 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [conflictBaseline, setConflictBaseline] = useState<Transaction | undefined>(initialData);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (initialData) {
-      const cat = categories.find(c => c.id === initialData.categoryId);
-      if (cat) { setType(cat.type); setCategoryId(initialData.categoryId); }
-      const ns = initialData.amount.toString().split(',');
+  const formatAmountInput = (amount: number) => {
+      const ns = amount.toString().split(',');
       const sisa = ns[0].length % 3;
       let rupiah = ns[0].substr(0, sisa);
       const ribuan = ns[0].substr(sisa).match(/\d{3}/gi);
       if (ribuan) rupiah += (sisa ? '.' : '') + ribuan.join('.');
-      setDisplayAmount(rupiah);
-      setDate(initialData.date);
-      setDescription(initialData.description);
+      return rupiah;
+  };
+
+  const getAttachmentLabel = (transaction?: Transaction | null) => {
+    if (transaction?.attachment?.name) return transaction.attachment.name;
+    if (transaction?.attachmentName) return transaction.attachmentName;
+    return 'Tanpa lampiran';
+  };
+
+  const applyTransactionToForm = (transaction: Transaction) => {
+    const category = categories.find((entry) => entry.id === transaction.categoryId);
+    setType(category?.type || 'EXPENSE');
+    setCategoryId(transaction.categoryId);
+    setDisplayAmount(formatAmountInput(transaction.amount));
+    setDate(transaction.date);
+    setDescription(transaction.description);
+    setAttachment(null);
+    setAttachmentType(null);
+    if (attachmentPreview) {
+      URL.revokeObjectURL(attachmentPreview);
     }
+    setAttachmentPreview(null);
+    setExistingAttachment(transaction.attachment || (transaction.attachmentUrl ? {
+      url: transaction.attachmentUrl,
+      name: transaction.attachmentName || 'Lampiran',
+      type: transaction.attachmentType || 'image',
+    } : null));
+    setIsAttachmentDeleted(false);
+    setCompressionMessage('');
+    setError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  useEffect(() => {
+    if (initialData) {
+      applyTransactionToForm(initialData);
+      setConflictBaseline(initialData);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, categories]);
 
   const filteredCategories = categories.filter(c => c.type === type);
@@ -88,6 +161,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   useEffect(() => {
     return () => { if (attachmentPreview) URL.revokeObjectURL(attachmentPreview); };
   }, [attachmentPreview]);
+
+  const hasRemoteConflict = !!(initialData && latestData && latestData.id === initialData.id && getTransactionSnapshot(conflictBaseline) !== getTransactionSnapshot(latestData));
 
   const formatRupiah = (value: string) => {
     const ns = value.replace(/[^,\d]/g, '').split(',');
@@ -138,8 +213,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     if (initialData && onDelete) { onDelete(initialData.id); setShowDeleteConfirm(false); onClose(); }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const persistTransaction = async (forceSave = false) => {
     setError('');
     const rawAmount = parseInt(displayAmount.replace(/\./g, ''), 10);
 
@@ -156,6 +230,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     if (validateAndNotify(!categoryId, 'Kategori Wajib Dipilih', 'Kategori transaksi wajib dipilih.')) return;
     if (validateAndNotify(!date, 'Tanggal Harus Diisi', 'Tanggal transaksi harus diisi.')) return;
     if (validateAndNotify(!description.trim(), 'Catatan Tidak Boleh Kosong', 'Catatan tidak boleh kosong.')) return;
+    if (!forceSave && hasRemoteConflict) {
+      setShowConflictDialog(true);
+      return;
+    }
 
     setIsSaving(true);
     if (onShowNotification) {
@@ -191,12 +269,54 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await persistTransaction();
+  };
+
+  const applyLatestVersion = () => {
+    if (!latestData) {
+      setShowConflictDialog(false);
+      return;
+    }
+
+    applyTransactionToForm(latestData);
+    setConflictBaseline(latestData);
+    setShowConflictDialog(false);
+  };
+
+  const keepMyVersion = async () => {
+    if (latestData) {
+      setConflictBaseline(latestData);
+    }
+    setShowConflictDialog(false);
+    await persistTransaction(true);
+  };
+
   const hasAttachment = (attachment || (existingAttachment && !isAttachmentDeleted));
   const showImagePreview = (attachmentType === 'image' && attachmentPreview) || (existingAttachment?.type === 'image' && existingAttachment.url && !isAttachmentDeleted);
 
   const formContent = (
     <Box component="form" id="transaction-form" onSubmit={handleSubmit}>
         {error && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
+        {hasRemoteConflict && initialData && latestData ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+              Transaksi ini berubah di perangkat atau tab lain.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Tinjau versi terbaru sebelum menyimpan supaya perubahan tidak saling timpa.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+              <Button size="small" variant="outlined" color="warning" onClick={applyLatestVersion}>
+                Pakai versi terbaru
+              </Button>
+              <Button size="small" variant="contained" color="warning" onClick={() => setShowConflictDialog(true)}>
+                Bandingkan dulu
+              </Button>
+            </Box>
+          </Alert>
+        ) : null}
 
         {/* Type Toggle */}
         <ToggleButtonGroup
@@ -433,6 +553,58 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
       )}
 
       {showToast && <Toast message={toastMessage} type={toastType} onClose={() => setShowToast(false)} />}
+
+      <Dialog
+        open={showConflictDialog}
+        onClose={isSaving ? undefined : () => setShowConflictDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogContent sx={{ pt: 3 }}>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+            Versi Transaksi Berubah
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Ada perubahan dari tab atau perangkat lain sejak form ini dibuka. Pilih versi mana yang ingin kamu lanjutkan.
+          </Typography>
+
+          <Box sx={{ display: 'grid', gap: 1.5 }}>
+            <Paper variant="outlined" sx={{ p: 1.5 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Versi terbaru di server
+              </Typography>
+              <Typography variant="body2">Jumlah: {latestData ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(latestData.amount) : '-'}</Typography>
+              <Typography variant="body2">Tanggal: {latestData?.date || '-'}</Typography>
+              <Typography variant="body2">Catatan: {latestData?.description || '-'}</Typography>
+              <Typography variant="body2">Lampiran: {getAttachmentLabel(latestData)}</Typography>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 1.5 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Versi yang sedang kamu edit
+              </Typography>
+              <Typography variant="body2">Jumlah: {displayAmount ? `Rp ${displayAmount}` : '-'}</Typography>
+              <Typography variant="body2">Tanggal: {date || '-'}</Typography>
+              <Typography variant="body2">Catatan: {description || '-'}</Typography>
+              <Typography variant="body2">
+                Lampiran: {attachment ? `${attachment.name} (baru)` : isAttachmentDeleted ? 'Lampiran dihapus' : existingAttachment?.name || 'Tanpa lampiran'}
+              </Typography>
+            </Paper>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1, flexWrap: 'wrap' }}>
+          <Button onClick={() => setShowConflictDialog(false)} disabled={isSaving}>
+            Tutup
+          </Button>
+          <Button variant="outlined" color="warning" onClick={applyLatestVersion} disabled={isSaving}>
+            Pakai versi terbaru
+          </Button>
+          <Button variant="contained" color="warning" onClick={() => void keepMyVersion()} disabled={isSaving}>
+            Simpan versi saya
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };
