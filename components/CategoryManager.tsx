@@ -17,12 +17,13 @@ import PageHeader from './PageHeader';
 
 interface CategoryManagerProps {
   categories: Category[];
+  currentUserId?: string | null;
   onAddCategory: (category: Omit<Category, 'id'>) => Promise<string | undefined>;
   onUpdateCategory: (id: string, category: Omit<Category, 'id'>) => void;
   onDeleteCategory: (id: string) => void;
 }
 
-const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCategory, onUpdateCategory, onDeleteCategory }) => {
+const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, currentUserId, onAddCategory, onUpdateCategory, onDeleteCategory }) => {
   const { theme } = useTheme();
   const [isAdding, setIsAdding] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -39,6 +40,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
       setDeletingCategory(null);
     }
   };
+
+  const canEditCategory = (category: Category) => !category.createdByUserId || !currentUserId || category.createdByUserId === currentUserId;
 
   const CategorySection = ({ type, label }: { type: 'INCOME' | 'EXPENSE'; label: string }) => {
     const color = type === 'INCOME' ? theme.colors.income : theme.colors.expense;
@@ -111,6 +114,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
                     <IconButton
                       size="small"
                       onClick={() => setEditingCategory(cat)}
+                      disabled={!canEditCategory(cat)}
                       title="Edit Kategori"
                       sx={{ color: 'text.secondary', bgcolor: 'action.hover', '&:hover': { color: 'info.main', bgcolor: 'info.main' + '14' } }}
                     >
@@ -119,6 +123,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
                     <IconButton
                       size="small"
                       onClick={() => setDeletingCategory(cat)}
+                      disabled={!canEditCategory(cat)}
                       title="Hapus Kategori"
                       sx={{ color: 'text.secondary', bgcolor: 'action.hover', '&:hover': { color: 'error.main', bgcolor: 'error.main' + '14' } }}
                     >

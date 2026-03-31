@@ -9,8 +9,8 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 ## Features
 
 ### 🌐 Web Application
-- Multi-`Akun Keuangan` untuk pisah data pribadi, keluarga, bisnis, atau bersama
-- Kolaborasi sederhana untuk `Akun Keuangan` bersama: anggota, kode gabung, dan data shared lintas user
+- Banyak `Akun Keuangan` yang bisa dibuat private atau langsung dibagikan per akun
+- Kolaborasi sederhana untuk akun bersama: anggota, kode gabung, dan data shared lintas user
 - Dashboard with expense analytics
 - Manual transaction entry
 - Category management
@@ -41,6 +41,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - `Rencana` menggantikan `Simulasi`
 - `Anggaran` berbasis budget plan, bukan auto-render semua kategori
 - `Hutang Piutang` saat ini **tidak otomatis mempengaruhi saldo** karena masih diposisikan sebagai modul tracking terpisah dari transaksi
+- Data shared hanya bisa diedit oleh user yang membuat datanya; transaksi milik anggota lain tampil read-only dengan info pembuat
 - Dashboard sekarang punya toggle untuk menyembunyikan nominal saldo saat dibuka di depan orang lain
 - Riwayat transaksi sekarang dikelompokkan per hari dengan card terpisah agar perbedaan tanggal lebih mudah discan
 - Pengaturan akun, daftar rencana, dan ringkasan anggaran sekarang diarahkan ke layout yang lebih minimal dan lebih mudah discan
@@ -179,6 +180,7 @@ GEMINI_API_KEY=your_gemini_api_key
 - Phase 8: modul `Hutang Piutang` + redesign UX yang lebih sederhana
 - Phase 9: onboarding user baru, helper dashboard, dan panduan singkat
 - Phase 10: kolaborasi `Akun Keuangan` bersama dengan anggota, kode gabung, dan shared data lintas user
+- Phase 11: refactor akun netral dengan share per akun dan ownership per record
 
 ## License
 

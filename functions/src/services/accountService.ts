@@ -91,7 +91,7 @@ export async function getActiveAccountId(userId: string): Promise<string | undef
     return context.accountId;
 }
 
-export async function getActiveAccountSummary(userId: string): Promise<{ id?: string; name?: string; type?: string }> {
+export async function getActiveAccountSummary(userId: string): Promise<{ id?: string; name?: string }> {
     const context = await getAccountContext(userId);
     if (context.usesLegacyPaths || !context.accountId) {
         return {};
@@ -108,15 +108,14 @@ export async function getActiveAccountSummary(userId: string): Promise<{ id?: st
         return {};
     }
 
-    const data = accountSnap.data() as { name?: string; type?: string };
+    const data = accountSnap.data() as { name?: string };
     return {
         id: accountSnap.id,
         name: data.name,
-        type: data.type,
     };
 }
 
-export async function getAccountSummary(userId: string, accountId?: string): Promise<{ id?: string; name?: string; type?: string }> {
+export async function getAccountSummary(userId: string, accountId?: string): Promise<{ id?: string; name?: string }> {
     const context = await getAccountContext(userId, accountId);
     if (context.usesLegacyPaths || !context.accountId) {
         return {};
@@ -133,15 +132,14 @@ export async function getAccountSummary(userId: string, accountId?: string): Pro
         return {};
     }
 
-    const data = accountSnap.data() as { name?: string; type?: string };
+    const data = accountSnap.data() as { name?: string };
     return {
         id: accountSnap.id,
         name: data.name,
-        type: data.type,
     };
 }
 
-export async function getUserAccounts(userId: string): Promise<Array<{ id: string; name: string; type?: string }>> {
+export async function getUserAccounts(userId: string): Promise<Array<{ id: string; name: string; sharedAccountId?: string; role?: 'OWNER' | 'MEMBER' }>> {
     const snapshot = await getDb()
         .collection('users')
         .doc(userId)
@@ -150,11 +148,12 @@ export async function getUserAccounts(userId: string): Promise<Array<{ id: strin
         .get();
 
     return snapshot.docs.map((accountDoc) => {
-        const data = accountDoc.data() as { name?: string; type?: string };
+        const data = accountDoc.data() as { name?: string; sharedAccountId?: string; role?: 'OWNER' | 'MEMBER' };
         return {
             id: accountDoc.id,
             name: data.name || 'Akun',
-            type: data.type,
+            sharedAccountId: data.sharedAccountId,
+            role: data.role,
         };
     });
 }

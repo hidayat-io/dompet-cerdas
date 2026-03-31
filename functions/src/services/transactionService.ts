@@ -11,6 +11,7 @@ import { getAccountContext, getCategoriesCollection, getTransactionsCollection }
 
 const CATEGORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const categoryCache = new Map<string, { expiresAt: number; categories: UserCategory[] }>();
+const creatorNameCache = new Map<string, string>();
 const DEFAULT_CATEGORY_DOCS = [
     { id: 'c1', name: 'Gaji', type: 'INCOME', icon: 'Wallet', color: '#10b981' },
     { id: 'c2', name: 'Bonus', type: 'INCOME', icon: 'Gift', color: '#34d399' },
@@ -48,6 +49,23 @@ export interface ManualTransactionInput {
     description: string;
     categoryName: string;
     categoryIdOverride?: string;
+}
+
+async function resolveCreatorName(userId: string): Promise<string> {
+    const cached = creatorNameCache.get(userId);
+    if (cached) {
+        return cached;
+    }
+
+    try {
+        const userRecord = await admin.auth().getUser(userId);
+        const name = userRecord.displayName || userRecord.email || 'Member';
+        creatorNameCache.set(userId, name);
+        return name;
+    } catch (error) {
+        console.warn('[TRANSACTION] Failed to resolve creator name, falling back to default:', error);
+        return 'Member';
+    }
 }
 
 async function seedDefaultCategories(context: Awaited<ReturnType<typeof getAccountContext>>): Promise<UserCategory[]> {
@@ -129,7 +147,8 @@ export interface Transaction {
     source: 'receipt' | 'manual' | 'telegram';
     photoUrl?: string;
     createdAt: admin.firestore.Timestamp;
-    createdBy: 'telegram';
+    createdByUserId?: string;
+    createdByName?: string;
     telegramId?: number;
     receiptConfidence?: 'high' | 'medium' | 'low';
 }
@@ -161,15 +180,21 @@ async function resolveManualTransactionCategoryId(
 function buildManualTransactionPayload(
     amount: number,
     categoryId: string,
-    description: string
+    description: string,
+    creator?: { userId: string; name: string }
 ) {
-    return {
+    const payload: Record<string, unknown> = {
         amount,
         categoryId,
         description,
         date: getJakartaDateString(),
         createdAt: new Date().toISOString()
     };
+    if (creator) {
+        payload.createdByUserId = creator.userId;
+        payload.createdByName = creator.name;
+    }
+    return payload;
 }
 
 /**
@@ -200,6 +225,7 @@ export async function createTransactionFromReceipt(
 
     const context = await getAccountContext(userId, accountId);
     const transactionsCollection = getTransactionsCollection(context);
+    const creatorName = await resolveCreatorName(userId);
 
     // Use today's date instead of receipt date
     const transactionDate = new Date();
@@ -280,7 +306,9 @@ export async function createTransactionFromReceipt(
         categoryId,
         description,
         date: dateString,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        createdByUserId: userId,
+        createdByName: creatorName,
     };
 
     // Add attachment if provided
@@ -344,7 +372,11 @@ export async function createManualTransaction(
         categoryIdOverride,
         categories
     );
-    const transaction = buildManualTransactionPayload(amount, categoryId, description);
+    const creatorName = await resolveCreatorName(userId);
+    const transaction = buildManualTransactionPayload(amount, categoryId, description, {
+        userId,
+        name: creatorName,
+    });
 
     const docRef = await transactionsCollection.add(transaction);
 
@@ -367,6 +399,8 @@ export async function createManualTransactionsBatch(
     const categories = items.some((item) => !item.categoryIdOverride)
         ? await getUserCategories(userId, false, context.accountId)
         : [];
+    const creatorName = await resolveCreatorName(userId);
+    const creator = { userId, name: creatorName };
 
     const batch = admin.firestore().batch();
     const docIds: string[] = [];
@@ -379,7 +413,7 @@ export async function createManualTransactionsBatch(
             categories
         );
         const docRef = transactionsCollection.doc();
-        batch.set(docRef, buildManualTransactionPayload(item.amount, categoryId, item.description));
+        batch.set(docRef, buildManualTransactionPayload(item.amount, categoryId, item.description, creator));
         docIds.push(docRef.id);
     }
 

@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
-import { AccountType, Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, SharedAccountMember, Transaction } from './types';
+import { Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, SharedAccountMember, Transaction } from './types';
 import TransactionForm from './components/TransactionForm';
 import OnboardingModal from './components/OnboardingModal';
 import AuthLogin from './components/AuthLogin';
@@ -45,7 +45,6 @@ import Alert from '@mui/material/Alert';
 import {
   AccountScopedCollectionName,
   DEFAULT_ACCOUNT_NAME,
-  DEFAULT_ACCOUNT_TYPE,
   createAccountPayload,
   getAccountDocRef,
   getAccountsCollectionRef,
@@ -80,7 +79,7 @@ import {
   hasPendingStorageCleanup,
   markCategoryCacheRefreshPending,
 } from './services/offlineQueue';
-import { getAccountTypeLabel } from './utils/accountLabels';
+import { getAccountStatusLabel } from './utils/accountLabels';
 import { getNormalizedBudget, getPreviousMonthKey } from './utils/budget';
 
 // ... (skip content)
@@ -235,6 +234,7 @@ function App() {
     () => accounts.find((account) => account.id === activeAccountId) || null,
     [accounts, activeAccountId]
   );
+  const currentUserLabel = user?.displayName || user?.email || 'Member';
 
   // Notification State
   const [notification, setNotification] = useState<{
@@ -597,7 +597,7 @@ function App() {
         const now = new Date().toISOString();
         const defaultAccountRef = doc(accountsRef);
         const batch = writeBatch(db);
-        batch.set(defaultAccountRef, createAccountPayload(DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_TYPE, now));
+        batch.set(defaultAccountRef, createAccountPayload(DEFAULT_ACCOUNT_NAME, now, { ownerUserId: user.uid }));
         batch.set(userRef, {
           activeAccountId: defaultAccountRef.id,
           accountMigrationVersion: 1,
@@ -608,7 +608,7 @@ function App() {
         resolvedAccountId = defaultAccountRef.id;
         resolvedAccount = {
           id: defaultAccountRef.id,
-          ...createAccountPayload(DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_TYPE, now)
+          ...createAccountPayload(DEFAULT_ACCOUNT_NAME, now, { ownerUserId: user.uid })
         };
       } else if (!resolvedAccountId || !existingAccounts.some((account) => account.id === resolvedAccountId)) {
         resolvedAccountId = existingAccounts[0].id;
@@ -885,19 +885,12 @@ function App() {
 
   // --- CRUD Handlers (Firestore) ---
 
-  const createAccount = async (name: string, type: AccountType) => {
+  const createPrivateAccount = async (name: string) => {
     if (!user) return;
 
     const trimmedName = name.trim();
     if (!trimmedName) {
       showNotification('warning', 'Nama Akun Wajib Diisi', 'Isi nama Akun Keuangan terlebih dahulu.', true);
-      return;
-    }
-
-    if (type === 'SHARED') {
-      if (!requireOnline('Perlu Koneksi Internet', 'Akun bersama dibuat lewat server, jadi internet perlu aktif dulu.')) return;
-      await callCloudFunction<{ name: string }, unknown>('createSharedAccount', { name: trimmedName });
-      showNotification('success', 'Akun Bersama Dibuat', `Akun Keuangan bersama "${trimmedName}" siap dipakai bareng.`, true);
       return;
     }
 
@@ -908,7 +901,7 @@ function App() {
     const categoriesRef = getCategoriesCollectionRef(db, user.uid, accountRef.id);
     const batch = writeBatch(db);
 
-    batch.set(accountRef, createAccountPayload(trimmedName, type, now));
+    batch.set(accountRef, createAccountPayload(trimmedName, now, { ownerUserId: user.uid }));
     INITIAL_CATEGORIES.forEach((category) => {
       batch.set(doc(categoriesRef, category.id), category);
     });
@@ -919,6 +912,20 @@ function App() {
 
     await batch.commit();
     showNotification('success', 'Akun Ditambahkan', `Akun Keuangan "${trimmedName}" siap digunakan.`, true);
+  };
+
+  const createSharedAccount = async (name: string) => {
+    if (!user) return;
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      showNotification('warning', 'Nama Akun Wajib Diisi', 'Isi nama Akun Keuangan terlebih dahulu.', true);
+      return;
+    }
+
+    if (!requireOnline('Perlu Koneksi Internet', 'Akun bersama dibuat lewat server, jadi internet perlu aktif dulu.')) return;
+    await callCloudFunction<{ name: string }, unknown>('createSharedAccount', { name: trimmedName });
+    showNotification('success', 'Akun Bersama Dibuat', `Akun Keuangan bersama "${trimmedName}" siap dipakai bareng.`, true);
   };
 
   const generateSharedInviteCode = async () => {
@@ -1078,7 +1085,7 @@ function App() {
       date,
       description,
       createdByUserId: user.uid,
-      createdByName: user.displayName || user.email || 'Member',
+      createdByName: currentUserLabel,
       createdAt: new Date().toISOString(),
       attachment: attachmentData
     });
@@ -1226,7 +1233,11 @@ function App() {
     if (!user || !activeAccount) return;
     const categoriesRef = getActiveScopedCollection<Category>('categories');
     if (!categoriesRef) return;
-    const docRef = await addDoc(categoriesRef, cat);
+    const docRef = await addDoc(categoriesRef, {
+      ...cat,
+      createdByUserId: user.uid,
+      createdByName: currentUserLabel,
+    });
     await refreshCategoryCache();
     return docRef.id;
   };
@@ -1261,7 +1272,9 @@ function App() {
     await addDoc(plansRef as any, {
       title,
       items: [],
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      createdByUserId: user.uid,
+      createdByName: currentUserLabel,
     });
   };
 
@@ -1281,7 +1294,12 @@ function App() {
     const planRef = doc(plansRef, planId);
     const plan = plans.find((entry) => entry.id === planId);
     if (plan) {
-      const newItem: PlanItem = { ...item, id: Date.now().toString() };
+      const newItem: PlanItem = {
+        ...item,
+        id: Date.now().toString(),
+        createdByUserId: user.uid,
+        createdByName: currentUserLabel,
+      };
       const updatedItems = [...plan.items, newItem];
       await setDoc(planRef, { items: updatedItems }, { merge: true });
     }
@@ -1295,7 +1313,7 @@ function App() {
     const plan = plans.find((entry) => entry.id === planId);
     if (plan) {
       const updatedItems = plan.items.map((item) =>
-        item.id === itemId ? { ...updatedItem, id: itemId } : item
+        item.id === itemId ? { ...updatedItem, id: itemId, createdByUserId: item.createdByUserId, createdByName: item.createdByName } : item
       );
       await setDoc(planRef, { items: updatedItems }, { merge: true });
     }
@@ -1363,6 +1381,8 @@ function App() {
       limitAmount: payload.limitAmount,
       createdAt: normalizedBudgets.find((budget) => budget.id === budgetId)?.createdAt || now,
       updatedAt: now,
+      createdByUserId: normalizedBudgets.find((budget) => budget.id === budgetId)?.createdByUserId || user.uid,
+      createdByName: normalizedBudgets.find((budget) => budget.id === budgetId)?.createdByName || currentUserLabel,
     });
     showNotification('success', 'Anggaran Disimpan', `Anggaran "${payload.name.trim()}" untuk ${payload.month} berhasil diperbarui.`, true);
   };
@@ -1405,6 +1425,8 @@ function App() {
         limitAmount: budget.limitAmount,
         createdAt: now,
         updatedAt: now,
+        createdByUserId: user.uid,
+        createdByName: currentUserLabel,
       });
     });
     await batch.commit();
@@ -1445,6 +1467,8 @@ function App() {
       payments: existingDebt?.payments || [],
       createdAt: existingDebt?.createdAt || now,
       updatedAt: now,
+      createdByUserId: existingDebt?.createdByUserId || user.uid,
+      createdByName: existingDebt?.createdByName || currentUserLabel,
     });
 
     showNotification(
@@ -1812,7 +1836,7 @@ function App() {
             >
               {accounts.map((account) => (
                 <MenuItem key={account.id} value={account.id}>
-                  {account.name} • {getAccountTypeLabel(account.type)}
+                  {account.name} • {getAccountStatusLabel(account)}
                 </MenuItem>
               ))}
             </Select>
@@ -1994,7 +2018,7 @@ function App() {
           >
             {accounts.map((account) => (
               <MenuItem key={account.id} value={account.id}>
-                {account.name} • {getAccountTypeLabel(account.type)}
+                {account.name} • {getAccountStatusLabel(account)}
               </MenuItem>
             ))}
           </Select>
@@ -2022,6 +2046,7 @@ function App() {
                 <TransactionList
                   transactions={transactions}
                   categories={categories}
+                  currentUserId={user.uid}
                   pendingAttachmentUploads={pendingAttachmentUploads}
                   onUpdate={updateTransaction}
                   onDelete={deleteTransaction}
@@ -2033,6 +2058,7 @@ function App() {
                 <PlanManager
                   plans={plans}
                   categories={categories}
+                  currentUserId={user.uid}
                   currentBalance={currentBalance}
                   currentMonthBalance={currentMonthBalance}
                   onCreatePlan={createPlan}
@@ -2050,6 +2076,7 @@ function App() {
                   budgets={normalizedBudgets}
                   transactions={transactions}
                   categories={categories}
+                  currentUserId={user.uid}
                   onSaveBudget={saveBudget}
                   onDeleteBudget={deleteBudget}
                   onCopyBudgetsFromPreviousMonth={copyBudgetsFromPreviousMonth}
@@ -2058,6 +2085,7 @@ function App() {
               {currentView === 'DEBTS' && (
                 <DebtManager
                   debts={debts}
+                  currentUserId={user.uid}
                   onSaveDebt={saveDebt}
                   onDeleteDebt={deleteDebt}
                   onRecordPayment={recordDebtPayment}
@@ -2067,6 +2095,7 @@ function App() {
               {currentView === 'CATEGORIES' && (
                 <CategoryManager
                   categories={categories}
+                  currentUserId={user.uid}
                   onAddCategory={addCategory}
                   onUpdateCategory={updateCategory}
                   onDeleteCategory={deleteCategory}
@@ -2090,7 +2119,8 @@ function App() {
                   sharedAccountMembers={sharedAccountMembers}
                   onOpenOnboarding={openOnboarding}
                   onUpdateTelegramAccount={updateTelegramDefaultAccount}
-                  onCreateAccount={createAccount}
+                  onCreateAccount={createPrivateAccount}
+                  onCreateSharedAccount={createSharedAccount}
                   onGenerateSharedInviteCode={generateSharedInviteCode}
                   onJoinSharedAccount={joinSharedAccount}
                   onSwitchAccount={switchAccount}
@@ -2220,6 +2250,7 @@ function App() {
         {showAddModal && (
           <TransactionForm
             categories={categories}
+            currentUserId={user.uid}
             onClose={() => setShowAddModal(false)}
             onAdd={addTransaction}
             onAddCategory={addCategory}

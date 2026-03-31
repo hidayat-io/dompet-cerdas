@@ -6,13 +6,11 @@ import {
   DocumentReference,
   Firestore,
 } from 'firebase/firestore';
-import { AccountType, DebtRecord, FinancialAccount, SharedAccount, SharedAccountMember } from '../types';
+import { DebtRecord, FinancialAccount, SharedAccount, SharedAccountMember } from '../types';
 
 export type AccountScopedCollectionName = 'categories' | 'transactions' | 'plans' | 'budgets' | 'simulations' | 'debts';
 
 export const DEFAULT_ACCOUNT_NAME = 'Pribadi';
-export const DEFAULT_ACCOUNT_TYPE: AccountType = 'PERSONAL';
-
 type UserMeta = {
   activeAccountId?: string;
   categoriesSeeded?: boolean;
@@ -87,12 +85,10 @@ export const getScopedStoragePath = (
 
 export const createAccountPayload = (
   name: string,
-  type: AccountType = DEFAULT_ACCOUNT_TYPE,
   now = new Date().toISOString(),
-  extra: Partial<Omit<FinancialAccount, 'id' | 'name' | 'type' | 'role' | 'createdAt' | 'updatedAt'>> = {}
+  extra: Partial<Omit<FinancialAccount, 'id' | 'name' | 'role' | 'createdAt' | 'updatedAt'>> = {}
 ): Omit<FinancialAccount, 'id'> => ({
   name,
-  type,
   role: 'OWNER',
   createdAt: now,
   updatedAt: now,

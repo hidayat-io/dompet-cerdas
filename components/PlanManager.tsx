@@ -31,6 +31,7 @@ import PageHeader from './PageHeader';
 interface PlanManagerProps {
     plans: Plan[];
     categories: Category[];
+    currentUserId?: string | null;
     currentBalance: number;
     currentMonthBalance: number;
     onCreatePlan: (title: string) => void;
@@ -115,6 +116,7 @@ const TypeToggle: React.FC<{ value: TransactionType; onChange: (v: TransactionTy
 const PlanManager: React.FC<PlanManagerProps> = ({
     plans,
     categories,
+    currentUserId,
     currentBalance,
     currentMonthBalance,
     onCreatePlan,
@@ -151,6 +153,10 @@ const PlanManager: React.FC<PlanManagerProps> = ({
     const [showAddModal, setShowAddModal] = useState(false);
     const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+    const canEditPlan = (plan: Plan) => !plan.createdByUserId || !currentUserId || plan.createdByUserId === currentUserId;
+    const canEditPlanItem = (plan: Plan, item: PlanItem) => (
+        canEditPlan(plan) && (!item.createdByUserId || !currentUserId || item.createdByUserId === currentUserId)
+    );
 
     useEffect(() => {
         const availableCategories = categories.filter((category) => category.type === newItemType);
@@ -407,6 +413,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                 <Box
                     component="button"
                     onClick={() => {
+                        if (!planEditable) return;
                         setNewItemName('');
                         setNewItemAmount('');
                         setNewItemType('EXPENSE');
@@ -414,6 +421,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                         setNewItemPlannedDate('');
                         setShowAddModal(true);
                     }}
+                    disabled={!planEditable}
                     sx={{
                         width: '100%',
                         p: 2,
@@ -423,7 +431,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                         borderRadius: 3,
                         bgcolor: theme.colors.accentLight,
                         color: theme.colors.accent,
-                        cursor: 'pointer',
+                        cursor: planEditable ? 'pointer' : 'not-allowed',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -493,7 +501,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                         </Box>
 
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-                                            {item.status === 'PLANNED' && (
+                                            {item.status === 'PLANNED' && planEditable && (
                                                 <>
                                                     <Button
                                                         size="small"
@@ -507,6 +515,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => openApplyModal(item)}
+                                                        disabled={!planEditable}
                                                         sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, display: { xs: 'flex', sm: 'none' } }}
                                                     >
                                                         <IconDisplay name="Save" size={14} />
@@ -514,6 +523,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => onUpdatePlanItemStatus(plan.id, item.id, 'CANCELLED')}
+                                                        disabled={!canEditPlanItem(plan, item)}
                                                         title="Batalkan item ini"
                                                         sx={{ bgcolor: theme.colors.expenseBg, color: theme.colors.expense }}
                                                     >
@@ -525,18 +535,20 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => onUpdatePlanItemStatus(plan.id, item.id, 'PLANNED')}
+                                                    disabled={!canEditPlanItem(plan, item)}
                                                     title="Aktifkan lagi"
                                                 >
                                                     <IconDisplay name="RefreshCw" size={14} />
                                                 </IconButton>
                                             )}
-                                            <IconButton size="small" onClick={() => handleEditClick(item)} title="Edit item">
+                                            <IconButton size="small" onClick={() => handleEditClick(item)} disabled={!canEditPlanItem(plan, item)} title="Edit item">
                                                 <IconDisplay name="Edit" size={14} />
                                             </IconButton>
                                             <IconButton
                                                 size="small"
                                                 color="error"
                                                 onClick={() => setDeleteTarget({ type: 'item', planId: plan.id, itemId: item.id, title: item.name })}
+                                                disabled={!canEditPlanItem(plan, item)}
                                                 title="Hapus item"
                                             >
                                                 <IconDisplay name="Trash2" size={14} />
@@ -732,6 +744,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                             ), 0);
                             const doneCount = plan.items.filter((item) => item.status === 'DONE').length;
                             const useMonthBalance = !!plan.useCurrentMonthBalance;
+                            const planEditable = canEditPlan(plan);
 
                             return (
                                 <Grid size={{ xs: 12, md: 6, xl: 4 }} key={plan.id}>
@@ -756,6 +769,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                 <IconButton
                                                     size="small"
                                                     color="error"
+                                                    disabled={!planEditable}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setDeleteTarget({ type: 'plan', planId: plan.id, title: plan.title });

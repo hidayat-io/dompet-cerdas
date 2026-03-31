@@ -1,11 +1,9 @@
 export type TransactionType = 'INCOME' | 'EXPENSE';
-export type AccountType = 'PERSONAL' | 'FAMILY' | 'BUSINESS' | 'SHARED';
 export type AccountRole = 'OWNER' | 'MEMBER';
 
 export interface FinancialAccount {
   id: string;
   name: string;
-  type: AccountType;
   role: AccountRole;
   ownerUserId?: string;
   sharedAccountId?: string;
@@ -16,7 +14,6 @@ export interface FinancialAccount {
 export interface SharedAccount {
   id: string;
   name: string;
-  type: 'SHARED';
   ownerUserId: string;
   inviteCode?: string | null;
   inviteCodeUpdatedAt?: string | null;
@@ -40,6 +37,8 @@ export interface Category {
   type: TransactionType;
   icon: string; // Icon name — mapped to Material icon in IconDisplay
   color: string; // Hex color
+  createdByUserId?: string;
+  createdByName?: string;
 }
 
 // Attachment structure
@@ -78,6 +77,8 @@ export interface PlanItem {
   categoryId: string; // Optional mapping to existing categories for color/icon
   plannedDate?: string;
   status: PlanItemStatus;
+  createdByUserId?: string;
+  createdByName?: string;
 }
 
 export interface Plan {
@@ -86,6 +87,8 @@ export interface Plan {
   items: PlanItem[];
   createdAt: string;
   useCurrentMonthBalance?: boolean;
+  createdByUserId?: string;
+  createdByName?: string;
 }
 
 export interface Budget {
@@ -96,6 +99,8 @@ export interface Budget {
   limitAmount: number;
   createdAt: string;
   updatedAt: string;
+  createdByUserId?: string;
+  createdByName?: string;
   // Legacy field kept for backward compatibility while old docs are normalized on read.
   categoryId?: string;
 }
@@ -126,6 +131,8 @@ export interface DebtRecord {
   payments: DebtPayment[];
   createdAt: string;
   updatedAt: string;
+  createdByUserId?: string;
+  createdByName?: string;
 }
 
 // Legacy aliases kept temporarily to reduce transition risk while phase 3 lands.

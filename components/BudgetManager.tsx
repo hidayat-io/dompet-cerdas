@@ -33,6 +33,7 @@ interface BudgetManagerProps {
     budgets: Budget[];
     transactions: Transaction[];
     categories: Category[];
+    currentUserId?: string | null;
     onSaveBudget: (payload: {
         budgetId?: string;
         month: string;
@@ -79,6 +80,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
     budgets,
     transactions,
     categories,
+    currentUserId,
     onSaveBudget,
     onDeleteBudget,
     onCopyBudgetsFromPreviousMonth,
@@ -137,6 +139,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
     const activeBudgetTransactions = activeSummary
         ? getBudgetTransactions(activeSummary.budget, transactions, categories, selectedMonth)
         : [];
+    const canEditBudget = (budget: Budget) => !budget.createdByUserId || !currentUserId || budget.createdByUserId === currentUserId;
 
     const resetForm = () => {
         setDraft(emptyDraft);
@@ -406,15 +409,15 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                         }
                         action={
                             <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, mt: 1, mr: 1 }}>
-                                <Button variant="outlined" size="small" onClick={() => openEditForm(activeSummary.budget)} sx={{ borderRadius: 2, fontWeight: 600 }}>
+                                <Button variant="outlined" size="small" onClick={() => openEditForm(activeSummary.budget)} disabled={!canEditBudget(activeSummary.budget)} sx={{ borderRadius: 2, fontWeight: 600 }}>
                                     Edit
                                 </Button>
                                 <Button
                                     variant="outlined"
                                     size="small"
                                     color="error"
-                                    disabled={deletingBudgetId === activeSummary.budget.id}
                                     onClick={() => setBudgetToDelete(activeSummary.budget)}
+                                    disabled={deletingBudgetId === activeSummary.budget.id || !canEditBudget(activeSummary.budget)}
                                     sx={{ borderRadius: 2, fontWeight: 600 }}
                                 >
                                     {deletingBudgetId === activeSummary.budget.id ? 'Loading...' : 'Hapus'}
@@ -709,6 +712,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                                                 variant="outlined"
                                                 size="small"
                                                 onClick={() => openEditForm(summary.budget)}
+                                                disabled={!canEditBudget(summary.budget)}
                                                 sx={{ borderRadius: 2, fontSize: 13, fontWeight: 600 }}
                                             >
                                                 Edit
@@ -717,7 +721,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                                                 variant="outlined"
                                                 size="small"
                                                 color="error"
-                                                disabled={deletingBudgetId === summary.budget.id}
+                                                disabled={deletingBudgetId === summary.budget.id || !canEditBudget(summary.budget)}
                                                 onClick={() => setBudgetToDelete(summary.budget)}
                                                 sx={{ borderRadius: 2, fontSize: 13, fontWeight: 600 }}
                                             >

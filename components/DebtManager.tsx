@@ -21,6 +21,7 @@ import PageHeader from './PageHeader';
 
 interface DebtManagerProps {
     debts: DebtRecord[];
+    currentUserId?: string | null;
     onSaveDebt: (payload: {
         debtId?: string;
         kind: DebtKind;
@@ -134,6 +135,7 @@ const getSupportingText = (debt: DebtRecord) => {
 
 const DebtManager: React.FC<DebtManagerProps> = ({
     debts,
+    currentUserId,
     onSaveDebt,
     onDeleteDebt,
     onRecordPayment,
@@ -181,6 +183,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({
     const activeDebt = filteredDebts.find((debt) => debt.id === activeDebtId) || null;
     const isDraftValid = !!draft.personName.trim() && Number(draft.amount.replace(/\./g, '')) > 0;
     const isPaymentValid = !!paymentDraft?.date && Number(paymentDraft?.amount.replace(/\./g, '') || '0') > 0;
+    const canEditDebt = (debt: DebtRecord) => !debt.createdByUserId || !currentUserId || debt.createdByUserId === currentUserId;
 
     const resetForm = () => {
         setDraft(emptyDraft());
@@ -561,13 +564,15 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                     >
                         Kembali ke Daftar
                     </Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => openCreateForm(activeDebt.kind)}
-                        sx={{ borderRadius: 99, fontWeight: 600 }}
-                    >
-                        + Tambah Catatan
-                    </Button>
+                    {canEditDebt(activeDebt) && (
+                        <Button
+                            variant="contained"
+                            onClick={() => openCreateForm(activeDebt.kind)}
+                            sx={{ borderRadius: 99, fontWeight: 600 }}
+                        >
+                            + Tambah Catatan
+                        </Button>
+                    )}
                 </Box>
 
                 <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 4, boxShadow: isDark ? 0 : 4 }}>
@@ -581,6 +586,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                                 <IconButton
                                     size="small"
                                     onClick={() => openEditForm(activeDebt)}
+                                    disabled={!canEditDebt(activeDebt)}
                                     title="Ubah"
                                     sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: '#fff' }}
                                 >
@@ -589,6 +595,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                                 <IconButton
                                     size="small"
                                     onClick={() => setDeleteTarget(activeDebt)}
+                                    disabled={!canEditDebt(activeDebt)}
                                     title="Hapus"
                                     sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: '#fff' }}
                                 >
@@ -650,6 +657,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                                         date: getToday(),
                                         note: '',
                                     })}
+                                    disabled={!canEditDebt(activeDebt)}
                                     sx={{ borderRadius: 99, py: 1.5, fontWeight: 700 }}
                                 >
                                     {activeDebt.kind === 'RECEIVABLE' ? 'Terima Pembayaran' : 'Catat Pembayaran'}
@@ -660,6 +668,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                                     fullWidth
                                     variant="outlined"
                                     onClick={() => setPayoffTarget(activeDebt)}
+                                    disabled={!canEditDebt(activeDebt)}
                                     sx={{ borderRadius: 99, py: 1.5, fontWeight: 700 }}
                                 >
                                     Tandai Lunas

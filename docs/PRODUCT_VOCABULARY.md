@@ -32,10 +32,8 @@ Dokumen ini mengunci istilah user-facing untuk DompetCerdas agar konsisten di we
 | account / workspace / ledger | Akun Keuangan |
 | active account | Akun Aktif |
 | switch account | Ganti Akun |
-| personal account | Pribadi |
-| family account | Keluarga |
-| business account | Bisnis |
-| shared account | Keuangan Bersama |
+| private account | Akun Pribadi |
+| shared account | Akun Bersama |
 | financial advice | Saran AI |
 | financial analysis | Analisis Keuangan |
 | savings advice | Saran Penghematan |
@@ -104,4 +102,4 @@ Dokumen ini mengunci istilah user-facing untuk DompetCerdas agar konsisten di we
 - `Catat Hutang`
 - `Catat Piutang`
 - `Ganti Akun`
-- `Akun Aktif: Pribadi`
+- `Akun Aktif: Akun Pribadi`

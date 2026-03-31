@@ -237,7 +237,7 @@ export async function getTelegramAccountState(telegramId: number): Promise<{
     userId: string;
     defaultAccountId?: string;
     defaultAccountName?: string;
-    accounts: Array<{ id: string; name: string; type?: string }>;
+    accounts: Array<{ id: string; name: string; sharedAccountId?: string; role?: string }>;
 } | null> {
     const context = await getTelegramLinkContext(telegramId);
     if (!context) return null;

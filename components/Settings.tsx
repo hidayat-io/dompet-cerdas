@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useTheme, themes } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
 import Toast from './Toast';
-import { Transaction, Category, FinancialAccount, AccountType, SharedAccountMember } from '../types';
+import { Transaction, Category, FinancialAccount, SharedAccountMember } from '../types';
 import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
 import { APP_VERSION, APP_BUILD_DATE } from '../constants';
-import { getAccountTypeLabel, sanitizeAccountNameForFilename } from '../utils/accountLabels';
+import { getAccountStatusLabel, sanitizeAccountNameForFilename } from '../utils/accountLabels';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -17,6 +17,7 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Grid from '@mui/material/Grid';
 import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -37,7 +38,8 @@ interface SettingsProps {
     sharedAccountMembers: SharedAccountMember[];
     onOpenOnboarding: () => void;
     onUpdateTelegramAccount: (accountId: string) => Promise<void>;
-    onCreateAccount: (name: string, type: AccountType) => Promise<void>;
+    onCreateAccount: (name: string) => Promise<void>;
+    onCreateSharedAccount: (name: string) => Promise<void>;
     onGenerateSharedInviteCode: () => Promise<void>;
     onJoinSharedAccount: (code: string) => Promise<void>;
     onSwitchAccount: (accountId: string) => Promise<void>;
@@ -59,6 +61,7 @@ const Settings: React.FC<SettingsProps> = ({
     onOpenOnboarding,
     onUpdateTelegramAccount,
     onCreateAccount,
+    onCreateSharedAccount,
     onGenerateSharedInviteCode,
     onJoinSharedAccount,
     onSwitchAccount,
@@ -73,7 +76,7 @@ const Settings: React.FC<SettingsProps> = ({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [newAccountName, setNewAccountName] = useState('');
-    const [newAccountType, setNewAccountType] = useState<AccountType>('PERSONAL');
+    const [createAsShared, setCreateAsShared] = useState(false);
     const [isCreatingAccount, setIsCreatingAccount] = useState(false);
     const [showAddAccountDialog, setShowAddAccountDialog] = useState(false);
     const [accountToDelete, setAccountToDelete] = useState<FinancialAccount | null>(null);
@@ -146,9 +149,13 @@ const Settings: React.FC<SettingsProps> = ({
         }
         setIsCreatingAccount(true);
         try {
-            await onCreateAccount(newAccountName, newAccountType);
+            if (createAsShared) {
+                await onCreateSharedAccount(newAccountName);
+            } else {
+                await onCreateAccount(newAccountName);
+            }
             setNewAccountName('');
-            setNewAccountType('PERSONAL');
+            setCreateAsShared(false);
             setShowAddAccountDialog(false);
         } catch (error) {
             console.error('Error creating account:', error);
@@ -178,7 +185,7 @@ const Settings: React.FC<SettingsProps> = ({
     const isSharedAccountActive = !!activeAccount?.sharedAccountId;
     const getAccountDeleteBlockReason = (account: FinancialAccount) => {
         if (accounts.length <= 1) return 'Minimal harus ada satu akun yang tersisa.';
-        if (account.type === 'SHARED' || account.sharedAccountId) return 'Akun bersama belum bisa dihapus dari sini.';
+        if (account.sharedAccountId) return 'Akun bersama belum bisa dihapus dari sini.';
         return null;
     };
 
@@ -264,12 +271,19 @@ const Settings: React.FC<SettingsProps> = ({
                                             <Typography variant="subtitle1" fontWeight={700}>
                                                 {account.name}
                                             </Typography>
-                                            <Chip size="small" label={getAccountTypeLabel(account.type)} />
+                                            <Chip size="small" label={getAccountStatusLabel(account)} />
                                             {isActive && (
                                                 <Chip
                                                     size="small"
                                                     label="Sedang dipakai"
                                                     sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600 }}
+                                                />
+                                            )}
+                                            {account.sharedAccountId && (
+                                                <Chip
+                                                    size="small"
+                                                    variant="outlined"
+                                                    label={account.role === 'OWNER' ? 'Anda Pemilik' : 'Akun Dibagikan'}
                                                 />
                                             )}
                                             {isTelegramDefault && (
@@ -278,7 +292,11 @@ const Settings: React.FC<SettingsProps> = ({
                                         </Box>
 
                                         <Typography variant="body2" color="text.secondary">
-                                            {account.role === 'OWNER' ? 'Pemilik akun ini.' : 'Anda bergabung sebagai anggota.'}
+                                            {account.sharedAccountId
+                                                ? (account.role === 'OWNER'
+                                                    ? 'Akun ini dibagikan dan Anda menjadi pemiliknya.'
+                                                    : 'Akun ini dibagikan dan Anda bergabung sebagai anggota.')
+                                                : 'Akun pribadi yang hanya bisa diakses oleh Anda.'}
                                         </Typography>
                                         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                                             {deleteBlockReason || 'Akun ini bisa dihapus selama belum punya transaksi.'}
@@ -455,7 +473,7 @@ const Settings: React.FC<SettingsProps> = ({
                     >
                         {accounts.map((account) => (
                             <MenuItem key={account.id} value={account.id}>
-                                {account.name} • {getAccountTypeLabel(account.type)}
+                                {account.name} • {getAccountStatusLabel(account)}
                             </MenuItem>
                         ))}
                     </Select>
@@ -721,7 +739,7 @@ const Settings: React.FC<SettingsProps> = ({
                     if (isCreatingAccount) return;
                     setShowAddAccountDialog(false);
                     setNewAccountName('');
-                    setNewAccountType('PERSONAL');
+                    setCreateAsShared(false);
                 }}
                 fullWidth
                 maxWidth="xs"
@@ -736,18 +754,23 @@ const Settings: React.FC<SettingsProps> = ({
                             placeholder="Contoh: Rumah Tangga"
                             autoFocus
                         />
-                        <FormControl fullWidth>
-                            <InputLabel>Tipe</InputLabel>
-                            <Select
-                                label="Tipe"
-                                value={newAccountType}
-                                onChange={(e) => setNewAccountType(e.target.value as AccountType)}
-                            >
-                                {(['PERSONAL', 'FAMILY', 'BUSINESS', 'SHARED'] as AccountType[]).map((type) => (
-                                    <MenuItem key={type} value={type}>{getAccountTypeLabel(type)}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                                Mode akun
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                                Akun baru bisa dibuat pribadi dulu, atau langsung dibagikan supaya orang lain bisa bergabung sejak awal.
+                            </Typography>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={createAsShared}
+                                        onChange={(e) => setCreateAsShared(e.target.checked)}
+                                    />
+                                }
+                                label={createAsShared ? 'Langsung jadi akun bersama' : 'Buat sebagai akun pribadi'}
+                            />
+                        </Paper>
                     </Box>
                 </DialogContent>
                 <DialogActions>
@@ -756,7 +779,7 @@ const Settings: React.FC<SettingsProps> = ({
                         onClick={() => {
                             setShowAddAccountDialog(false);
                             setNewAccountName('');
-                            setNewAccountType('PERSONAL');
+                            setCreateAsShared(false);
                         }}
                     >
                         Batal
@@ -767,7 +790,7 @@ const Settings: React.FC<SettingsProps> = ({
                         onClick={handleCreateAccount}
                         startIcon={isCreatingAccount ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
                     >
-                        {isCreatingAccount ? 'Membuat...' : 'Tambah Akun'}
+                        {isCreatingAccount ? 'Membuat...' : createAsShared ? 'Buat Akun Bersama' : 'Tambah Akun'}
                     </Button>
                 </DialogActions>
             </Dialog>

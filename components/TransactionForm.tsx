@@ -27,6 +27,7 @@ interface TransactionFormProps {
   categories: Category[];
   initialData?: Transaction;
   latestData?: Transaction | null;
+  currentUserId?: string | null;
   onAdd?: (amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' }) => Promise<void>;
   onUpdate?: (id: string, amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' } | null) => Promise<void>;
   onDelete?: (id: string) => void;
@@ -70,7 +71,7 @@ const getTransactionSnapshot = (transaction?: Transaction | null) => {
   });
 };
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, latestData, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, latestData, currentUserId, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
   const { theme } = useTheme();
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [displayAmount, setDisplayAmount] = useState('');
@@ -98,6 +99,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [conflictBaseline, setConflictBaseline] = useState<Transaction | undefined>(initialData);
+  const canEditTransaction = !initialData || !currentUserId || !initialData.createdByUserId || initialData.createdByUserId === currentUserId;
+  const isReadOnly = !!initialData && !canEditTransaction;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -214,6 +217,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   };
 
   const persistTransaction = async (forceSave = false) => {
+    if (isReadOnly) {
+      return;
+    }
     setError('');
     const rawAmount = parseInt(displayAmount.replace(/\./g, ''), 10);
 
@@ -299,6 +305,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const formContent = (
     <Box component="form" id="transaction-form" onSubmit={handleSubmit}>
         {error && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
+        {initialData && isReadOnly && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+              Dibuat oleh: {initialData.createdByName || 'anggota lain'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Transaksi ini hanya bisa diubah oleh pembuatnya.
+            </Typography>
+          </Alert>
+        )}
         {hasRemoteConflict && initialData && latestData ? (
           <Alert severity="warning" sx={{ mb: 2 }}>
             <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
@@ -323,7 +339,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           fullWidth
           exclusive
           value={type}
-          onChange={(_, val) => val && setType(val)}
+          onChange={(_, val) => !isReadOnly && val && setType(val)}
+          disabled={isReadOnly}
           sx={{ mb: 2, bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}
         >
           <ToggleButton value="EXPENSE" sx={{ borderRadius: 1.5, fontWeight: 700, border: 'none', '&.Mui-selected': { bgcolor: 'background.paper', color: 'error.main', boxShadow: 1 } }}>
@@ -340,7 +357,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           label="Jumlah (Rp)"
           value={displayAmount}
           onChange={handleAmountChange}
-          disabled={isSaving}
+          disabled={isSaving || isReadOnly}
           inputProps={{ inputMode: 'numeric' }}
           autoFocus={!initialData}
           sx={{ mb: 2 }}
@@ -352,7 +369,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Typography variant="subtitle2" fontWeight={700}>Kategori</Typography>
             {onAddCategory && (
-              <Button size="small" variant="outlined" startIcon={<IconDisplay name="Plus" size={14} />} onClick={() => setShowCategoryModal(true)}>
+              <Button size="small" variant="outlined" startIcon={<IconDisplay name="Plus" size={14} />} onClick={() => setShowCategoryModal(true)} disabled={isReadOnly}>
                 Kategori Baru
               </Button>
             )}
@@ -363,9 +380,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 key={cat.id}
                 component="button"
                 type="button"
-                onClick={() => setCategoryId(cat.id)}
+                onClick={() => !isReadOnly && setCategoryId(cat.id)}
                 sx={{
-                  p: 1.25, borderRadius: 2, border: '1px solid', cursor: 'pointer',
+                  p: 1.25, borderRadius: 2, border: '1px solid', cursor: isReadOnly ? 'not-allowed' : 'pointer',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
                   transition: 'all 0.15s',
                   borderColor: categoryId === cat.id ? 'primary.main' : 'divider',
@@ -383,7 +400,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           {filteredCategories.length === 0 && (
             <Typography variant="body2" color="text.disabled" textAlign="center" sx={{ py: 1 }}>
               Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.
-              {onAddCategory && (
+              {onAddCategory && !isReadOnly && (
                 <Box component="span" onClick={() => setShowCategoryModal(true)} sx={{ ml: 0.5, color: 'primary.main', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
                   Buat sekarang
                 </Box>
@@ -393,13 +410,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         </Box>
 
         {/* Date */}
-        <TextField
+          <TextField
           fullWidth
           label="Tanggal"
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          disabled={isSaving}
+          disabled={isSaving || isReadOnly}
           InputLabelProps={{ shrink: true }}
           sx={{ mb: 2 }}
         />
@@ -412,7 +429,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          disabled={isSaving}
+          disabled={isSaving || isReadOnly}
           placeholder="Contoh: Makan siang, Gaji bulanan"
           sx={{ mb: 2 }}
           slotProps={{
@@ -426,16 +443,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
             Lampiran
           </Typography>
-          <input type="file" ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileSelect} disabled={isSaving} style={{ display: 'none' }} />
+          <input type="file" ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileSelect} disabled={isSaving || isReadOnly} style={{ display: 'none' }} />
           {!hasAttachment ? (
             <Paper
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !isReadOnly && fileInputRef.current?.click()}
               sx={{
                 border: '2px dashed',
                 borderColor: 'divider',
                 p: 3,
                 textAlign: 'center',
-                cursor: 'pointer',
+                cursor: isReadOnly ? 'not-allowed' : 'pointer',
                 bgcolor: 'action.hover',
                 '&:hover': { borderColor: 'primary.main' },
               }}
@@ -464,7 +481,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                     </Typography>
                   </Box>
                 </Box>
-                <IconButton size="small" onClick={removeAttachment} disabled={isSaving}>
+                <IconButton size="small" onClick={removeAttachment} disabled={isSaving || isReadOnly}>
                   <IconDisplay name="X" size={18} />
                 </IconButton>
               </Box>
@@ -479,12 +496,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
 
   const formActions = (
     <>
-      {initialData && onDelete ? (
+      {initialData && onDelete && canEditTransaction ? (
         <Button
           variant="outlined"
           color="error"
           onClick={handleDelete}
-          disabled={isSaving}
+          disabled={isSaving || isReadOnly}
           startIcon={<IconDisplay name="Trash2" size={18} />}
         >
           Hapus
@@ -494,15 +511,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
       <Button variant="outlined" onClick={onClose} disabled={isSaving}>
         Batal
       </Button>
-      <Button
-        type="submit"
-        form="transaction-form"
-        variant="contained"
-        disabled={isSaving}
-        startIcon={isSaving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name={initialData ? 'Check' : 'Save'} size={18} sx={{ color: '#fff' }} />}
-      >
-        {isSaving ? 'Menyimpan...' : initialData ? 'Update' : 'Simpan'}
-      </Button>
+      {!isReadOnly && (
+        <Button
+          type="submit"
+          form="transaction-form"
+          variant="contained"
+          disabled={isSaving}
+          startIcon={isSaving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name={initialData ? 'Check' : 'Save'} size={18} sx={{ color: '#fff' }} />}
+        >
+          {isSaving ? 'Menyimpan...' : initialData ? 'Update' : 'Simpan'}
+        </Button>
+      )}
     </>
   );
 
@@ -511,8 +530,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
       <FullScreenDialog
         open
         onClose={onClose}
-        title={initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}
-        description="Gunakan pola input yang sama untuk semua transaksi agar pencatatan tetap konsisten dan mudah dibaca."
+        title={initialData ? (isReadOnly ? 'Detail Transaksi' : 'Edit Transaksi') : 'Tambah Transaksi'}
+        description={initialData && isReadOnly
+          ? 'Transaksi ini hanya bisa dibaca karena dibuat oleh anggota lain.'
+          : 'Gunakan pola input yang sama untuk semua transaksi agar pencatatan tetap konsisten dan mudah dibaca.'}
         actions={formActions}
       >
         {formContent}
@@ -539,7 +560,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         icon="Trash2"
       />
 
-      {onAddCategory && (
+      {onAddCategory && !isReadOnly && (
         <CategoryFormModal
           isOpen={showCategoryModal}
           defaultType={type}

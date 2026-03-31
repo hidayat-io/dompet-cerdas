@@ -177,7 +177,6 @@ export const linkTelegram = functions
             telegramId: validation.telegramId,
             accountId: accountSummary.id,
             accountName: accountSummary.name,
-            accountType: accountSummary.type,
         };
     });
 
@@ -241,7 +240,6 @@ export const createSharedAccount = functions
 
         batch.set(sharedAccountRef, {
             name,
-            type: 'SHARED',
             ownerUserId: userId,
             inviteCode: null,
             inviteCodeUpdatedAt: null,
@@ -259,7 +257,6 @@ export const createSharedAccount = functions
 
         batch.set(userAccountRef, {
             name,
-            type: 'SHARED',
             role: 'OWNER',
             ownerUserId: userId,
             sharedAccountId: sharedAccountRef.id,
@@ -400,7 +397,6 @@ export const joinSharedAccountByCode = functions
 
         batch.set(accountRef, {
             name: sharedData.name || 'Keuangan Bersama',
-            type: 'SHARED',
             role,
             ownerUserId: sharedData.ownerUserId || userId,
             sharedAccountId: sharedAccountDoc.id,

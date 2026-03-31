@@ -18,7 +18,7 @@
 **Key Features**:
 - ✅ UI konsisten berbasis **Material UI** — semua komponen pakai MUI, dark/light mode via MUI ThemeProvider
 - ✅ Standardisasi layout lintas menu dengan `PageHeader`, `FullScreenDialog`, dan default MUI component overrides
-- ✅ Multi-`Akun Keuangan` untuk memisahkan data pribadi, keluarga, bisnis, atau bersama
+- ✅ Banyak `Akun Keuangan` yang bisa dibuat private atau langsung dibagikan per akun
 - ✅ Kolaborasi sederhana untuk akun bersama: anggota, kode gabung, dan shared data lintas user
 - ✅ Pengaturan `Akun Keuangan` sekarang lebih simple: daftar akun, popup tambah akun, dan guard hapus akun kosong
 - ✅ Dashboard dengan pie chart breakdown
@@ -185,9 +185,11 @@ dompet_cerdas/
 ### 2️⃣ Akun Keuangan
 - **Multi-Account**: Satu user bisa punya beberapa `Akun Keuangan`
 - **Active Account Context**: Semua transaksi, kategori, rencana, anggaran, dan hutang piutang scoped ke akun aktif
+- **Share per Account**: Setiap akun bisa dipilih untuk dibagikan atau tetap private
 - **Telegram Default Account**: Bot Telegram punya akun default sendiri yang bisa berbeda dari akun aktif web
-- **Migration Support**: User lama otomatis dibuatkan akun default `Pribadi`
+- **Migration Support**: User lama otomatis dibuatkan akun default tanpa tipe khusus
 - **Simplified Settings UI**: Daftar akun tampil langsung, tambah akun lewat popup kecil, dan perpindahan akun cukup satu klik
+- **Ownership Rule**: Data shared hanya bisa diedit oleh user yang membuatnya; data milik anggota lain tampil read-only dengan info pembuat
 - **Delete Guard**: Akun biasa hanya bisa dihapus kalau belum punya transaksi; akun terakhir tidak bisa dihapus; akun bersama belum dihapus dari menu ini
 
 ### 3️⃣ Transaksi (Transactions)

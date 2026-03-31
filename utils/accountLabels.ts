@@ -1,15 +1,11 @@
-import { AccountType } from '../types';
+import { FinancialAccount } from '../types';
 
-export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
-  PERSONAL: 'Pribadi',
-  FAMILY: 'Keluarga',
-  BUSINESS: 'Bisnis',
-  SHARED: 'Keuangan Bersama',
-};
-
-export const getAccountTypeLabel = (type?: AccountType | string) => {
-  if (!type) return 'Akun';
-  return ACCOUNT_TYPE_LABELS[type as AccountType] || type;
+export const getAccountStatusLabel = (account?: Pick<FinancialAccount, 'sharedAccountId' | 'role'> | null) => {
+  if (!account) return 'Akun';
+  if (account.sharedAccountId) {
+    return account.role === 'OWNER' ? 'Akun Bersama • Pemilik' : 'Akun Bersama • Anggota';
+  }
+  return 'Akun Pribadi';
 };
 
 export const sanitizeAccountNameForFilename = (name: string) => (
