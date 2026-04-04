@@ -1,14 +1,15 @@
 {
   "name": "dompetcerdas---expense-tracker",
   "private": true,
-  "version": "2.8.0",
+  "version": "2.8.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "vite build",
     "preview": "vite preview",
     "smoke:hosting": "node scripts/hosting-smoke-check.mjs",
-    "deploy:hosting:safe": "npm run build && firebase deploy --only hosting --project expensetracker-test-1 --non-interactive && npm run smoke:hosting -- https://expensetracker-test-1.web.app / /link-telegram"
+    "deploy:hosting:safe": "firebase deploy --only hosting --project expensetracker-test-1 --non-interactive && npm run smoke:hosting -- https://expensetracker-test-1.web.app / /link-telegram"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

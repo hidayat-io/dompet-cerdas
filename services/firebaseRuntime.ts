@@ -2,6 +2,17 @@ import { firebaseApp } from '../firebase';
 
 type CloudFunctionPayload = Record<string, unknown> | void;
 
+const normalizeCallableErrorMessage = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return 'Terjadi kesalahan saat memanggil layanan.';
+  }
+
+  const rawMessage = error.message || 'Terjadi kesalahan saat memanggil layanan.';
+  const strippedPrefix = rawMessage.replace(/^Firebase:\s*/i, '');
+  const strippedSuffix = strippedPrefix.replace(/\s*\(functions\/[a-z-]+\)\.?$/i, '');
+  return strippedSuffix || rawMessage;
+};
+
 export const callCloudFunction = async <TRequest extends CloudFunctionPayload, TResponse>(
   name: string,
   payload?: TRequest
@@ -9,8 +20,12 @@ export const callCloudFunction = async <TRequest extends CloudFunctionPayload, T
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   const functions = getFunctions(firebaseApp, 'asia-southeast1');
   const callable = httpsCallable<TRequest, TResponse>(functions, name);
-  const response = await callable(payload as TRequest);
-  return response.data;
+  try {
+    const response = await callable(payload as TRequest);
+    return response.data;
+  } catch (error) {
+    throw new Error(normalizeCallableErrorMessage(error));
+  }
 };
 
 export const uploadFileToStorage = async (path: string, file: File) => {

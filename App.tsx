@@ -79,7 +79,6 @@ import {
   hasPendingStorageCleanup,
   markCategoryCacheRefreshPending,
 } from './services/offlineQueue';
-import { getAccountStatusLabel } from './utils/accountLabels';
 import { getNormalizedBudget, getPreviousMonthKey } from './utils/budget';
 
 // ... (skip content)
@@ -163,6 +162,8 @@ const normalizePlanItem = (item: Partial<PlanItem> & { id: string }): PlanItem =
   categoryId: item.categoryId || '',
   plannedDate: item.plannedDate,
   status: item.status || DEFAULT_PLAN_ITEM_STATUS,
+  createdByUserId: item.createdByUserId,
+  createdByName: item.createdByName,
 });
 
 const ViewLoadingFallback = () => (
@@ -187,6 +188,8 @@ const normalizePlan = (planId: string, rawPlan: Partial<Plan>): Plan => ({
     : [],
   createdAt: rawPlan.createdAt || new Date().toISOString(),
   useCurrentMonthBalance: !!rawPlan.useCurrentMonthBalance,
+  createdByUserId: rawPlan.createdByUserId,
+  createdByName: rawPlan.createdByName,
 });
 
 function App() {
@@ -225,6 +228,8 @@ function App() {
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [sharedAccountMembers, setSharedAccountMembers] = useState<SharedAccountMember[]>([]);
   const [activeSharedInviteCode, setActiveSharedInviteCode] = useState<string | null>(null);
+  const activeAccountRef = useRef<FinancialAccount | null>(null);
+  const lastCategorySeededAccountRef = useRef<string | null>(null);
 
   const normalizedBudgets = useMemo(
     () => budgets.map((budget) => getNormalizedBudget(budget, categories)),
@@ -234,7 +239,46 @@ function App() {
     () => accounts.find((account) => account.id === activeAccountId) || null,
     [accounts, activeAccountId]
   );
+  useEffect(() => {
+    activeAccountRef.current = activeAccount;
+  }, [activeAccount]);
   const currentUserLabel = user?.displayName || user?.email || 'Member';
+
+  useEffect(() => {
+    if (!user || !activeAccountId || accountLoading) {
+      return;
+    }
+
+    if (categories.length > 0) {
+      lastCategorySeededAccountRef.current = activeAccountId;
+      return;
+    }
+
+    if (lastCategorySeededAccountRef.current === activeAccountId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const seedCategoriesIfNeeded = async () => {
+      try {
+        await callCloudFunction('refreshCategoryCache', {});
+        if (!cancelled) {
+          lastCategorySeededAccountRef.current = activeAccountId;
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Failed to seed default categories for active account:', error);
+        }
+      }
+    };
+
+    void seedCategoriesIfNeeded();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, activeAccountId, accountLoading, categories.length]);
 
   // Notification State
   const [notification, setNotification] = useState<{
@@ -304,6 +348,31 @@ function App() {
     }
   };
 
+  const isPermissionDeniedError = (error: unknown) => {
+    if (typeof error === 'object' && error && 'code' in error && typeof (error as { code?: unknown }).code === 'string') {
+      const code = String((error as { code?: string }).code);
+      if (/permission-denied/i.test(code)) return true;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return /permission-denied|missing or insufficient permissions/i.test(message);
+  };
+
+  const pickFallbackAccount = (accountList: FinancialAccount[], excludedAccountId?: string | null) =>
+    accountList.find((account) => account.id !== excludedAccountId && !account.sharedAccountId) ||
+    accountList.find((account) => account.id !== excludedAccountId) ||
+    null;
+
+  const getFallbackAccessibleAccount = () =>
+    pickFallbackAccount(accounts, activeAccountRef.current?.id);
+
+  const persistActiveAccountSelection = async (accountId: string) => {
+    if (!user || !accountId) return;
+    await setDoc(getUserDocRef(db, user.uid), {
+      activeAccountId: accountId,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  };
+
   const getAttachmentPathFromTransaction = (transaction?: Transaction | null) => {
     if (transaction?.attachment?.path) return transaction.attachment.path;
     if (transaction?.attachmentUrl) return getLegacyStoragePathFromUrl(transaction.attachmentUrl);
@@ -348,6 +417,27 @@ function App() {
   const getActiveScopedCollection = <T,>(collectionName: AccountScopedCollectionName) => {
     if (!user || !activeAccount) return null;
     return getScopedCollectionRefForAccount<T>(db, user.uid, activeAccount, collectionName);
+  };
+
+  const handleFirestoreListenerError = (source: string, error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!isPermissionDeniedError(error)) {
+      console.error(`Firestore listener error (${source}):`, error);
+      return;
+    }
+
+    const currentAccount = activeAccountRef.current;
+    if (!currentAccount?.sharedAccountId) {
+      return;
+    }
+
+    const fallbackAccount = pickFallbackAccount(accounts, currentAccount.id);
+    if (fallbackAccount) {
+      setActiveAccountId(fallbackAccount.id);
+      void persistActiveAccountSelection(fallbackAccount.id);
+    }
+    setSharedAccountMembers([]);
+    setActiveSharedInviteCode(null);
   };
 
   // --- Auth Listener ---
@@ -622,6 +712,39 @@ function App() {
         resolvedAccount = existingAccounts.find((account) => account.id === resolvedAccountId) || null;
       }
 
+      if (resolvedAccount?.sharedAccountId) {
+        try {
+          const sharedMemberRef = doc(db, 'sharedAccounts', resolvedAccount.sharedAccountId, 'members', user.uid);
+          const sharedMemberSnap = await getDoc(sharedMemberRef);
+
+          if (!sharedMemberSnap.exists()) {
+            const fallbackAccount = pickFallbackAccount(existingAccounts, resolvedAccount.id);
+            if (fallbackAccount) {
+              resolvedAccountId = fallbackAccount.id;
+              resolvedAccount = fallbackAccount;
+              await setDoc(userRef, {
+                activeAccountId: fallbackAccount.id,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+            }
+          }
+        } catch (error) {
+          if (isPermissionDeniedError(error)) {
+            const fallbackAccount = pickFallbackAccount(existingAccounts, resolvedAccount.id);
+            if (fallbackAccount) {
+              resolvedAccountId = fallbackAccount.id;
+              resolvedAccount = fallbackAccount;
+              await setDoc(userRef, {
+                activeAccountId: fallbackAccount.id,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+
       if (resolvedAccountId && resolvedAccount && !resolvedAccount.sharedAccountId) {
         const targetCategoriesRef = getScopedCollectionRefForAccount<Category>(db, user.uid, resolvedAccount, 'categories');
         const targetTransactionsRef = getScopedCollectionRefForAccount<Transaction>(db, user.uid, resolvedAccount, 'transactions');
@@ -782,23 +905,50 @@ function App() {
 
     const sharedAccountRef = getSharedAccountDocRef(db, activeAccount.sharedAccountId);
     const membersRef = query(getSharedAccountMembersCollectionRef(db, activeAccount.sharedAccountId));
+    const listenerAccountId = activeAccount.id;
+    const listenerSharedAccountId = activeAccount.sharedAccountId;
+    const isCurrentListener = () => {
+      const currentAccount = activeAccountRef.current;
+      return (
+        currentAccount?.id === listenerAccountId &&
+        currentAccount.sharedAccountId === listenerSharedAccountId
+      );
+    };
 
-    const unsubSharedAccount = onSnapshot(sharedAccountRef, { includeMetadataChanges: true }, (snapshot) => {
-      updatePendingSyncKey('shared-account-meta', snapshot.metadata.hasPendingWrites);
-      const data = snapshot.data();
-      setActiveSharedInviteCode(typeof data?.inviteCode === 'string' ? data.inviteCode : null);
-    });
+    const unsubSharedAccount = onSnapshot(
+      sharedAccountRef,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!isCurrentListener()) return;
+        updatePendingSyncKey('shared-account-meta', snapshot.metadata.hasPendingWrites);
+        const data = snapshot.data();
+        setActiveSharedInviteCode(typeof data?.inviteCode === 'string' ? data.inviteCode : null);
+      },
+      (error) => {
+        if (!isCurrentListener()) return;
+        handleFirestoreListenerError('shared-account-meta', error);
+      }
+    );
 
-    const unsubMembers = onSnapshot(membersRef, { includeMetadataChanges: true }, (snapshot) => {
-      updatePendingSyncKey('shared-account-members', snapshot.metadata.hasPendingWrites);
-      const members = snapshot.docs
-        .map((memberDoc) => ({
-          id: memberDoc.id,
-          ...(memberDoc.data() as Omit<SharedAccountMember, 'id'>)
-        }))
-        .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt));
-      setSharedAccountMembers(members);
-    });
+    const unsubMembers = onSnapshot(
+      membersRef,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!isCurrentListener()) return;
+        updatePendingSyncKey('shared-account-members', snapshot.metadata.hasPendingWrites);
+        const members = snapshot.docs
+          .map((memberDoc) => ({
+            id: memberDoc.id,
+            ...(memberDoc.data() as Omit<SharedAccountMember, 'id'>)
+          }))
+          .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt));
+        setSharedAccountMembers(members);
+      },
+      (error) => {
+        if (!isCurrentListener()) return;
+        handleFirestoreListenerError('shared-account-members', error);
+      }
+    );
 
     return () => {
       updatePendingSyncKey('shared-account-meta', false);
@@ -829,45 +979,105 @@ function App() {
     const plansRef = getActiveScopedCollection<Plan>('plans');
     const budgetsRef = getActiveScopedCollection<Budget>('budgets');
     const debtsRef = getActiveScopedCollection<DebtRecord>('debts');
+    const listenerAccountId = activeAccount.id;
+    const listenerSharedAccountId = activeAccount.sharedAccountId || null;
+    const isCurrentListener = () => {
+      const currentAccount = activeAccountRef.current;
+      return (
+        currentAccount?.id === listenerAccountId &&
+        (currentAccount.sharedAccountId || null) === listenerSharedAccountId
+      );
+    };
 
     if (!categoriesRef || !transactionsRef || !plansRef || !budgetsRef || !debtsRef) {
       return;
     }
 
+    setCategories([]);
+    setTransactions([]);
+    setPlans([]);
+    setBudgets([]);
+    setDebts([]);
+
     const catQuery = query(categoriesRef);
-    const unsubCat = onSnapshot(catQuery, { includeMetadataChanges: true }, (snapshot) => {
-      updatePendingSyncKey('categories', snapshot.metadata.hasPendingWrites);
-      const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category));
-      setCategories(data);
-    });
+    const unsubCat = onSnapshot(
+      catQuery,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!isCurrentListener()) return;
+        updatePendingSyncKey('categories', snapshot.metadata.hasPendingWrites);
+        const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category));
+        setCategories(data);
+      },
+      (error) => {
+        if (!isCurrentListener()) return;
+        handleFirestoreListenerError('categories', error);
+      }
+    );
 
     const txQuery = query(transactionsRef);
-    const unsubTx = onSnapshot(txQuery, { includeMetadataChanges: true }, (snapshot) => {
-      updatePendingSyncKey('transactions', snapshot.metadata.hasPendingWrites);
-      const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
-      setTransactions(data);
-    });
+    const unsubTx = onSnapshot(
+      txQuery,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!isCurrentListener()) return;
+        updatePendingSyncKey('transactions', snapshot.metadata.hasPendingWrites);
+        const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
+        setTransactions(data);
+      },
+      (error) => {
+        if (!isCurrentListener()) return;
+        handleFirestoreListenerError('transactions', error);
+      }
+    );
 
     const planQuery = query(plansRef);
-    const unsubPlans = onSnapshot(planQuery, { includeMetadataChanges: true }, (snapshot) => {
-      updatePendingSyncKey('plans', snapshot.metadata.hasPendingWrites);
-      const data = snapshot.docs.map((planDoc) => normalizePlan(planDoc.id, planDoc.data() as Partial<Plan>));
-      setPlans(data);
-    });
+    const unsubPlans = onSnapshot(
+      planQuery,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!isCurrentListener()) return;
+        updatePendingSyncKey('plans', snapshot.metadata.hasPendingWrites);
+        const data = snapshot.docs.map((planDoc) => normalizePlan(planDoc.id, planDoc.data() as Partial<Plan>));
+        setPlans(data);
+      },
+      (error) => {
+        if (!isCurrentListener()) return;
+        handleFirestoreListenerError('plans', error);
+      }
+    );
 
     const budgetQuery = query(budgetsRef);
-    const unsubBudgets = onSnapshot(budgetQuery, { includeMetadataChanges: true }, (snapshot) => {
-      updatePendingSyncKey('budgets', snapshot.metadata.hasPendingWrites);
-      const data = snapshot.docs.map((budgetDoc) => ({ id: budgetDoc.id, ...(budgetDoc.data() as Partial<Budget>) } as Budget));
-      setBudgets(data);
-    });
+    const unsubBudgets = onSnapshot(
+      budgetQuery,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!isCurrentListener()) return;
+        updatePendingSyncKey('budgets', snapshot.metadata.hasPendingWrites);
+        const data = snapshot.docs.map((budgetDoc) => ({ id: budgetDoc.id, ...(budgetDoc.data() as Partial<Budget>) } as Budget));
+        setBudgets(data);
+      },
+      (error) => {
+        if (!isCurrentListener()) return;
+        handleFirestoreListenerError('budgets', error);
+      }
+    );
 
     const debtQuery = query(debtsRef);
-    const unsubDebts = onSnapshot(debtQuery, { includeMetadataChanges: true }, (snapshot) => {
-      updatePendingSyncKey('debts', snapshot.metadata.hasPendingWrites);
-      const data = snapshot.docs.map((debtDoc) => normalizeDebtRecord(debtDoc.id, debtDoc.data() as Partial<DebtRecord>));
-      setDebts(data);
-    });
+    const unsubDebts = onSnapshot(
+      debtQuery,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!isCurrentListener()) return;
+        updatePendingSyncKey('debts', snapshot.metadata.hasPendingWrites);
+        const data = snapshot.docs.map((debtDoc) => normalizeDebtRecord(debtDoc.id, debtDoc.data() as Partial<DebtRecord>));
+        setDebts(data);
+      },
+      (error) => {
+        if (!isCurrentListener()) return;
+        handleFirestoreListenerError('debts', error);
+      }
+    );
 
     return () => {
       updatePendingSyncKey('categories', false);
@@ -928,6 +1138,29 @@ function App() {
     showNotification('success', 'Akun Bersama Dibuat', `Akun Keuangan bersama "${trimmedName}" siap dipakai bareng.`, true);
   };
 
+  const shareAccount = async (accountId: string) => {
+    if (!user || !accountId) return;
+
+    const targetAccount = accounts.find((account) => account.id === accountId);
+    if (!targetAccount) return;
+
+    if (targetAccount.sharedAccountId) {
+      showNotification('info', 'Akun Sudah Dibagikan', `Akun "${targetAccount.name}" sudah berada di mode kolaborasi.`, true);
+      return;
+    }
+
+    if (!requireOnline('Perlu Koneksi Internet', 'Membagikan akun perlu internet aktif karena data harus dipindahkan ke shared workspace.')) return;
+
+    await callCloudFunction<{ accountId: string }, { success: boolean; sharedAccountId?: string; name?: string }>('shareExistingAccount', { accountId });
+
+    showNotification(
+      'success',
+      'Akun Dibagikan',
+      `Akun "${targetAccount.name}" sekarang bisa dipakai bareng. Buka pengaturan akun itu untuk buat kode gabung.`,
+      true
+    );
+  };
+
   const generateSharedInviteCode = async () => {
     if (!activeAccountId || !activeAccount?.sharedAccountId) return;
     if (!requireOnline('Perlu Koneksi Internet', 'Kode gabung baru bisa dibuat saat internet aktif.')) return;
@@ -956,6 +1189,16 @@ function App() {
 
   const switchAccount = async (accountId: string) => {
     if (!user || !accountId || accountId === activeAccountId) return;
+
+    const nextAccount = accounts.find((account) => account.id === accountId) || null;
+    setActiveAccountId(accountId);
+    setSharedAccountMembers([]);
+    setActiveSharedInviteCode(null);
+    setCategories([]);
+    setTransactions([]);
+    setPlans([]);
+    setBudgets([]);
+    setDebts([]);
 
     await setDoc(getUserDocRef(db, user.uid), {
       activeAccountId: accountId,
@@ -988,52 +1231,146 @@ function App() {
       return;
     }
 
-    if (targetAccount.type === 'SHARED' || targetAccount.sharedAccountId) {
-      showNotification('warning', 'Akun Bersama Belum Bisa Dihapus', 'Untuk saat ini akun bersama belum bisa dihapus dari halaman ini.', true);
-      return;
-    }
-
-    const transactionsSnap = await getDocs(getTransactionsCollectionRef(db, user.uid, targetAccount.id));
-    if (!transactionsSnap.empty) {
-      showNotification('warning', 'Akun Tidak Bisa Dihapus', 'Akun ini sudah punya transaksi. Hapus semua transaksi di akun tersebut terlebih dahulu.', true);
-      return;
-    }
-
     const fallbackAccount = accounts.find((account) => account.id !== targetAccount.id) || null;
+    if (!fallbackAccount) {
+      showNotification('warning', 'Akun Terakhir Tidak Bisa Dihapus', 'Minimal harus ada satu Akun Keuangan yang tersisa.', true);
+      return;
+    }
+
     const now = new Date().toISOString();
-    const collectionsToClear = [
-      getCategoriesCollectionRef(db, user.uid, targetAccount.id),
-      getPlansCollectionRef(db, user.uid, targetAccount.id),
-      getBudgetsCollectionRef(db, user.uid, targetAccount.id),
-      getLegacySimulationsCollectionRef(db, user.uid, targetAccount.id),
-      getDebtsCollectionRef(db, user.uid, targetAccount.id),
-    ];
+    const previousActiveAccountId = activeAccountId;
+    const previousAccounts = accounts;
+    const previousCategories = categories;
+    const previousTransactions = transactions;
+    const previousPlans = plans;
+    const previousBudgets = budgets;
+    const previousDebts = debts;
+    const previousSharedAccountMembers = sharedAccountMembers;
+    const previousActiveSharedInviteCode = activeSharedInviteCode;
+    try {
+      const removeAccountFromLocalState = () => {
+        setAccounts((currentAccounts) => currentAccounts.filter((account) => account.id !== targetAccount.id));
+      };
 
-    for (const collectionRef of collectionsToClear) {
-      const snapshot = await getDocs(collectionRef);
-      await Promise.all(snapshot.docs.map((itemDoc) => deleteDoc(itemDoc.ref)));
+      const switchToFallbackLocally = async () => {
+        setActiveAccountId(fallbackAccount.id);
+        setSharedAccountMembers([]);
+        setActiveSharedInviteCode(null);
+        setCategories([]);
+        setTransactions([]);
+        setPlans([]);
+        setBudgets([]);
+        setDebts([]);
+        await setDoc(getUserDocRef(db, user.uid), {
+          activeAccountId: fallbackAccount.id,
+          updatedAt: now,
+        }, { merge: true });
+      };
+
+      if (targetAccount.sharedAccountId) {
+        if (
+          targetAccount.role === 'OWNER' &&
+          activeAccountId === targetAccount.id &&
+          sharedAccountMembers.length > 1
+        ) {
+          showNotification(
+            'warning',
+            'Akun Bersama Masih Punya Anggota',
+            `Ada ${sharedAccountMembers.length - 1} anggota lain di akun ini. Minta mereka keluar dulu sebelum akun bisa dihapus.`,
+            true
+          );
+          return;
+        }
+
+        removeAccountFromLocalState();
+        if (activeAccountId === targetAccount.id) {
+          await switchToFallbackLocally();
+        }
+
+        const result = await callCloudFunction<{ accountId: string }, { success: boolean; action: 'LEFT' | 'DELETED'; name?: string }>(
+          'deleteSharedAccountAccess',
+          { accountId }
+        );
+
+        if (telegramDefaultAccountId === targetAccount.id) {
+          await setDoc(doc(db, 'users', user.uid, 'telegram_link', 'main'), {
+            defaultAccountId: fallbackAccount.id,
+            updatedAt: now,
+          }, { merge: true });
+        }
+
+        if (result.action === 'LEFT') {
+          showNotification('success', 'Keluar dari Akun Bersama', `Kamu keluar dari akun bersama "${result.name || targetAccount.name}".`, true);
+        } else {
+          showNotification('success', 'Akun Bersama Dihapus', `Akun bersama "${result.name || targetAccount.name}" berhasil dihapus.`, true);
+        }
+        return;
+      }
+
+      removeAccountFromLocalState();
+      if (activeAccountId === targetAccount.id) {
+        await switchToFallbackLocally();
+      }
+
+      const transactionsSnap = await getDocs(getTransactionsCollectionRef(db, user.uid, targetAccount.id));
+      if (!transactionsSnap.empty) {
+        setAccounts(previousAccounts);
+        setCategories(previousCategories);
+        setTransactions(previousTransactions);
+        setPlans(previousPlans);
+        setBudgets(previousBudgets);
+        setDebts(previousDebts);
+        setSharedAccountMembers(previousSharedAccountMembers);
+        setActiveSharedInviteCode(previousActiveSharedInviteCode);
+        if (previousActiveAccountId) {
+          setActiveAccountId(previousActiveAccountId);
+        }
+        showNotification('warning', 'Akun Tidak Bisa Dihapus', 'Akun ini sudah punya transaksi. Hapus semua transaksi di akun tersebut terlebih dahulu.', true);
+        return;
+      }
+
+      const collectionsToClear = [
+        getCategoriesCollectionRef(db, user.uid, targetAccount.id),
+        getPlansCollectionRef(db, user.uid, targetAccount.id),
+        getBudgetsCollectionRef(db, user.uid, targetAccount.id),
+        getLegacySimulationsCollectionRef(db, user.uid, targetAccount.id),
+        getDebtsCollectionRef(db, user.uid, targetAccount.id),
+      ];
+
+      for (const collectionRef of collectionsToClear) {
+        const snapshot = await getDocs(collectionRef);
+        await Promise.all(snapshot.docs.map((itemDoc) => deleteDoc(itemDoc.ref)));
+      }
+
+      await deleteDoc(getAccountDocRef(db, user.uid, targetAccount.id));
+
+      if (telegramDefaultAccountId === targetAccount.id) {
+        await setDoc(doc(db, 'users', user.uid, 'telegram_link', 'main'), {
+          defaultAccountId: fallbackAccount.id,
+          updatedAt: now,
+        }, { merge: true });
+      }
+
+      showNotification('success', 'Akun Dihapus', `Akun Keuangan "${targetAccount.name}" berhasil dihapus.`, true);
+    } catch (error) {
+      setAccounts(previousAccounts);
+      setCategories(previousCategories);
+      setTransactions(previousTransactions);
+      setPlans(previousPlans);
+      setBudgets(previousBudgets);
+      setDebts(previousDebts);
+      setSharedAccountMembers(previousSharedAccountMembers);
+      setActiveSharedInviteCode(previousActiveSharedInviteCode);
+      if (previousActiveAccountId) {
+        setActiveAccountId(previousActiveAccountId);
+        await setDoc(getUserDocRef(db, user.uid), {
+          activeAccountId: previousActiveAccountId,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan saat menghapus akun.';
+      showNotification('error', 'Gagal Menghapus Akun', errorMessage, true);
     }
-
-    await deleteDoc(getAccountDocRef(db, user.uid, targetAccount.id));
-
-    const userMetaUpdate: Partial<UserMeta> = {
-      updatedAt: now,
-    };
-
-    if (activeAccountId === targetAccount.id && fallbackAccount) {
-      userMetaUpdate.activeAccountId = fallbackAccount.id;
-    }
-
-    await setDoc(getUserDocRef(db, user.uid), userMetaUpdate, { merge: true });
-
-    if (telegramDefaultAccountId === targetAccount.id && fallbackAccount) {
-      await setDoc(doc(db, 'users', user.uid, 'telegram_link', 'main'), {
-        defaultAccountId: fallbackAccount.id,
-        updatedAt: now,
-      }, { merge: true });
-    }
-
-    showNotification('success', 'Akun Dihapus', `Akun Keuangan "${targetAccount.name}" berhasil dihapus.`, true);
   };
 
   const addTransaction = async (
@@ -1233,7 +1570,9 @@ function App() {
     if (!user || !activeAccount) return;
     const categoriesRef = getActiveScopedCollection<Category>('categories');
     if (!categoriesRef) return;
-    const docRef = await addDoc(categoriesRef, {
+    const docRef = doc(categoriesRef);
+    await setDoc(docRef, {
+      id: docRef.id,
       ...cat,
       createdByUserId: user.uid,
       createdByName: currentUserLabel,
@@ -1600,6 +1939,15 @@ function App() {
   const onboardingStorageKey = user && activeAccountId
     ? `dompetcerdas_onboarding_seen_${user.uid}_${activeAccountId}`
     : null;
+  const gettingStartedStorageKey = user && activeAccountId
+    ? `dompetcerdas_getting_started_seen_${user.uid}_${activeAccountId}`
+    : null;
+  const hasSeenOnboarding = onboardingStorageKey
+    ? localStorage.getItem(onboardingStorageKey) === '1'
+    : false;
+  const isGettingStartedDismissed = gettingStartedStorageKey
+    ? localStorage.getItem(gettingStartedStorageKey) === '1'
+    : false;
   const hasStarterData = transactions.length > 0 || plans.length > 0 || budgets.length > 0 || debts.length > 0;
 
   useEffect(() => {
@@ -1618,6 +1966,9 @@ function App() {
   const closeOnboarding = () => {
     if (onboardingStorageKey) {
       localStorage.setItem(onboardingStorageKey, '1');
+    }
+    if (gettingStartedStorageKey) {
+      localStorage.setItem(gettingStartedStorageKey, '1');
     }
     setShowOnboarding(false);
   };
@@ -1717,20 +2068,6 @@ function App() {
         </Snackbar>
       )}
 
-      {hasPendingWrites && (
-        <Snackbar
-          open
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          sx={{ bottom: { xs: 152, md: 88 } }}
-        >
-          <Alert severity="info" variant="filled" sx={{ fontWeight: 600, alignItems: 'center' }}>
-            {isOffline
-              ? 'Perubahan aman di perangkat ini dan akan dikirim saat koneksi kembali.'
-              : 'Perubahan sedang dikirim ke server.'}
-          </Alert>
-        </Snackbar>
-      )}
-
       {isOffline && (
         <Snackbar
           open
@@ -1752,18 +2089,6 @@ function App() {
       >
         <Alert onClose={() => setShowReconnectToast(false)} severity="success" variant="filled" sx={{ fontWeight: 600, alignItems: 'center' }}>
           Koneksi kembali. Sinkronisasi dilanjutkan.
-        </Alert>
-      </Snackbar>
-
-      <Snackbar
-        open={showSyncCompletedToast}
-        autoHideDuration={2400}
-        onClose={() => setShowSyncCompletedToast(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{ bottom: { xs: 152, md: 88 } }}
-      >
-        <Alert onClose={() => setShowSyncCompletedToast(false)} severity="success" variant="filled" sx={{ fontWeight: 600, alignItems: 'center' }}>
-          Semua perubahan sudah tersinkron.
         </Alert>
       </Snackbar>
 
@@ -1836,7 +2161,7 @@ function App() {
             >
               {accounts.map((account) => (
                 <MenuItem key={account.id} value={account.id}>
-                  {account.name} • {getAccountStatusLabel(account)}
+                  {account.name}
                 </MenuItem>
               ))}
             </Select>
@@ -2001,9 +2326,6 @@ function App() {
             <Typography variant="overline" sx={{ fontWeight: 600, letterSpacing: '0.16em', color: theme.colors.textMuted, fontSize: '0.6rem' }}>
               Akun Aktif
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: theme.colors.textPrimary }}>
-              {activeAccount?.name || 'Pilih Akun'}
-            </Typography>
           </Box>
           <Select
             value={activeAccountId || ''}
@@ -2018,7 +2340,7 @@ function App() {
           >
             {accounts.map((account) => (
               <MenuItem key={account.id} value={account.id}>
-                {account.name} • {getAccountStatusLabel(account)}
+                {account.name}
               </MenuItem>
             ))}
           </Select>
@@ -2034,6 +2356,7 @@ function App() {
                   categories={categories}
                   budgets={normalizedBudgets}
                   showGettingStarted={!hasStarterData}
+                  isGettingStartedDismissed={isGettingStartedDismissed || hasSeenOnboarding}
                   activeAccountName={activeAccount?.name || 'Akun Keuangan'}
                   telegramLinked={telegramLinked}
                   onGoToTransactions={() => setCurrentView('TRANSACTIONS')}
@@ -2121,6 +2444,7 @@ function App() {
                   onUpdateTelegramAccount={updateTelegramDefaultAccount}
                   onCreateAccount={createPrivateAccount}
                   onCreateSharedAccount={createSharedAccount}
+                  onShareAccount={shareAccount}
                   onGenerateSharedInviteCode={generateSharedInviteCode}
                   onJoinSharedAccount={joinSharedAccount}
                   onSwitchAccount={switchAccount}

@@ -333,9 +333,14 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                                                     >
                                                         <IconDisplay name={category.icon} size={16} sx={{ color: '#fff' }} />
                                                     </Avatar>
-                                                    <Box sx={{ minWidth: 0 }}>
-                                                        <Typography variant="body2" fontWeight={600} noWrap>{category.name}</Typography>
-                                                        <Typography variant="caption" sx={{ color: selected ? theme.colors.accent : 'text.secondary', fontWeight: 600 }}>
+                                                        <Box sx={{ minWidth: 0 }}>
+                                                        <Typography variant="body2" fontWeight={600} noWrap sx={{ color: theme.colors.textPrimary }}>
+                                                            {category.name}
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="caption"
+                                                            sx={{ color: selected ? theme.colors.accent : theme.colors.textSecondary, fontWeight: 600 }}
+                                                        >
                                                             {selected ? 'Terpilih' : 'Pilih kategori'}
                                                         </Typography>
                                                     </Box>

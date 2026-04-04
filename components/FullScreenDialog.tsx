@@ -75,7 +75,7 @@ const FullScreenDialog: React.FC<FullScreenDialogProps> = ({
                         py: { xs: 2, sm: 3 },
                     },
                     contentSx,
-                ]}
+                ] as any}
             >
                 {children}
             </DialogContent>
@@ -91,7 +91,7 @@ const FullScreenDialog: React.FC<FullScreenDialogProps> = ({
                             bgcolor: 'background.paper',
                         },
                         actionsSx,
-                    ]}
+                    ] as any}
                 >
                     {actions}
                 </DialogActions>

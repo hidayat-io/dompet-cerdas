@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.0
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.2
 
 **Status**: ✅ Fully Documented
-**Last Updated**: March 30, 2026
-**Version**: 2.8.0
+**Last Updated**: March 31, 2026
+**Version**: 2.8.2
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -19,7 +19,9 @@
 - ✅ UI konsisten berbasis **Material UI** — semua komponen pakai MUI, dark/light mode via MUI ThemeProvider
 - ✅ Standardisasi layout lintas menu dengan `PageHeader`, `FullScreenDialog`, dan default MUI component overrides
 - ✅ Banyak `Akun Keuangan` yang bisa dibuat private atau langsung dibagikan per akun
+- ✅ Akun private bisa dikonversi jadi akun bersama langsung dari Settings
 - ✅ Kolaborasi sederhana untuk akun bersama: anggota, kode gabung, dan shared data lintas user
+- ✅ Member akun bersama bisa keluar sendiri, owner bisa hapus workspace kalau sudah sendirian
 - ✅ Pengaturan `Akun Keuangan` sekarang lebih simple: daftar akun, popup tambah akun, dan guard hapus akun kosong
 - ✅ Dashboard dengan pie chart breakdown
 - ✅ Toggle privasi untuk sembunyikan nominal saldo di dashboard
@@ -349,8 +351,9 @@ users/
     ├── accounts/
     │   └── {accountId}/
     │       ├── name: string
-    │       ├── type: "PERSONAL" | "FAMILY" | "BUSINESS" | "SHARED"
-    │       ├── role: "OWNER"
+    │       ├── role: "OWNER" | "MEMBER"
+    │       ├── ownerUserId: string
+    │       ├── sharedAccountId?: string
     │       ├── createdAt: string
     │       ├── updatedAt: string
     │       │
@@ -496,7 +499,7 @@ firebase deploy --only firestore:indexes # indexes
 2. deploy hosting
 3. smoke check root `/`
 4. smoke check route SPA `/link-telegram`
-5. verifikasi asset JS/CSS utama bisa diakses
+5. verifikasi asset JS utama bisa diakses, dan CSS jika memang ada di `index.html`
 
 ### Workflow Standard: Lakukan finishing
 
@@ -884,6 +887,17 @@ firebase functions:log
 
 ## 🧾 Changelog
 
+### v2.8.1 - March 31, 2026
+- Akun private sekarang bisa dibagikan dari kartu akun di Settings dan dikonversi ke shared workspace tanpa membuat akun baru dari nol.
+- Flow share existing account memindahkan data scoped ke shared workspace, mempertahankan ownership per record, lalu menyiapkan mode kolaborasi untuk owner.
+- Deploy hosting dipaksa lewat `typecheck` sebelum build supaya error import/typing yang hilang ketangkap lebih awal.
+- Runtime crash dashboard dari import yang hilang sudah diperbaiki dan live bundle sudah di-refresh.
+
+### v2.8.2 - March 31, 2026
+- Member akun bersama sekarang bisa keluar dari workspace lewat tombol akun, sementara owner bisa menghapus workspace jika sudah menjadi satu-satunya anggota.
+- Backend delete shared account memisahkan flow owner vs member, menolak hapus saat masih ada anggota lain, dan merapikan update akun aktif/default Telegram.
+- Pesan error callable dirapikan supaya alasan dari server tampil lebih jelas di UI.
+
 ### v2.8.0 - March 30, 2026
 - Fondasi PWA diselesaikan dengan service worker, offline fallback, prompt update versi, dan Firestore local persistence.
 - Initial load dirapikan lewat chunk splitting, lazy screen loading, pemecahan runtime Firebase, dan pemindahan chart dashboard ke lazy chunk terpisah.
@@ -908,6 +922,8 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.2** | Mar 31, 2026 | Flow keluar member shared account, hapus workspace owner saat sendirian, dan error callable yang lebih jelas |
+| **v2.8.1** | Mar 31, 2026 | Share existing private account from Settings, ownership-preserving shared workspace conversion, and hosting typecheck guardrail |
 | **v2.8.0** | Mar 30, 2026 | Fondasi PWA/offline, attachment retry, conflict warning transaksi, lazy loading dashboard, dan optimasi bundle |
 | **v2.7.2** | Mar 30, 2026 | Simplifikasi visual Akun Keuangan, Rencana, dan Anggaran; guard hapus akun lebih aman |
 | **v2.7.1** | Mar 30, 2026 | Standardisasi UI Material UI, full-screen form flow, grouping transaksi per hari, hide saldo dashboard, dan SOP finishing |

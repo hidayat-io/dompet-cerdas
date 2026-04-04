@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.0
+# DompetCerdas - Smart Expense Tracker v2.8.2
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -11,6 +11,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 ### 🌐 Web Application
 - Banyak `Akun Keuangan` yang bisa dibuat private atau langsung dibagikan per akun
 - Kolaborasi sederhana untuk akun bersama: anggota, kode gabung, dan data shared lintas user
+- Member akun bersama bisa keluar sendiri, dan owner bisa hapus workspace kalau sudah jadi satu-satunya anggota
 - Dashboard with expense analytics
 - Manual transaction entry
 - Category management
@@ -42,6 +43,7 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - `Anggaran` berbasis budget plan, bukan auto-render semua kategori
 - `Hutang Piutang` saat ini **tidak otomatis mempengaruhi saldo** karena masih diposisikan sebagai modul tracking terpisah dari transaksi
 - Data shared hanya bisa diedit oleh user yang membuat datanya; transaksi milik anggota lain tampil read-only dengan info pembuat
+- Akun private bisa langsung diubah jadi akun bersama dari kartu akun di Settings
 - Dashboard sekarang punya toggle untuk menyembunyikan nominal saldo saat dibuka di depan orang lain
 - Riwayat transaksi sekarang dikelompokkan per hari dengan card terpisah agar perbedaan tanggal lebih mudah discan
 - Pengaturan akun, daftar rencana, dan ringkasan anggaran sekarang diarahkan ke layout yang lebih minimal dan lebih mudah discan
@@ -50,11 +52,22 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.0`
-- **Build Date**: `March 30, 2026`
-- **Status**: Release candidate dengan PWA/offline yang lebih matang, attachment retry, conflict warning transaksi, dan optimasi performa dashboard
+- **Version**: `v2.8.2`
+- **Build Date**: `March 31, 2026`
+- **Status**: Release candidate dengan share akun per akun, ownership per record, flow keluar/hapus akun bersama yang lebih aman, PWA/offline yang lebih matang, attachment retry, conflict warning transaksi, dan guardrail typecheck hosting
 
 ## Changelog
+
+### v2.8.2 - March 31, 2026
+- Member akun bersama sekarang bisa keluar dari workspace lewat tombol akun, sementara owner bisa menghapus workspace jika sudah menjadi satu-satunya anggota.
+- Backend delete shared account sekarang memisahkan flow owner vs member, menolak hapus saat masih ada anggota lain, dan merapikan update akun aktif/default Telegram.
+- Pesan error callable dirapikan supaya alasan dari server tampil lebih jelas di UI.
+
+### v2.8.1 - March 31, 2026
+- Akun private sekarang bisa dibagikan langsung dari kartu akun di Settings dan dikonversi ke shared workspace tanpa membuat akun baru dari nol.
+- Tombol share existing account ini memindahkan data scoped ke shared workspace, mempertahankan ownership per record, dan langsung menyiapkan mode kolaborasi.
+- Deploy hosting sekarang dipaksa lewat `typecheck` sebelum build supaya error runtime yang berasal dari import/typing yang hilang ketangkap lebih awal.
+- Dashboard runtime crash dari import yang hilang sudah diperbaiki dan live bundle sudah di-refresh.
 
 ### v2.8.0 - March 30, 2026
 - Fondasi PWA diselesaikan dengan service worker, offline fallback, prompt update versi, dan Firestore local persistence.
@@ -124,7 +137,7 @@ firebase deploy --only hosting      # Frontend only
 firebase deploy --only functions    # Backend only
 firebase deploy --only firestore    # Firestore rules only
 
-# Deploy hosting + smoke check wajib
+# Deploy hosting + smoke check wajib (predeploy typecheck + build)
 npm run deploy:hosting:safe
 ```
 

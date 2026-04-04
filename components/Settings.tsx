@@ -5,7 +5,7 @@ import Toast from './Toast';
 import { Transaction, Category, FinancialAccount, SharedAccountMember } from '../types';
 import { exportToExcel, getCurrentMonthRange, formatDateRange } from '../utils/excelExport';
 import { APP_VERSION, APP_BUILD_DATE } from '../constants';
-import { getAccountStatusLabel, sanitizeAccountNameForFilename } from '../utils/accountLabels';
+import { sanitizeAccountNameForFilename } from '../utils/accountLabels';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -40,6 +40,7 @@ interface SettingsProps {
     onUpdateTelegramAccount: (accountId: string) => Promise<void>;
     onCreateAccount: (name: string) => Promise<void>;
     onCreateSharedAccount: (name: string) => Promise<void>;
+    onShareAccount: (accountId: string) => Promise<void>;
     onGenerateSharedInviteCode: () => Promise<void>;
     onJoinSharedAccount: (code: string) => Promise<void>;
     onSwitchAccount: (accountId: string) => Promise<void>;
@@ -62,6 +63,7 @@ const Settings: React.FC<SettingsProps> = ({
     onUpdateTelegramAccount,
     onCreateAccount,
     onCreateSharedAccount,
+    onShareAccount,
     onGenerateSharedInviteCode,
     onJoinSharedAccount,
     onSwitchAccount,
@@ -81,6 +83,7 @@ const Settings: React.FC<SettingsProps> = ({
     const [showAddAccountDialog, setShowAddAccountDialog] = useState(false);
     const [accountToDelete, setAccountToDelete] = useState<FinancialAccount | null>(null);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [sharingAccountId, setSharingAccountId] = useState<string | null>(null);
     const [joinCode, setJoinCode] = useState('');
     const [isJoiningShared, setIsJoiningShared] = useState(false);
     const [isGeneratingInviteCode, setIsGeneratingInviteCode] = useState(false);
@@ -174,9 +177,22 @@ const Settings: React.FC<SettingsProps> = ({
             setAccountToDelete(null);
         } catch (error) {
             console.error('Error deleting account:', error);
-            setToast({ show: true, message: 'Gagal menghapus Akun Keuangan. Silakan coba lagi.', type: 'error' });
+            const errorMessage = error instanceof Error ? error.message : 'Gagal menghapus Akun Keuangan. Silakan coba lagi.';
+            setToast({ show: true, message: errorMessage, type: 'error' });
         } finally {
             setIsDeletingAccount(false);
+        }
+    };
+
+    const handleShareAccount = async (accountId: string) => {
+        setSharingAccountId(accountId);
+        try {
+            await onShareAccount(accountId);
+        } catch (error) {
+            console.error('Error sharing account:', error);
+            setToast({ show: true, message: 'Gagal membagikan akun. Silakan coba lagi.', type: 'error' });
+        } finally {
+            setSharingAccountId(null);
         }
     };
 
@@ -185,8 +201,58 @@ const Settings: React.FC<SettingsProps> = ({
     const isSharedAccountActive = !!activeAccount?.sharedAccountId;
     const getAccountDeleteBlockReason = (account: FinancialAccount) => {
         if (accounts.length <= 1) return 'Minimal harus ada satu akun yang tersisa.';
-        if (account.sharedAccountId) return 'Akun bersama belum bisa dihapus dari sini.';
+        if (
+            account.sharedAccountId &&
+            account.role === 'OWNER' &&
+            account.id === activeAccountId &&
+            sharedAccountMembers.length > 1
+        ) {
+            return `Ada ${sharedAccountMembers.length - 1} anggota lain di akun ini. Minta mereka keluar dulu sebelum akun bisa dihapus.`;
+        }
         return null;
+    };
+
+    const getAccountDeleteHelperText = (account: FinancialAccount) => {
+        if (account.sharedAccountId) {
+            if (account.role === 'OWNER') {
+                return 'Akun bersama bisa dihapus kalau kamu sudah menjadi satu-satunya anggota.';
+            }
+
+            return 'Klik Keluar untuk meninggalkan akun bersama ini. Data bersama tetap tersimpan untuk anggota lain.';
+        }
+
+        return 'Akun ini bisa dihapus selama belum punya transaksi.';
+    };
+
+    const getAccountDeleteActionLabel = (account: FinancialAccount) => {
+        if (account.sharedAccountId) {
+            return account.role === 'OWNER' ? 'Hapus Workspace' : 'Keluar';
+        }
+
+        return 'Hapus Akun';
+    };
+
+    const getAccountDeleteDialogTitle = (account: FinancialAccount | null) => {
+        if (!account) return 'Hapus Akun Keuangan';
+        if (account.sharedAccountId) {
+            return account.role === 'OWNER' ? 'Hapus Akun Bersama' : 'Keluar dari Akun Bersama';
+        }
+
+        return 'Hapus Akun Keuangan';
+    };
+
+    const getAccountDeleteDialogBody = (account: FinancialAccount | null) => {
+        if (!account) return null;
+
+        if (account.sharedAccountId) {
+            if (account.role === 'OWNER') {
+                return <>Akun bersama <strong>{account.name}</strong> bisa dihapus kalau kamu sudah menjadi satu-satunya anggota.</>;
+            }
+
+            return <>Kamu akan keluar dari akun bersama <strong>{account.name}</strong>. Data bersama tetap tersimpan untuk anggota lain.</>;
+        }
+
+        return <>Akun <strong>{account.name}</strong> hanya bisa dihapus kalau belum punya transaksi.</>;
     };
 
     const handleGenerateInviteCode = async () => {
@@ -271,7 +337,6 @@ const Settings: React.FC<SettingsProps> = ({
                                             <Typography variant="subtitle1" fontWeight={700}>
                                                 {account.name}
                                             </Typography>
-                                            <Chip size="small" label={getAccountStatusLabel(account)} />
                                             {isActive && (
                                                 <Chip
                                                     size="small"
@@ -296,10 +361,10 @@ const Settings: React.FC<SettingsProps> = ({
                                                 ? (account.role === 'OWNER'
                                                     ? 'Akun ini dibagikan dan Anda menjadi pemiliknya.'
                                                     : 'Akun ini dibagikan dan Anda bergabung sebagai anggota.')
-                                                : 'Akun pribadi yang hanya bisa diakses oleh Anda.'}
+                                                : 'Akun ini hanya bisa diakses oleh Anda. Klik Bagikan untuk membuka kolaborasi.'}
                                         </Typography>
                                         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                                            {deleteBlockReason || 'Akun ini bisa dihapus selama belum punya transaksi.'}
+                                            {deleteBlockReason || getAccountDeleteHelperText(account)}
                                         </Typography>
                                     </Box>
 
@@ -313,6 +378,17 @@ const Settings: React.FC<SettingsProps> = ({
                                                 Pakai
                                             </Button>
                                         )}
+                                        {!account.sharedAccountId && (
+                                            <Button
+                                                variant="contained"
+                                                disabled={sharingAccountId === account.id}
+                                                onClick={() => handleShareAccount(account.id)}
+                                                startIcon={sharingAccountId === account.id ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconDisplay name="Share" size={16} />}
+                                                sx={{ borderRadius: 2 }}
+                                            >
+                                                {sharingAccountId === account.id ? 'Membagikan...' : 'Bagikan'}
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="text"
                                             color="error"
@@ -320,7 +396,7 @@ const Settings: React.FC<SettingsProps> = ({
                                             onClick={() => setAccountToDelete(account)}
                                             sx={{ borderRadius: 2 }}
                                         >
-                                            Hapus
+                                            {getAccountDeleteActionLabel(account)}
                                         </Button>
                                     </Box>
                                 </Box>
@@ -473,7 +549,7 @@ const Settings: React.FC<SettingsProps> = ({
                     >
                         {accounts.map((account) => (
                             <MenuItem key={account.id} value={account.id}>
-                                {account.name} • {getAccountStatusLabel(account)}
+                                {account.name}
                             </MenuItem>
                         ))}
                     </Select>
@@ -804,15 +880,17 @@ const Settings: React.FC<SettingsProps> = ({
                 fullWidth
                 maxWidth="xs"
             >
-                <DialogTitle>Hapus Akun Keuangan</DialogTitle>
+                <DialogTitle>{getAccountDeleteDialogTitle(accountToDelete)}</DialogTitle>
                 <DialogContent>
                     <Typography sx={{ pt: 1 }}>
-                        {accountToDelete
-                            ? <>Akun <strong>{accountToDelete.name}</strong> hanya bisa dihapus kalau belum punya transaksi.</>
-                            : null}
+                        {getAccountDeleteDialogBody(accountToDelete)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-                        Kalau akun ini sudah punya transaksi, hapus dulu semua transaksi di akun tersebut. Kalau masih kosong, akun akan dihapus beserta data pendukungnya.
+                        {accountToDelete?.sharedAccountId
+                            ? (accountToDelete.role === 'OWNER'
+                                ? 'Kalau masih ada anggota lain, mereka harus keluar dulu sebelum workspace ini bisa dihapus.'
+                                : 'Aksi ini hanya menghapus aksesmu dari akun bersama. Data bersama tetap tersedia untuk anggota lain.')
+                            : 'Kalau akun ini sudah punya transaksi, hapus dulu semua transaksi di akun tersebut. Kalau masih kosong, akun akan dihapus beserta data pendukungnya.'}
                     </Typography>
                 </DialogContent>
                 <DialogActions>
@@ -826,7 +904,11 @@ const Settings: React.FC<SettingsProps> = ({
                         onClick={handleDeleteAccount}
                         startIcon={isDeletingAccount ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
                     >
-                        {isDeletingAccount ? 'Menghapus...' : 'Hapus Akun'}
+                        {isDeletingAccount
+                            ? 'Memproses...'
+                            : accountToDelete?.sharedAccountId
+                                ? (accountToDelete.role === 'OWNER' ? 'Hapus Workspace' : 'Keluar')
+                                : 'Hapus Akun'}
                     </Button>
                 </DialogActions>
             </Dialog>

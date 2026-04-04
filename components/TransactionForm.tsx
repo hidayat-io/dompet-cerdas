@@ -393,12 +393,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
                 <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <IconDisplay name={cat.icon} size={16} sx={{ color: '#fff' }} />
                 </Box>
-                <Typography variant="caption" fontWeight={600} textAlign="center" noWrap sx={{ width: '100%' }}>{cat.name}</Typography>
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  textAlign="center"
+                  noWrap
+                  sx={{ width: '100%', color: theme.colors.textPrimary }}
+                >
+                  {cat.name}
+                </Typography>
               </Box>
             ))}
           </Box>
           {filteredCategories.length === 0 && (
-            <Typography variant="body2" color="text.disabled" textAlign="center" sx={{ py: 1 }}>
+            <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 1 }}>
               Belum ada kategori {type === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'}.
               {onAddCategory && !isReadOnly && (
                 <Box component="span" onClick={() => setShowCategoryModal(true)} sx={{ ml: 0.5, color: 'primary.main', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>

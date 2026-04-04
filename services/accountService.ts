@@ -10,7 +10,7 @@ import { DebtRecord, FinancialAccount, SharedAccount, SharedAccountMember } from
 
 export type AccountScopedCollectionName = 'categories' | 'transactions' | 'plans' | 'budgets' | 'simulations' | 'debts';
 
-export const DEFAULT_ACCOUNT_NAME = 'Pribadi';
+export const DEFAULT_ACCOUNT_NAME = 'Akun Utama';
 type UserMeta = {
   activeAccountId?: string;
   categoriesSeeded?: boolean;

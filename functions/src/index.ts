@@ -11,20 +11,17 @@ import { analyzeFinancialDataForWeb, WebFinancialAnalysisMode } from './services
 import { getActiveAccountSummary } from './services/accountService';
 import { escapeMarkdown } from './services/responseFormatter';
 import { buildSharedMemberPayload, generateInviteCode, normalizeInviteCode } from './services/collaborationService';
+import {
+    DEFAULT_SHARED_CATEGORIES,
+    copyPrivateAccountScopedDataToSharedWorkspace,
+    deletePrivateAccountScopedData,
+    removeSharedAccountAccess,
+} from './services/sharedAccountService';
 
 // Initialize Firebase Admin
 admin.initializeApp();
 const firestore = admin.firestore();
 firestore.settings({ ignoreUndefinedProperties: true });
-
-const DEFAULT_SHARED_CATEGORIES = [
-    { id: 'c1', name: 'Gaji', type: 'INCOME', icon: 'Wallet', color: '#10b981' },
-    { id: 'c2', name: 'Bonus', type: 'INCOME', icon: 'Gift', color: '#34d399' },
-    { id: 'c3', name: 'Makanan', type: 'EXPENSE', icon: 'Utensils', color: '#f87171' },
-    { id: 'c4', name: 'Transport', type: 'EXPENSE', icon: 'Car', color: '#60a5fa' },
-    { id: 'c5', name: 'Belanja', type: 'EXPENSE', icon: 'ShoppingBag', color: '#f472b6' },
-    { id: 'c6', name: 'Tagihan', type: 'EXPENSE', icon: 'Zap', color: '#fbbf24' },
-];
 
 /**
  * Get Firestore database reference
@@ -281,6 +278,110 @@ export const createSharedAccount = functions
             sharedAccountId: sharedAccountRef.id,
             name,
         };
+    });
+
+export const shareExistingAccount = functions
+    .region('asia-southeast1')
+    .https.onCall(async (data, context) => {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+        }
+
+        const accountId = typeof data?.accountId === 'string' ? data.accountId.trim() : '';
+        if (!accountId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Account ID is required.');
+        }
+
+        const userId = context.auth.uid;
+        const userRef = firestore.collection('users').doc(userId);
+        const userAccountRef = userRef.collection('accounts').doc(accountId);
+        const userAccountSnap = await userAccountRef.get();
+
+        if (!userAccountSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Akun tidak ditemukan.');
+        }
+
+        const accountData = userAccountSnap.data() as {
+            name?: string;
+            sharedAccountId?: string;
+            role?: 'OWNER' | 'MEMBER';
+            createdAt?: string;
+        };
+
+        if (accountData.sharedAccountId) {
+            throw new functions.https.HttpsError('failed-precondition', 'Akun ini sudah dibagikan.');
+        }
+
+        if (accountData.role && accountData.role !== 'OWNER') {
+            throw new functions.https.HttpsError('permission-denied', 'Hanya pemilik yang bisa membagikan akun.');
+        }
+
+        const accountName = (accountData.name || 'Akun Keuangan').trim() || 'Akun Keuangan';
+        const now = new Date().toISOString();
+        const sharedAccountRef = firestore.collection('sharedAccounts').doc();
+
+        await copyPrivateAccountScopedDataToSharedWorkspace(userId, accountId, sharedAccountRef.id);
+
+        const batch = firestore.batch();
+
+        batch.set(sharedAccountRef, {
+            name: accountName,
+            ownerUserId: userId,
+            inviteCode: null,
+            inviteCodeUpdatedAt: null,
+            createdAt: accountData.createdAt || now,
+            updatedAt: now,
+            sourceAccountId: accountId,
+        });
+
+        batch.set(sharedAccountRef.collection('members').doc(userId), buildSharedMemberPayload({
+            userId,
+            role: 'OWNER',
+            now,
+            email: context.auth.token.email || null,
+            displayName: context.auth.token.name || null,
+        }));
+
+        batch.set(userAccountRef, {
+            name: accountName,
+            role: 'OWNER',
+            ownerUserId: userId,
+            sharedAccountId: sharedAccountRef.id,
+            createdAt: accountData.createdAt || now,
+            updatedAt: now,
+        }, { merge: true });
+
+        batch.set(userRef, {
+            activeAccountId: accountId,
+            updatedAt: now,
+        }, { merge: true });
+
+        await batch.commit();
+        await deletePrivateAccountScopedData(userId, accountId);
+
+        return {
+            success: true,
+            accountId,
+            sharedAccountId: sharedAccountRef.id,
+            name: accountName,
+            role: 'OWNER',
+        };
+    });
+
+export const deleteSharedAccountAccess = functions
+    .region('asia-southeast1')
+    .https.onCall(async (data, context) => {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+        }
+
+        const accountId = typeof data?.accountId === 'string' ? data.accountId.trim() : '';
+        if (!accountId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Account ID is required.');
+        }
+
+        const result = await removeSharedAccountAccess(context.auth.uid, accountId);
+        return result;
     });
 
 export const createSharedInviteCode = functions

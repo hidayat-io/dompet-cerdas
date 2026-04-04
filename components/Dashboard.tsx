@@ -10,6 +10,7 @@ import Divider from '@mui/material/Divider';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardActionArea from '@mui/material/CardActionArea';
+import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemText from '@mui/material/ListItemText';
@@ -27,6 +28,7 @@ interface DashboardProps {
   categories: Category[];
   budgets: Budget[];
   showGettingStarted: boolean;
+  isGettingStartedDismissed: boolean;
   activeAccountName: string;
   telegramLinked: boolean;
   onGoToTransactions: () => void;
@@ -40,6 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   categories,
   budgets,
   showGettingStarted,
+  isGettingStartedDismissed,
   activeAccountName,
   telegramLinked,
   onGoToTransactions,
@@ -109,7 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       />
 
       {/* Getting Started Card */}
-      {showGettingStarted && (
+      {showGettingStarted && !isGettingStartedDismissed && (
         <Card variant="outlined" sx={{ borderRadius: 4, mb: 4, bgcolor: 'background.paper' }}>
           <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>

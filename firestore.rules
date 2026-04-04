@@ -17,8 +17,22 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/sharedAccounts/$(sharedAccountId)/members/$(request.auth.uid));
     }
 
+    function sharedAccountExists(sharedAccountId) {
+      return exists(/databases/$(database)/documents/sharedAccounts/$(sharedAccountId));
+    }
+
     function sharedAccountOwner(sharedAccountId) {
       return get(/databases/$(database)/documents/sharedAccounts/$(sharedAccountId)).data.ownerUserId;
+    }
+
+    function isSharedOwner(sharedAccountId) {
+      return isAuthenticated() &&
+        sharedAccountExists(sharedAccountId) &&
+        sharedAccountOwner(sharedAccountId) == request.auth.uid;
+    }
+
+    function canAccessSharedAccount(sharedAccountId) {
+      return isSharedMember(sharedAccountId) || isSharedOwner(sharedAccountId);
     }
 
     function isSharedRecordCreator() {
@@ -28,16 +42,16 @@ service cloud.firestore {
     function isSharedRecordLegacyOwner(sharedAccountId) {
       return isAuthenticated() &&
         (resource.data.createdByUserId == null || resource.data.createdByUserId == '') &&
-        sharedAccountOwner(sharedAccountId) == request.auth.uid;
+        isSharedOwner(sharedAccountId);
     }
 
     function canCreateSharedRecord(sharedAccountId) {
-      return isSharedMember(sharedAccountId) &&
+      return canAccessSharedAccount(sharedAccountId) &&
         request.resource.data.createdByUserId == request.auth.uid;
     }
 
     function canUpdateSharedRecord(sharedAccountId) {
-      return isSharedMember(sharedAccountId) &&
+      return canAccessSharedAccount(sharedAccountId) &&
         (
           resource.data.createdByUserId == request.auth.uid ||
           isSharedRecordLegacyOwner(sharedAccountId)
@@ -106,46 +120,46 @@ service cloud.firestore {
     }
 
     match /sharedAccounts/{sharedAccountId} {
-      allow read: if isSharedMember(sharedAccountId);
+      allow read: if canAccessSharedAccount(sharedAccountId);
       allow write: if false;
 
       match /members/{memberId} {
-        allow read: if isSharedMember(sharedAccountId);
+        allow read: if canAccessSharedAccount(sharedAccountId);
         allow write: if false;
       }
 
       match /categories/{categoryId} {
-        allow read: if isSharedMember(sharedAccountId);
+        allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
         allow update, delete: if canUpdateSharedRecord(sharedAccountId);
       }
 
       match /transactions/{transactionId} {
-        allow read: if isSharedMember(sharedAccountId);
+        allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
         allow update, delete: if canUpdateSharedRecord(sharedAccountId);
       }
 
       match /plans/{planId} {
-        allow read: if isSharedMember(sharedAccountId);
+        allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
         allow update, delete: if canUpdateSharedRecord(sharedAccountId);
       }
 
       match /budgets/{budgetId} {
-        allow read: if isSharedMember(sharedAccountId);
+        allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
         allow update, delete: if canUpdateSharedRecord(sharedAccountId);
       }
 
       match /debts/{debtId} {
-        allow read: if isSharedMember(sharedAccountId);
+        allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
         allow update, delete: if canUpdateSharedRecord(sharedAccountId);
       }
 
       match /simulations/{simulationId} {
-        allow read: if isSharedMember(sharedAccountId);
+        allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
         allow update, delete: if canUpdateSharedRecord(sharedAccountId);
       }

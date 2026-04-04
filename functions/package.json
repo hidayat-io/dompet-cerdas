@@ -1,6 +1,6 @@
 {
     "name": "functions",
-    "version": "2.8.0",
+    "version": "2.8.2",
     "description": "Firebase Cloud Functions for DompetCerdas Telegram Bot",
     "main": "lib/index.js",
     "scripts": {

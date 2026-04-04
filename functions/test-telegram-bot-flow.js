@@ -119,8 +119,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9002, {
@@ -128,8 +128,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9003, {
@@ -137,8 +137,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9004, {
@@ -146,8 +146,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9005, {
@@ -155,8 +155,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9006, {
@@ -164,8 +164,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9007, {
@@ -173,8 +173,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9008, {
@@ -182,8 +182,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
     [9009, {
@@ -191,8 +191,8 @@ async function run() {
       defaultAccountId: 'personal',
       defaultAccountName: 'Pribadi',
       accounts: [
-        { id: 'personal', name: 'Pribadi', type: 'PERSONAL' },
-        { id: 'family', name: 'Keluarga', type: 'FAMILY' },
+        { id: 'personal', name: 'Pribadi' },
+        { id: 'family', name: 'Keluarga' },
       ],
     }],
   ]);

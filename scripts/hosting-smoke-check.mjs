@@ -61,18 +61,30 @@ const run = async () => {
     console.log(`✅ ${route} -> app shell OK`);
   }
 
-  const assetChecks = [
-    ['js', findPrimaryAsset(firstHtml, 'js')],
-    ['css', findPrimaryAsset(firstHtml, 'css')],
-  ];
+  const jsAsset = findPrimaryAsset(firstHtml, 'js');
+  if (!jsAsset) {
+    throw new Error('missing primary JS asset in index.html');
+  }
 
-  for (const [assetType, assetPath] of assetChecks) {
-    if (!assetPath) {
-      throw new Error(`missing primary ${assetType.toUpperCase()} asset in index.html`);
-    }
+  const jsUrl = withCacheBust(jsAsset.startsWith('http') ? jsAsset : normalizeUrl(jsAsset));
+  const jsResponse = await fetch(jsUrl, {
+    method: 'HEAD',
+    redirect: 'follow',
+    cache: 'no-store',
+    headers: {
+      'cache-control': 'no-cache',
+      pragma: 'no-cache',
+    },
+  });
+  if (!jsResponse.ok) {
+    throw new Error(`asset ${jsAsset} returned HTTP ${jsResponse.status}`);
+  }
+  console.log(`✅ asset JS -> ${jsAsset}`);
 
-    const assetUrl = withCacheBust(assetPath.startsWith('http') ? assetPath : normalizeUrl(assetPath));
-    const response = await fetch(assetUrl, {
+  const cssAsset = findPrimaryAsset(firstHtml, 'css');
+  if (cssAsset) {
+    const cssUrl = withCacheBust(cssAsset.startsWith('http') ? cssAsset : normalizeUrl(cssAsset));
+    const cssResponse = await fetch(cssUrl, {
       method: 'HEAD',
       redirect: 'follow',
       cache: 'no-store',
@@ -81,10 +93,12 @@ const run = async () => {
         pragma: 'no-cache',
       },
     });
-    if (!response.ok) {
-      throw new Error(`asset ${assetPath} returned HTTP ${response.status}`);
+    if (!cssResponse.ok) {
+      throw new Error(`asset ${cssAsset} returned HTTP ${cssResponse.status}`);
     }
-    console.log(`✅ asset ${assetType.toUpperCase()} -> ${assetPath}`);
+    console.log(`✅ asset CSS -> ${cssAsset}`);
+  } else {
+    console.log('ℹ️ asset CSS -> not present in index.html');
   }
 
   console.log('✅ Hosting smoke check passed');

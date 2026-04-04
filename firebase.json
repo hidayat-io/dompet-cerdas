@@ -1,6 +1,11 @@
 {
     "hosting": {
+        "site": "expensetracker-test-1",
         "public": "dist",
+        "predeploy": [
+            "npm run typecheck",
+            "npm run build"
+        ],
         "ignore": [
             "firebase.json",
             "**/.*",

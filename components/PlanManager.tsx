@@ -298,6 +298,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
         const planExpense = plannedItems.filter((item) => item.type === 'EXPENSE').reduce((acc, item) => acc + item.amount, 0);
         const planTotal = planIncome - planExpense;
         const projectedBalance = baseBalance + planTotal;
+        const planEditable = canEditPlan(plan);
         const filteredCategories = categories.filter((category) => category.type === newItemType);
         const sortedItems = [...plan.items].sort((left, right) => {
             const statusDelta = PLAN_STATUS_ORDER[left.status] - PLAN_STATUS_ORDER[right.status];

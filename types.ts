@@ -15,6 +15,7 @@ export interface SharedAccount {
   id: string;
   name: string;
   ownerUserId: string;
+  sourceAccountId?: string;
   inviteCode?: string | null;
   inviteCodeUpdatedAt?: string | null;
   createdAt: string;
