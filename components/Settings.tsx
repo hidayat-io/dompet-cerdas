@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTheme, themes } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
 import Toast from './Toast';
 import { Transaction, Category, FinancialAccount, SharedAccountMember } from '../types';
@@ -73,7 +73,7 @@ const Settings: React.FC<SettingsProps> = ({
     transactions,
     categories
 }) => {
-    const { theme, isDark, toggleTheme } = useTheme();
+    const { theme, isDark } = useTheme();
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -301,7 +301,7 @@ const Settings: React.FC<SettingsProps> = ({
         <Box sx={{ pb: { xs: 10, md: 0 } }}>
             <PageHeader
                 title="Pengaturan"
-                description="Kelola akun keuangan, integrasi Telegram, tema, export, dan tindakan administratif dalam pola yang sama."
+                description="Kelola akun keuangan, integrasi Telegram, export, dan tindakan administratif dalam pola yang sama."
             />
 
             {/* Financial Accounts */}
@@ -594,85 +594,6 @@ const Settings: React.FC<SettingsProps> = ({
                             </Paper>
                         </Grid>
                     ))}
-                </Grid>
-            </Paper>
-
-            {/* Theme */}
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: theme.colors.accentLight }}>
-                            <IconDisplay name={isDark ? 'Moon' : 'Sun'} size={24} sx={{ color: theme.colors.accent }} />
-                        </Box>
-                        <Box>
-                            <Typography variant="h6" fontWeight={700}>Mode {isDark ? 'Gelap' : 'Terang'}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                {isDark ? 'Tampilan gelap untuk mata yang nyaman' : 'Tampilan terang untuk penggunaan sehari-hari'}
-                            </Typography>
-                        </Box>
-                    </Box>
-                    <Switch checked={isDark} onChange={toggleTheme} color="primary" />
-                </Box>
-
-                <Grid container spacing={2}>
-                    <Grid size={{ xs: 6 }}>
-                        <Paper
-                            variant="outlined"
-                            onClick={() => isDark && toggleTheme()}
-                            sx={{
-                                p: 2, borderRadius: 2, cursor: 'pointer',
-                                bgcolor: themes.light.colors.bgCard,
-                                borderColor: !isDark ? theme.colors.accent : themes.light.colors.border,
-                                borderWidth: !isDark ? 2 : 1,
-                                transition: 'all 0.15s',
-                                '&:hover': { boxShadow: 2 },
-                            }}
-                        >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: themes.light.colors.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <IconDisplay name="Sun" size={20} sx={{ color: '#f59e0b' }} />
-                                </Box>
-                                <Typography fontWeight={600} sx={{ color: themes.light.colors.textPrimary }}>Terang</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                {[themes.light.colors.bgPrimary, themes.light.colors.accent, themes.light.colors.income].map((c, i) => (
-                                    <Box key={i} sx={{ height: 8, flex: 1, borderRadius: 2, bgcolor: c, border: i === 0 ? '1px solid #e5e7eb' : 'none' }} />
-                                ))}
-                            </Box>
-                            {!isDark && (
-                                <Chip label="✓ Aktif" size="small" sx={{ mt: 1.5, bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, width: '100%' }} />
-                            )}
-                        </Paper>
-                    </Grid>
-                    <Grid size={{ xs: 6 }}>
-                        <Paper
-                            variant="outlined"
-                            onClick={() => !isDark && toggleTheme()}
-                            sx={{
-                                p: 2, borderRadius: 2, cursor: 'pointer',
-                                bgcolor: themes.dark.colors.bgCard,
-                                borderColor: isDark ? theme.colors.accent : themes.dark.colors.border,
-                                borderWidth: isDark ? 2 : 1,
-                                transition: 'all 0.15s',
-                                '&:hover': { boxShadow: 2 },
-                            }}
-                        >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: themes.dark.colors.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <IconDisplay name="Moon" size={20} sx={{ color: '#a78bfa' }} />
-                                </Box>
-                                <Typography fontWeight={600} sx={{ color: themes.dark.colors.textPrimary }}>Gelap</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                {[themes.dark.colors.bgPrimary, themes.dark.colors.accent, themes.dark.colors.income].map((c, i) => (
-                                    <Box key={i} sx={{ height: 8, flex: 1, borderRadius: 2, bgcolor: c }} />
-                                ))}
-                            </Box>
-                            {isDark && (
-                                <Chip label="✓ Aktif" size="small" sx={{ mt: 1.5, bgcolor: theme.colors.accentLight, color: theme.colors.accent, fontWeight: 600, width: '100%' }} />
-                            )}
-                        </Paper>
-                    </Grid>
                 </Grid>
             </Paper>
 

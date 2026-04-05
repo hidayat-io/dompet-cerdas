@@ -1,13 +1,15 @@
 {
   "name": "dompetcerdas---expense-tracker",
   "private": true,
-  "version": "2.8.2",
+  "version": "2.8.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "vite build",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:local": "firebase emulators:exec --only auth,firestore --project expensetracker-test-1 \"npx playwright test\"",
     "smoke:hosting": "node scripts/hosting-smoke-check.mjs",
     "deploy:hosting:safe": "firebase deploy --only hosting --project expensetracker-test-1 --non-interactive && npm run smoke:hosting -- https://expensetracker-test-1.web.app / /link-telegram"
   },
@@ -24,6 +26,7 @@
     "recharts": "^3.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",

@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.2
+# DompetCerdas - Smart Expense Tracker v2.8.3
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -47,16 +47,22 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 - Dashboard sekarang punya toggle untuk menyembunyikan nominal saldo saat dibuka di depan orang lain
 - Riwayat transaksi sekarang dikelompokkan per hari dengan card terpisah agar perbedaan tanggal lebih mudah discan
 - Pengaturan akun, daftar rencana, dan ringkasan anggaran sekarang diarahkan ke layout yang lebih minimal dan lebih mudah discan
+- Toggle tema dipindah keluar dari Settings supaya akses ganti tema lebih cepat tanpa merusak komposisi desktop/mobile
 - Deploy hosting sekarang wajib lewat smoke check agar root `/` dan route SPA tetap aman setelah rilis
 - Dashboard chart sekarang lazy-loaded, dan status sync/offline lebih jelas untuk penggunaan mobile/PWA
 
 ## Current Release
 
-- **Version**: `v2.8.2`
-- **Build Date**: `March 31, 2026`
-- **Status**: Release candidate dengan share akun per akun, ownership per record, flow keluar/hapus akun bersama yang lebih aman, PWA/offline yang lebih matang, attachment retry, conflict warning transaksi, dan guardrail typecheck hosting
+- **Version**: `v2.8.3`
+- **Build Date**: `April 5, 2026`
+- **Status**: Release dengan toggle tema global yang lebih natural di desktop/mobile dan halaman Settings yang lebih fokus
 
 ## Changelog
+
+### v2.8.3 - April 5, 2026
+- Toggle tema dipindah keluar dari Settings dan ditempatkan di shell aplikasi supaya user bisa ganti tema langsung dari desktop sidebar atau bar akun mobile.
+- Desktop sidebar dirapikan lagi agar aksi tema menyatu dengan kartu user, bukan berdiri sendiri di bar logo.
+- Panel tema di Settings dihapus supaya halaman fokus ke pengaturan akun, Telegram, export, dan tindakan administratif.
 
 ### v2.8.2 - March 31, 2026
 - Member akun bersama sekarang bisa keluar dari workspace lewat tombol akun, sementara owner bisa menghapus workspace jika sudah menjadi satu-satunya anggota.

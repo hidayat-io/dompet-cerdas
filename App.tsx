@@ -41,6 +41,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import Tooltip from '@mui/material/Tooltip';
 
 import {
   AccountScopedCollectionName,
@@ -160,11 +161,29 @@ const normalizePlanItem = (item: Partial<PlanItem> & { id: string }): PlanItem =
   amount: typeof item.amount === 'number' ? item.amount : 0,
   type: item.type === 'INCOME' ? 'INCOME' : 'EXPENSE',
   categoryId: item.categoryId || '',
-  plannedDate: item.plannedDate,
   status: item.status || DEFAULT_PLAN_ITEM_STATUS,
-  createdByUserId: item.createdByUserId,
-  createdByName: item.createdByName,
+  ...(item.plannedDate !== undefined ? { plannedDate: item.plannedDate } : {}),
+  ...(item.createdByUserId !== undefined ? { createdByUserId: item.createdByUserId } : {}),
+  ...(item.createdByName !== undefined ? { createdByName: item.createdByName } : {}),
 });
+
+const serializePlanItemForFirestore = (item: PlanItem): PlanItem => {
+  const payload: PlanItem = {
+    id: item.id,
+    name: item.name,
+    amount: item.amount,
+    type: item.type,
+    categoryId: item.categoryId,
+    status: item.status,
+  };
+
+  return {
+    ...payload,
+    ...(item.plannedDate !== undefined ? { plannedDate: item.plannedDate } : {}),
+    ...(item.createdByUserId !== undefined ? { createdByUserId: item.createdByUserId } : {}),
+    ...(item.createdByName !== undefined ? { createdByName: item.createdByName } : {}),
+  };
+};
 
 const ViewLoadingFallback = () => (
   <Box
@@ -193,7 +212,7 @@ const normalizePlan = (planId: string, rawPlan: Partial<Plan>): Plan => ({
 });
 
 function App() {
-  const { theme } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -214,6 +233,7 @@ function App() {
   const hadPendingWritesRef = useRef(false);
   const pendingSyncKeysRef = useRef(new Set<string>());
   const isFlushingAttachmentQueueRef = useRef(false);
+  const isBackfillingPlanCreatorsRef = useRef(false);
 
   // Data States (Synced with Firestore)
   const [categories, setCategories] = useState<Category[]>([]);
@@ -239,10 +259,66 @@ function App() {
     () => accounts.find((account) => account.id === activeAccountId) || null,
     [accounts, activeAccountId]
   );
+  const isOperationalSharedAccount = useMemo(
+    () => !!activeAccount?.sharedAccountId && sharedAccountMembers.length > 1,
+    [activeAccount?.sharedAccountId, sharedAccountMembers.length]
+  );
   useEffect(() => {
     activeAccountRef.current = activeAccount;
   }, [activeAccount]);
   const currentUserLabel = user?.displayName || user?.email || 'Member';
+  const themeToggleButton = (
+    <Tooltip title={isDark ? 'Beralih ke mode terang' : 'Beralih ke mode gelap'} arrow>
+      <IconButton
+        size="small"
+        onClick={toggleTheme}
+        aria-label={isDark ? 'Beralih ke mode terang' : 'Beralih ke mode gelap'}
+        sx={{
+          width: 36,
+          height: 36,
+          borderRadius: 2,
+          flexShrink: 0,
+          bgcolor: isDark ? 'rgba(148, 163, 184, 0.14)' : theme.colors.accentLight,
+          color: isDark ? '#f8fafc' : theme.colors.accent,
+          border: `1px solid ${theme.colors.border}`,
+          transition: 'all 0.15s ease',
+          '&:hover': {
+            bgcolor: isDark ? 'rgba(148, 163, 184, 0.22)' : theme.colors.accentLight,
+            transform: 'translateY(-1px)',
+          },
+        }}
+      >
+        <IconDisplay name={isDark ? 'Sun' : 'Moon'} size={18} />
+      </IconButton>
+    </Tooltip>
+  );
+  const themeToggleTextButton = (
+    <Button
+      size="small"
+      onClick={toggleTheme}
+      startIcon={<IconDisplay name={isDark ? 'Sun' : 'Moon'} size={14} />}
+      sx={{
+        minWidth: 'auto',
+        px: 1.2,
+        py: 0.35,
+        borderRadius: 999,
+        textTransform: 'none',
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        letterSpacing: 0,
+        color: isDark ? theme.colors.textPrimary : theme.colors.accent,
+        bgcolor: isDark ? 'rgba(148, 163, 184, 0.14)' : theme.colors.accentLight,
+        border: `1px solid ${theme.colors.border}`,
+        alignSelf: 'flex-start',
+        '&:hover': {
+          bgcolor: isDark ? 'rgba(148, 163, 184, 0.22)' : theme.colors.accentLight,
+          transform: 'translateY(-1px)',
+        },
+      }}
+    >
+      {isDark ? 'Mode terang' : 'Mode gelap'}
+    </Button>
+  );
 
   useEffect(() => {
     if (!user || !activeAccountId || accountLoading) {
@@ -418,6 +494,67 @@ function App() {
     if (!user || !activeAccount) return null;
     return getScopedCollectionRefForAccount<T>(db, user.uid, activeAccount, collectionName);
   };
+
+  useEffect(() => {
+    if (!user || !activeAccount?.sharedAccountId || activeAccount.role !== 'OWNER') {
+      return;
+    }
+
+    if (isBackfillingPlanCreatorsRef.current) {
+      return;
+    }
+
+    const legacyPlans = plans.filter((plan) => (
+      !plan.createdByUserId || plan.items.some((item) => !item.createdByUserId)
+    ));
+
+    if (legacyPlans.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    isBackfillingPlanCreatorsRef.current = true;
+
+    const backfillPlanCreators = async () => {
+      try {
+        const plansRef = getActiveScopedCollection<Plan>('plans');
+        if (!plansRef) return;
+
+        const batch = writeBatch(db);
+        legacyPlans.forEach((plan) => {
+          const nextItems = plan.items.map((item) => (
+            item.createdByUserId
+              ? item
+              : {
+                ...item,
+                createdByUserId: user.uid,
+                createdByName: item.createdByName || currentUserLabel,
+              }
+          )).map(serializePlanItemForFirestore);
+
+          batch.set(doc(plansRef, plan.id), {
+            createdByUserId: plan.createdByUserId || user.uid,
+            createdByName: plan.createdByName || currentUserLabel,
+            items: nextItems,
+          }, { merge: true });
+        });
+
+        await batch.commit();
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to backfill legacy plan creators:', error);
+        }
+      } finally {
+        isBackfillingPlanCreatorsRef.current = false;
+      }
+    };
+
+    void backfillPlanCreators();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, activeAccount, plans, currentUserLabel]);
 
   const handleFirestoreListenerError = (source: string, error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -915,46 +1052,68 @@ function App() {
       );
     };
 
-    const unsubSharedAccount = onSnapshot(
-      sharedAccountRef,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        if (!isCurrentListener()) return;
-        updatePendingSyncKey('shared-account-meta', snapshot.metadata.hasPendingWrites);
-        const data = snapshot.data();
-        setActiveSharedInviteCode(typeof data?.inviteCode === 'string' ? data.inviteCode : null);
-      },
-      (error) => {
-        if (!isCurrentListener()) return;
-        handleFirestoreListenerError('shared-account-meta', error);
-      }
-    );
+    let unsubSharedAccount: (() => void) | null = null;
+    let unsubMembers: (() => void) | null = null;
+    let cancelled = false;
 
-    const unsubMembers = onSnapshot(
-      membersRef,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        if (!isCurrentListener()) return;
-        updatePendingSyncKey('shared-account-members', snapshot.metadata.hasPendingWrites);
-        const members = snapshot.docs
-          .map((memberDoc) => ({
-            id: memberDoc.id,
-            ...(memberDoc.data() as Omit<SharedAccountMember, 'id'>)
-          }))
-          .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt));
-        setSharedAccountMembers(members);
-      },
-      (error) => {
-        if (!isCurrentListener()) return;
-        handleFirestoreListenerError('shared-account-members', error);
+    const attachListeners = async () => {
+      try {
+        const preflightSnap = await getDoc(sharedAccountRef);
+        if (!preflightSnap.exists()) {
+          throw new Error('permission-denied: shared account does not exist or is no longer accessible');
+        }
+      } catch (error) {
+        if (cancelled || !isCurrentListener()) return;
+        handleFirestoreListenerError('shared-account-preflight', error);
+        return;
       }
-    );
+
+      if (cancelled || !isCurrentListener()) return;
+
+      unsubSharedAccount = onSnapshot(
+        sharedAccountRef,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isCurrentListener()) return;
+          updatePendingSyncKey('shared-account-meta', snapshot.metadata.hasPendingWrites);
+          const data = snapshot.data();
+          setActiveSharedInviteCode(typeof data?.inviteCode === 'string' ? data.inviteCode : null);
+        },
+        (error) => {
+          if (!isCurrentListener()) return;
+          handleFirestoreListenerError('shared-account-meta', error);
+        }
+      );
+
+      unsubMembers = onSnapshot(
+        membersRef,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isCurrentListener()) return;
+          updatePendingSyncKey('shared-account-members', snapshot.metadata.hasPendingWrites);
+          const members = snapshot.docs
+            .map((memberDoc) => ({
+              id: memberDoc.id,
+              ...(memberDoc.data() as Omit<SharedAccountMember, 'id'>)
+            }))
+            .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt));
+          setSharedAccountMembers(members);
+        },
+        (error) => {
+          if (!isCurrentListener()) return;
+          handleFirestoreListenerError('shared-account-members', error);
+        }
+      );
+    };
+
+    void attachListeners();
 
     return () => {
+      cancelled = true;
       updatePendingSyncKey('shared-account-meta', false);
       updatePendingSyncKey('shared-account-members', false);
-      unsubSharedAccount();
-      unsubMembers();
+      unsubSharedAccount?.();
+      unsubMembers?.();
     };
   }, [activeAccount?.sharedAccountId]);
 
@@ -999,97 +1158,124 @@ function App() {
     setBudgets([]);
     setDebts([]);
 
-    const catQuery = query(categoriesRef);
-    const unsubCat = onSnapshot(
-      catQuery,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        if (!isCurrentListener()) return;
-        updatePendingSyncKey('categories', snapshot.metadata.hasPendingWrites);
-        const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category));
-        setCategories(data);
-      },
-      (error) => {
-        if (!isCurrentListener()) return;
-        handleFirestoreListenerError('categories', error);
-      }
-    );
+    let unsubCat: (() => void) | null = null;
+    let unsubTx: (() => void) | null = null;
+    let unsubPlans: (() => void) | null = null;
+    let unsubBudgets: (() => void) | null = null;
+    let unsubDebts: (() => void) | null = null;
+    let cancelled = false;
 
-    const txQuery = query(transactionsRef);
-    const unsubTx = onSnapshot(
-      txQuery,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        if (!isCurrentListener()) return;
-        updatePendingSyncKey('transactions', snapshot.metadata.hasPendingWrites);
-        const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
-        setTransactions(data);
-      },
-      (error) => {
-        if (!isCurrentListener()) return;
-        handleFirestoreListenerError('transactions', error);
+    const attachListeners = async () => {
+      if (activeAccount.sharedAccountId) {
+        try {
+          const preflightSnap = await getDoc(getSharedAccountDocRef(db, activeAccount.sharedAccountId));
+          if (!preflightSnap.exists()) {
+            throw new Error('permission-denied: shared account does not exist or is no longer accessible');
+          }
+        } catch (error) {
+          if (cancelled || !isCurrentListener()) return;
+          handleFirestoreListenerError('scoped-data-preflight', error);
+          return;
+        }
       }
-    );
 
-    const planQuery = query(plansRef);
-    const unsubPlans = onSnapshot(
-      planQuery,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        if (!isCurrentListener()) return;
-        updatePendingSyncKey('plans', snapshot.metadata.hasPendingWrites);
-        const data = snapshot.docs.map((planDoc) => normalizePlan(planDoc.id, planDoc.data() as Partial<Plan>));
-        setPlans(data);
-      },
-      (error) => {
-        if (!isCurrentListener()) return;
-        handleFirestoreListenerError('plans', error);
-      }
-    );
+      if (cancelled || !isCurrentListener()) return;
 
-    const budgetQuery = query(budgetsRef);
-    const unsubBudgets = onSnapshot(
-      budgetQuery,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        if (!isCurrentListener()) return;
-        updatePendingSyncKey('budgets', snapshot.metadata.hasPendingWrites);
-        const data = snapshot.docs.map((budgetDoc) => ({ id: budgetDoc.id, ...(budgetDoc.data() as Partial<Budget>) } as Budget));
-        setBudgets(data);
-      },
-      (error) => {
-        if (!isCurrentListener()) return;
-        handleFirestoreListenerError('budgets', error);
-      }
-    );
+      const catQuery = query(categoriesRef);
+      unsubCat = onSnapshot(
+        catQuery,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isCurrentListener()) return;
+          updatePendingSyncKey('categories', snapshot.metadata.hasPendingWrites);
+          const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category));
+          setCategories(data);
+        },
+        (error) => {
+          if (!isCurrentListener()) return;
+          handleFirestoreListenerError('categories', error);
+        }
+      );
 
-    const debtQuery = query(debtsRef);
-    const unsubDebts = onSnapshot(
-      debtQuery,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        if (!isCurrentListener()) return;
-        updatePendingSyncKey('debts', snapshot.metadata.hasPendingWrites);
-        const data = snapshot.docs.map((debtDoc) => normalizeDebtRecord(debtDoc.id, debtDoc.data() as Partial<DebtRecord>));
-        setDebts(data);
-      },
-      (error) => {
-        if (!isCurrentListener()) return;
-        handleFirestoreListenerError('debts', error);
-      }
-    );
+      const txQuery = query(transactionsRef);
+      unsubTx = onSnapshot(
+        txQuery,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isCurrentListener()) return;
+          updatePendingSyncKey('transactions', snapshot.metadata.hasPendingWrites);
+          const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
+          setTransactions(data);
+        },
+        (error) => {
+          if (!isCurrentListener()) return;
+          handleFirestoreListenerError('transactions', error);
+        }
+      );
+
+      const planQuery = query(plansRef);
+      unsubPlans = onSnapshot(
+        planQuery,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isCurrentListener()) return;
+          updatePendingSyncKey('plans', snapshot.metadata.hasPendingWrites);
+          const data = snapshot.docs.map((planDoc) => normalizePlan(planDoc.id, planDoc.data() as Partial<Plan>));
+          setPlans(data);
+        },
+        (error) => {
+          if (!isCurrentListener()) return;
+          handleFirestoreListenerError('plans', error);
+        }
+      );
+
+      const budgetQuery = query(budgetsRef);
+      unsubBudgets = onSnapshot(
+        budgetQuery,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isCurrentListener()) return;
+          updatePendingSyncKey('budgets', snapshot.metadata.hasPendingWrites);
+          const data = snapshot.docs.map((budgetDoc) => ({ id: budgetDoc.id, ...(budgetDoc.data() as Partial<Budget>) } as Budget));
+          setBudgets(data);
+        },
+        (error) => {
+          if (!isCurrentListener()) return;
+          handleFirestoreListenerError('budgets', error);
+        }
+      );
+
+      const debtQuery = query(debtsRef);
+      unsubDebts = onSnapshot(
+        debtQuery,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isCurrentListener()) return;
+          updatePendingSyncKey('debts', snapshot.metadata.hasPendingWrites);
+          const data = snapshot.docs.map((debtDoc) => normalizeDebtRecord(debtDoc.id, debtDoc.data() as Partial<DebtRecord>));
+          setDebts(data);
+        },
+        (error) => {
+          if (!isCurrentListener()) return;
+          handleFirestoreListenerError('debts', error);
+        }
+      );
+    };
+
+    void attachListeners();
 
     return () => {
+      cancelled = true;
       updatePendingSyncKey('categories', false);
       updatePendingSyncKey('transactions', false);
       updatePendingSyncKey('plans', false);
       updatePendingSyncKey('budgets', false);
       updatePendingSyncKey('debts', false);
-      unsubCat();
-      unsubTx();
-      unsubPlans();
-      unsubBudgets();
-      unsubDebts();
+      unsubCat?.();
+      unsubTx?.();
+      unsubPlans?.();
+      unsubBudgets?.();
+      unsubDebts?.();
     };
   }, [user, activeAccount]);
 
@@ -1639,7 +1825,7 @@ function App() {
         createdByUserId: user.uid,
         createdByName: currentUserLabel,
       };
-      const updatedItems = [...plan.items, newItem];
+      const updatedItems = [...plan.items, newItem].map(serializePlanItemForFirestore);
       await setDoc(planRef, { items: updatedItems }, { merge: true });
     }
   };
@@ -1654,7 +1840,7 @@ function App() {
       const updatedItems = plan.items.map((item) =>
         item.id === itemId ? { ...updatedItem, id: itemId, createdByUserId: item.createdByUserId, createdByName: item.createdByName } : item
       );
-      await setDoc(planRef, { items: updatedItems }, { merge: true });
+      await setDoc(planRef, { items: updatedItems.map(serializePlanItemForFirestore) }, { merge: true });
     }
   };
 
@@ -1668,13 +1854,87 @@ function App() {
 
   const deletePlanItem = async (planId: string, itemId: string) => {
     if (!user || !activeAccount) return;
-    const plansRef = getActiveScopedCollection<Plan>('plans');
-    if (!plansRef) return;
-    const planRef = doc(plansRef, planId);
     const plan = plans.find((entry) => entry.id === planId);
-    if (plan) {
-      const updatedItems = plan.items.filter((item) => item.id !== itemId);
-      await setDoc(planRef, { items: updatedItems }, { merge: true });
+    if (!plan) return;
+
+    const item = plan.items.find((i) => i.id === itemId);
+    if (!item) return;
+
+    const isPrivateAccount = !isOperationalSharedAccount;
+    const isSharedOwner = activeAccount.role === 'OWNER';
+    const canEditLegacySharedRecord = !isPrivateAccount && isSharedOwner;
+    const canEditPlan = (p: Plan) => {
+      if (isPrivateAccount) return true;
+      if (!p.createdByUserId) return canEditLegacySharedRecord;
+      return p.createdByUserId === user.uid;
+    };
+    const canEditItem = () => {
+      if (isPrivateAccount) return true;
+      if (!canEditPlan(plan)) return false;
+      if (!item.createdByUserId) return canEditLegacySharedRecord;
+      return item.createdByUserId === user.uid;
+    };
+
+    if (!canEditItem()) {
+      showNotification(
+        'error',
+        'Tidak Punya Akses',
+        'Item rencana ini tidak bisa dihapus karena bukan milik Anda.',
+        true
+      );
+      return;
+    }
+
+    const updatedItems = plan.items.filter((i) => i.id !== itemId);
+
+    const privatePlansRef = getPlansCollectionRef(db, user.uid, activeAccount.id);
+    const privatePlanRef = doc(privatePlansRef, planId);
+
+    const activeScopedPlansRef = getActiveScopedCollection<Plan>('plans');
+    const activePlanRef = activeScopedPlansRef ? doc(activeScopedPlansRef, planId) : null;
+
+    const candidateRefs = [privatePlanRef, activePlanRef]
+      .filter((ref): ref is NonNullable<typeof ref> => !!ref)
+      .filter((ref, index, arr) => arr.findIndex((other) => other.path === ref.path) === index);
+
+    const attemptErrors: unknown[] = [];
+
+    for (const targetRef of candidateRefs) {
+      try {
+        const snap = await getDoc(targetRef);
+        if (!snap.exists()) continue;
+        await setDoc(targetRef, {
+          items: updatedItems.map(serializePlanItemForFirestore),
+        }, { merge: true });
+        return;
+      } catch (error) {
+        attemptErrors.push(error);
+      }
+    }
+
+    const firstError = attemptErrors[0];
+    try {
+      if (isPermissionDeniedError(firstError)) {
+        const permissionMessage = isOperationalSharedAccount
+          ? 'Item rencana ini tidak bisa dihapus karena bukan milik Anda atau hak akses akun bersama terbatas.'
+          : 'Akses ditolak saat menghapus item rencana. Coba refresh halaman lalu ulangi lagi.';
+        showNotification(
+          'error',
+          'Tidak Punya Akses',
+          permissionMessage,
+          true
+        );
+      } else {
+        showNotification('error', 'Gagal Menghapus Item', 'Terjadi kesalahan saat menghapus item rencana.', true);
+      }
+      if (firstError) {
+        console.error('Failed to delete plan item from all candidate paths:', firstError);
+      }
+      return;
+    } catch (error) {
+      console.error('Unexpected failure while handling delete plan item:', error);
+      showNotification('error', 'Gagal Menghapus Item', 'Terjadi kesalahan saat menghapus item rencana.', true);
+      return;
     }
   };
 
@@ -1690,7 +1950,7 @@ function App() {
       item.id === itemId ? { ...item, status } : item
     ));
 
-    await setDoc(planRef, { items: updatedItems }, { merge: true });
+    await setDoc(planRef, { items: updatedItems.map(serializePlanItemForFirestore) }, { merge: true });
   };
 
   const applyPlanItemToTransaction = async (planId: string, itemId: string, item: PlanItem, date: string) => {
@@ -2111,12 +2371,14 @@ function App() {
       >
         {/* App Logo */}
         <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: `1px solid ${theme.colors.border}` }}>
-          <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: theme.colors.accent, color: '#fff', display: 'flex' }}>
-            <IconDisplay name="Wallet" size={24} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+            <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: theme.colors.accent, color: '#fff', display: 'flex' }}>
+              <IconDisplay name="Wallet" size={24} />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em', color: theme.colors.textPrimary, whiteSpace: 'nowrap' }}>
+              DompetCerdas <Typography component="span" variant="caption" sx={{ opacity: 0.6 }}>v{APP_VERSION}</Typography>
+            </Typography>
           </Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em', color: theme.colors.textPrimary }}>
-            DompetCerdas <Typography component="span" variant="caption" sx={{ opacity: 0.6 }}>v{APP_VERSION}</Typography>
-          </Typography>
         </Box>
 
         {/* User Info */}
@@ -2126,13 +2388,16 @@ function App() {
             sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, borderRadius: 3, bgcolor: theme.colors.bgHover, border: `1px solid ${theme.colors.border}` }}
           >
             <Avatar src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt={user.displayName || 'User'} sx={{ width: 40, height: 40 }} />
-            <Box sx={{ overflow: 'hidden', flex: 1 }}>
+            <Box sx={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
               <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: theme.colors.textPrimary }}>
                 {user.displayName}
               </Typography>
-              <Button size="small" onClick={handleLogout} sx={{ p: 0, minWidth: 'auto', color: theme.colors.expense, textTransform: 'none', fontSize: '0.75rem', fontWeight: 500 }}>
-                Keluar
-              </Button>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
+                <Button size="small" onClick={handleLogout} sx={{ p: 0, minWidth: 'auto', color: theme.colors.expense, textTransform: 'none', fontSize: '0.75rem', fontWeight: 500 }}>
+                  Keluar
+                </Button>
+                {themeToggleTextButton}
+              </Box>
             </Box>
           </Paper>
 
@@ -2175,6 +2440,7 @@ function App() {
               key={item.view}
               selected={currentView === item.view}
               onClick={() => setCurrentView(item.view)}
+              data-testid={`nav-${item.view.toLowerCase()}`}
               sx={{
                 borderRadius: 2,
                 mb: 0.5,
@@ -2322,28 +2588,32 @@ function App() {
             borderBottom: `1px solid ${theme.colors.border}`,
           }}
         >
-          <Box>
+          <Box sx={{ minWidth: 0 }}>
             <Typography variant="overline" sx={{ fontWeight: 600, letterSpacing: '0.16em', color: theme.colors.textMuted, fontSize: '0.6rem' }}>
               Akun Aktif
             </Typography>
           </Box>
-          <Select
-            value={activeAccountId || ''}
-            onChange={(e) => switchAccount(e.target.value as string)}
-            size="small"
-            sx={{
-              borderRadius: 2,
-              bgcolor: theme.colors.bgPrimary,
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.colors.border },
-              maxWidth: 200,
-            }}
-          >
-            {accounts.map((account) => (
-              <MenuItem key={account.id} value={account.id}>
-                {account.name}
-              </MenuItem>
-            ))}
-          </Select>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Select
+              value={activeAccountId || ''}
+              onChange={(e) => switchAccount(e.target.value as string)}
+              size="small"
+              sx={{
+                borderRadius: 2,
+                bgcolor: theme.colors.bgPrimary,
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.colors.border },
+                maxWidth: 180,
+                minWidth: 140,
+              }}
+            >
+              {accounts.map((account) => (
+                <MenuItem key={account.id} value={account.id}>
+                  {account.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {themeToggleButton}
+          </Box>
         </Box>
 
         {/* Content Area */}
@@ -2382,6 +2652,8 @@ function App() {
                   plans={plans}
                   categories={categories}
                   currentUserId={user.uid}
+                  isSharedAccount={isOperationalSharedAccount}
+                  isSharedOwner={activeAccount?.role === 'OWNER'}
                   currentBalance={currentBalance}
                   currentMonthBalance={currentMonthBalance}
                   onCreatePlan={createPlan}

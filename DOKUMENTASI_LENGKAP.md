@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.2
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.3
 
 **Status**: ✅ Fully Documented
-**Last Updated**: March 31, 2026
-**Version**: 2.8.2
+**Last Updated**: April 5, 2026
+**Version**: 2.8.3
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -23,6 +23,7 @@
 - ✅ Kolaborasi sederhana untuk akun bersama: anggota, kode gabung, dan shared data lintas user
 - ✅ Member akun bersama bisa keluar sendiri, owner bisa hapus workspace kalau sudah sendirian
 - ✅ Pengaturan `Akun Keuangan` sekarang lebih simple: daftar akun, popup tambah akun, dan guard hapus akun kosong
+- ✅ Toggle tema global tersedia langsung di shell aplikasi tanpa masuk Settings
 - ✅ Dashboard dengan pie chart breakdown
 - ✅ Toggle privasi untuk sembunyikan nominal saldo di dashboard
 - ✅ Riwayat transaksi per hari dalam card terpisah dengan header tanggal yang lebih jelas
@@ -898,6 +899,11 @@ firebase functions:log
 - Backend delete shared account memisahkan flow owner vs member, menolak hapus saat masih ada anggota lain, dan merapikan update akun aktif/default Telegram.
 - Pesan error callable dirapikan supaya alasan dari server tampil lebih jelas di UI.
 
+### v2.8.3 - April 5, 2026
+- Toggle tema dipindah keluar dari Settings dan ditempatkan di shell aplikasi supaya user bisa ganti tema langsung dari desktop sidebar atau bar akun mobile.
+- Desktop sidebar dirapikan lagi agar aksi tema menyatu dengan kartu user, bukan berdiri sendiri di bar logo.
+- Panel tema di Settings dihapus supaya halaman fokus ke pengaturan akun, Telegram, export, dan tindakan administratif.
+
 ### v2.8.0 - March 30, 2026
 - Fondasi PWA diselesaikan dengan service worker, offline fallback, prompt update versi, dan Firestore local persistence.
 - Initial load dirapikan lewat chunk splitting, lazy screen loading, pemecahan runtime Firebase, dan pemindahan chart dashboard ke lazy chunk terpisah.
@@ -922,6 +928,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.3** | Apr 5, 2026 | Toggle tema global dipindah keluar dari Settings dan dirapikan untuk desktop/mobile |
 | **v2.8.2** | Mar 31, 2026 | Flow keluar member shared account, hapus workspace owner saat sendirian, dan error callable yang lebih jelas |
 | **v2.8.1** | Mar 31, 2026 | Share existing private account from Settings, ownership-preserving shared workspace conversion, and hosting typecheck guardrail |
 | **v2.8.0** | Mar 30, 2026 | Fondasi PWA/offline, attachment retry, conflict warning transaksi, lazy loading dashboard, dan optimasi bundle |
@@ -950,6 +957,6 @@ firebase functions:log
 
 ---
 
-**Last Updated**: March 31, 2026
+**Last Updated**: April 5, 2026
 **Status**: ✅ Internal Testing Ready
 **Support**: Check documentation or Firebase console logs
