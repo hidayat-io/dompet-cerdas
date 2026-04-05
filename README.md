@@ -167,6 +167,8 @@ npm run deploy:hosting:safe
 
 ### Lakukan finishing
 - Cek dokumentasi yang relevan dan pastikan perubahan fitur, bug fix, atau polishing yang baru memang sudah tercatat.
+- Baca seluruh `git diff` dan pahami semua perubahan yang ada di worktree, termasuk yang bukan hasil kerja agent saat ini.
+- Jika ada perubahan lain di worktree, commit semuanya agar worktree kembali clean sebelum lanjut.
 - Update versi app dan dokumentasi, lalu tulis changelog untuk versi terbaru.
 - Jalankan `git commit` dan `git push`.
 - Deploy bila perubahan belum dirilis.
