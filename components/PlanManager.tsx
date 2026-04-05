@@ -32,16 +32,18 @@ interface PlanManagerProps {
     plans: Plan[];
     categories: Category[];
     currentUserId?: string | null;
+    isSharedAccount?: boolean;
+    isSharedOwner?: boolean;
     currentBalance: number;
     currentMonthBalance: number;
-    onCreatePlan: (title: string) => void;
-    onDeletePlan: (id: string) => void;
-    onAddPlanItem: (planId: string, item: Omit<PlanItem, 'id'>) => void;
-    onUpdatePlanItem: (planId: string, itemId: string, item: Omit<PlanItem, 'id'>) => void;
-    onDeletePlanItem: (planId: string, itemId: string) => void;
-    onApplyPlanItemToTransaction: (planId: string, itemId: string, item: PlanItem, date: string) => void;
-    onUpdatePlanSettings: (planId: string, useCurrentMonthBalance: boolean) => void;
-    onUpdatePlanItemStatus: (planId: string, itemId: string, status: PlanItemStatus) => void;
+    onCreatePlan: (title: string) => void | Promise<void>;
+    onDeletePlan: (id: string) => void | Promise<void>;
+    onAddPlanItem: (planId: string, item: Omit<PlanItem, 'id'>) => void | Promise<void>;
+    onUpdatePlanItem: (planId: string, itemId: string, item: Omit<PlanItem, 'id'>) => void | Promise<void>;
+    onDeletePlanItem: (planId: string, itemId: string) => void | Promise<void>;
+    onApplyPlanItemToTransaction: (planId: string, itemId: string, item: PlanItem, date: string) => void | Promise<void>;
+    onUpdatePlanSettings: (planId: string, useCurrentMonthBalance: boolean) => void | Promise<void>;
+    onUpdatePlanItemStatus: (planId: string, itemId: string, status: PlanItemStatus) => void | Promise<void>;
 }
 
 const STATUS_LABELS: Record<PlanItemStatus, string> = {
@@ -117,6 +119,8 @@ const PlanManager: React.FC<PlanManagerProps> = ({
     plans,
     categories,
     currentUserId,
+    isSharedAccount = false,
+    isSharedOwner = false,
     currentBalance,
     currentMonthBalance,
     onCreatePlan,
@@ -153,10 +157,21 @@ const PlanManager: React.FC<PlanManagerProps> = ({
     const [showAddModal, setShowAddModal] = useState(false);
     const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-    const canEditPlan = (plan: Plan) => !plan.createdByUserId || !currentUserId || plan.createdByUserId === currentUserId;
-    const canEditPlanItem = (plan: Plan, item: PlanItem) => (
-        canEditPlan(plan) && (!item.createdByUserId || !currentUserId || item.createdByUserId === currentUserId)
-    );
+    const isPrivateAccount = !isSharedAccount;
+    const canEditLegacySharedRecord = !isSharedAccount || isSharedOwner;
+    const canEditPlan = (plan: Plan) => {
+        if (isPrivateAccount) return true;
+        if (!plan.createdByUserId) return canEditLegacySharedRecord;
+        return !currentUserId || plan.createdByUserId === currentUserId;
+    };
+    const canEditPlanItem = (plan: Plan, item: PlanItem) => {
+        if (isPrivateAccount) return true;
+        return canEditPlan(plan) && (
+            !item.createdByUserId
+                ? canEditLegacySharedRecord
+                : !currentUserId || item.createdByUserId === currentUserId
+        );
+    };
 
     useEffect(() => {
         const availableCategories = categories.filter((category) => category.type === newItemType);
@@ -243,13 +258,17 @@ const PlanManager: React.FC<PlanManagerProps> = ({
         setEditingItem(null);
     };
 
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if (!deleteTarget) return;
-        if (deleteTarget.type === 'plan') {
-            onDeletePlan(deleteTarget.planId);
-            if (activePlanId === deleteTarget.planId) setActivePlanId(null);
-        } else {
-            onDeletePlanItem(deleteTarget.planId, deleteTarget.itemId);
+        try {
+            if (deleteTarget.type === 'plan') {
+                await onDeletePlan(deleteTarget.planId);
+                if (activePlanId === deleteTarget.planId) setActivePlanId(null);
+            } else {
+                await onDeletePlanItem(deleteTarget.planId, deleteTarget.itemId);
+            }
+        } catch (error) {
+            return;
         }
         setDeleteTarget(null);
     };
@@ -443,6 +462,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                         transition: 'all 0.15s',
                         '&:hover': { borderStyle: 'solid', boxShadow: 2 },
                     }}
+                    data-testid="plans-open-add-item"
                 >
                     <IconDisplay name="Plus" size={20} />
                     Tambah Item Rencana
@@ -523,12 +543,20 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                     </IconButton>
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => onUpdatePlanItemStatus(plan.id, item.id, 'CANCELLED')}
+                                                        onClick={() => handleEditClick(item)}
                                                         disabled={!canEditPlanItem(plan, item)}
-                                                        title="Batalkan item ini"
-                                                        sx={{ bgcolor: theme.colors.expenseBg, color: theme.colors.expense }}
+                                                        title="Edit item"
                                                     >
-                                                        <IconDisplay name="XCircle" size={14} />
+                                                        <IconDisplay name="Edit" size={14} />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => setDeleteTarget({ type: 'item', planId: plan.id, itemId: item.id, title: item.name })}
+                                                        disabled={!canEditPlanItem(plan, item)}
+                                                        title="Hapus item"
+                                                    >
+                                                        <IconDisplay name="Trash2" size={14} />
                                                     </IconButton>
                                                 </>
                                             )}
@@ -542,18 +570,22 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                                     <IconDisplay name="RefreshCw" size={14} />
                                                 </IconButton>
                                             )}
-                                            <IconButton size="small" onClick={() => handleEditClick(item)} disabled={!canEditPlanItem(plan, item)} title="Edit item">
-                                                <IconDisplay name="Edit" size={14} />
-                                            </IconButton>
-                                            <IconButton
-                                                size="small"
-                                                color="error"
-                                                onClick={() => setDeleteTarget({ type: 'item', planId: plan.id, itemId: item.id, title: item.name })}
-                                                disabled={!canEditPlanItem(plan, item)}
-                                                title="Hapus item"
-                                            >
-                                                <IconDisplay name="Trash2" size={14} />
-                                            </IconButton>
+                                            {item.status !== 'PLANNED' && (
+                                                <>
+                                                    <IconButton size="small" onClick={() => handleEditClick(item)} disabled={!canEditPlanItem(plan, item)} title="Edit item">
+                                                        <IconDisplay name="Edit" size={14} />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => setDeleteTarget({ type: 'item', planId: plan.id, itemId: item.id, title: item.name })}
+                                                        disabled={!canEditPlanItem(plan, item)}
+                                                        title="Hapus item"
+                                                    >
+                                                        <IconDisplay name="Trash2" size={14} />
+                                                    </IconButton>
+                                                </>
+                                            )}
                                         </Box>
                                     </Box>
 
@@ -654,7 +686,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                     actions={
                         <>
                             <Button variant="outlined" onClick={() => setShowAddModal(false)}>Batal</Button>
-                            <Button type="submit" form="add-plan-item-form" variant="contained">Tambah Item</Button>
+                            <Button type="submit" form="add-plan-item-form" variant="contained" data-testid="plans-item-submit">Tambah Item</Button>
                         </>
                     }
                 >
@@ -668,6 +700,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                 value={newItemName}
                                 onChange={(e) => setNewItemName(e.target.value)}
                                 required
+                                inputProps={{ 'data-testid': 'plans-item-name' }}
                             />
                             <TextField
                                 label="Jumlah"
@@ -679,10 +712,11 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                 onChange={(e) => setNewItemAmount(formatRupiahInput(e.target.value.replace(/\D/g, '')))}
                                 required
                                 slotProps={{ input: { startAdornment: <InputAdornment position="start">Rp</InputAdornment> } }}
+                                inputProps={{ 'data-testid': 'plans-item-amount' }}
                             />
                             <FormControl size="small" fullWidth required>
                                 <InputLabel>Kategori</InputLabel>
-                                <Select label="Kategori" value={newItemCategory} onChange={(e) => setNewItemCategory(e.target.value)}>
+                                <Select label="Kategori" value={newItemCategory} onChange={(e) => setNewItemCategory(e.target.value)} inputProps={{ 'data-testid': 'plans-item-category' }}>
                                     <MenuItem value="">Pilih Kategori...</MenuItem>
                                     {filteredCategories.map((c) => (
                                         <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
@@ -697,6 +731,7 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                 value={newItemPlannedDate}
                                 onChange={(e) => setNewItemPlannedDate(e.target.value)}
                                 slotProps={{ inputLabel: { shrink: true } }}
+                                inputProps={{ 'data-testid': 'plans-item-date' }}
                             />
                     </Box>
                 </FullScreenDialog>
@@ -714,13 +749,14 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                     title="Rencana"
                     description="Siapkan pemasukan dan pengeluaran berikutnya tanpa langsung mengubah saldo."
                     actions={(
-                        <Button
-                            variant="contained"
-                            onClick={() => setShowCreatePlanDialog(true)}
-                            startIcon={<IconDisplay name="Plus" size={16} sx={{ color: '#fff' }} />}
-                        >
-                            Buat Rencana
-                        </Button>
+                                <Button
+                                    variant="contained"
+                                    onClick={() => setShowCreatePlanDialog(true)}
+                                    startIcon={<IconDisplay name="Plus" size={16} sx={{ color: '#fff' }} />}
+                                    data-testid="plans-open-create-dialog"
+                                >
+                                    Buat Rencana
+                                </Button>
                     )}
                 />
 
@@ -756,10 +792,15 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                             transition: 'box-shadow 0.2s',
                                             '&:hover': { boxShadow: 3 },
                                         }}
+                                        data-testid={`plan-card-${plan.id}`}
                                     >
                                         <Box sx={{ p: 2.5 }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, mb: 2 }}>
-                                                <Box sx={{ cursor: 'pointer', flex: 1, minWidth: 0 }} onClick={() => setActivePlanId(plan.id)}>
+                                            <Box
+                                                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, mb: 2, cursor: 'pointer' }}
+                                                onClick={() => setActivePlanId(plan.id)}
+                                                data-testid={`plan-open-${plan.id}`}
+                                            >
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
                                                     <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.3 }}>
                                                         {plan.title}
                                                     </Typography>
@@ -853,13 +894,14 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                             value={newPlanTitle}
                             onChange={(e) => setNewPlanTitle(e.target.value)}
                             sx={{ mt: 1 }}
+                            inputProps={{ 'data-testid': 'plans-create-title' }}
                         />
                     </DialogContent>
                     <DialogActions>
                         <Button variant="outlined" onClick={() => setShowCreatePlanDialog(false)}>
                             Batal
                         </Button>
-                        <Button type="submit" variant="contained" disabled={!newPlanTitle.trim()}>
+                        <Button type="submit" variant="contained" disabled={!newPlanTitle.trim()} data-testid="plans-create-submit">
                             Buat Rencana
                         </Button>
                     </DialogActions>

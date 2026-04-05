@@ -53,10 +53,25 @@ service cloud.firestore {
     function canUpdateSharedRecord(sharedAccountId) {
       return canAccessSharedAccount(sharedAccountId) &&
         (
+          isSharedOwner(sharedAccountId) ||
+          (
+            (
+              resource.data.createdByUserId == request.auth.uid ||
+              isSharedRecordLegacyOwner(sharedAccountId)
+            ) &&
+            request.resource != null &&
+            request.resource.data.createdByUserId == resource.data.createdByUserId
+          )
+        );
+    }
+
+    function canDeleteSharedRecord(sharedAccountId) {
+      return canAccessSharedAccount(sharedAccountId) &&
+        (
+          isSharedOwner(sharedAccountId) ||
           resource.data.createdByUserId == request.auth.uid ||
           isSharedRecordLegacyOwner(sharedAccountId)
-        ) &&
-        request.resource.data.createdByUserId == resource.data.createdByUserId;
+        );
     }
     
     // Link tokens - Cloud Functions only (Admin SDK bypasses rules)
@@ -131,37 +146,43 @@ service cloud.firestore {
       match /categories/{categoryId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
-        allow update, delete: if canUpdateSharedRecord(sharedAccountId);
+        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
       match /transactions/{transactionId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
-        allow update, delete: if canUpdateSharedRecord(sharedAccountId);
+        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
       match /plans/{planId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
-        allow update, delete: if canUpdateSharedRecord(sharedAccountId);
+        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
       match /budgets/{budgetId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
-        allow update, delete: if canUpdateSharedRecord(sharedAccountId);
+        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
       match /debts/{debtId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
-        allow update, delete: if canUpdateSharedRecord(sharedAccountId);
+        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
       match /simulations/{simulationId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId);
-        allow update, delete: if canUpdateSharedRecord(sharedAccountId);
+        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
     }
     

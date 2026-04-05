@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, Auth } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getRedirectResult, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, Auth } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -28,6 +28,9 @@ const AuthLogin: React.FC = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
+    const isE2EMode = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
+    const testEmail = import.meta.env.VITE_E2E_TEST_EMAIL || 'e2e.test@dompet.local';
+    const testPassword = import.meta.env.VITE_E2E_TEST_PASSWORD || 'E2eTest123!';
 
     // Check for redirect result on page load (for mobile redirect flow)
     useEffect(() => {
@@ -103,6 +106,24 @@ const AuthLogin: React.FC = () => {
         }
     };
 
+    const handleTestLogin = async () => {
+        setIsLoading(true);
+        setError('');
+
+        try {
+            await signInWithEmailAndPassword(auth as Auth, testEmail, testPassword);
+        } catch (err: any) {
+            if (err?.code === 'auth/user-not-found' || err?.code === 'auth/invalid-credential') {
+                await createUserWithEmailAndPassword(auth as Auth, testEmail, testPassword);
+            } else {
+                console.error('Test login error:', err);
+                setError(`Gagal login test: ${err?.message || 'unknown error'}`);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     if (isCheckingRedirect) {
         return (
             <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
@@ -166,6 +187,24 @@ const AuthLogin: React.FC = () => {
                 >
                     Masuk dengan Google
                 </Button>
+
+                {isE2EMode && (
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={handleTestLogin}
+                        disabled={isLoading}
+                        sx={{
+                            mt: 1.5,
+                            py: 1.25,
+                            borderRadius: 2,
+                            fontWeight: 600,
+                        }}
+                        data-testid="auth-e2e-login"
+                    >
+                        Masuk Test
+                    </Button>
+                )}
 
                 <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 3 }}>
                     Dengan masuk, kamu menyetujui bahwa data akan tersimpan di cloud Firebase.

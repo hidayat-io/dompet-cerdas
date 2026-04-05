@@ -68,7 +68,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({
             description="Tidak perlu paham akuntansi. Fokus kita cukup catat transaksi, lihat ringkasan, lalu atur yang ingin dipantau."
             actions={
                 <>
-                    <Button variant="outlined" onClick={onClose}>
+                    <Button variant="outlined" onClick={onClose} data-testid="onboarding-close">
                         Tutup Panduan
                     </Button>
                 </>

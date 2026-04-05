@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
+import { connectAuthEmulator, getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
 import {
     Firestore,
+    connectFirestoreEmulator,
     getFirestore,
     initializeFirestore,
     persistentLocalCache,
@@ -21,6 +22,11 @@ const firebaseConfig = {
     appId: "1:192680721146:web:84049577f6e2de212f6743",
     measurementId: "G-DVEH6873YX"
 };
+
+const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
+const authEmulatorUrl = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL || 'http://127.0.0.1:9099';
+const firestoreEmulatorHost = import.meta.env.VITE_FIRESTORE_EMULATOR_HOST || '127.0.0.1';
+const firestoreEmulatorPort = Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8080);
 
 let app: FirebaseApp;
 let authInstance: Auth;
@@ -49,6 +55,11 @@ try {
         dbInstance = getFirestore(app);
     }
     googleProviderInstance = new GoogleAuthProvider();
+
+    if (useEmulators) {
+        connectAuthEmulator(authInstance, authEmulatorUrl, { disableWarnings: true });
+        connectFirestoreEmulator(dbInstance, firestoreEmulatorHost, firestoreEmulatorPort);
+    }
 
 } catch (criticalError) {
     console.error("CRITICAL FIREBASE ERROR:", criticalError);
