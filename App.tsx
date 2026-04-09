@@ -1610,6 +1610,7 @@ function App() {
       createdByUserId: user.uid,
       createdByName: currentUserLabel,
       createdAt: new Date().toISOString(),
+      source: 'app',
       attachment: attachmentData
     });
   };

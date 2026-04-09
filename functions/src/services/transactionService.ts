@@ -188,7 +188,8 @@ function buildManualTransactionPayload(
         categoryId,
         description,
         date: getJakartaDateString(),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        source: 'telegram'
     };
     if (creator) {
         payload.createdByUserId = creator.userId;
@@ -309,6 +310,7 @@ export async function createTransactionFromReceipt(
         createdAt: new Date().toISOString(),
         createdByUserId: userId,
         createdByName: creatorName,
+        source: 'telegram',
     };
 
     // Add attachment if provided

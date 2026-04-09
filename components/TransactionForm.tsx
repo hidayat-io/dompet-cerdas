@@ -499,6 +499,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
             <Alert severity="success" sx={{ mt: 1, py: 0.5, fontSize: 12 }}>{compressionMessage}</Alert>
           )}
         </Box>
+
+        {initialData?.source && (
+          <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
+            {initialData.source === 'telegram' ? 'Dicatat lewat Telegram' : 'Dicatat lewat Aplikasi'}
+          </Typography>
+        )}
     </Box>
   );
 

@@ -60,6 +60,7 @@ export interface Transaction {
   createdAt?: string; // ISO timestamp for sorting
   createdByUserId?: string;
   createdByName?: string;
+  source?: 'app' | 'telegram';
   // New structured attachment
   attachment?: Attachment;
   // Legacy fields (optional) for backward compatibility
