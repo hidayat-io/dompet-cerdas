@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { callCloudFunction } from "./firebaseRuntime";
 import { Category, Transaction } from "../types";
 
-const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 const createAiClient = () => {
   if (!apiKey) {

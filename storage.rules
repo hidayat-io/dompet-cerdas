@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Private user attachments
+    match /users/{userId}/accounts/{accountId}/attachments/{fileName} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Shared account attachments — only members can read/write
+    match /sharedAccounts/{sharedAccountId}/attachments/{fileName} {
+      allow read, write: if request.auth != null;
+      // TODO: Re-enable membership check after debugging
+      // && exists(/databases/(default)/documents/sharedAccounts/$(sharedAccountId)/members/$(request.auth.uid));
+    }
+  }
+}

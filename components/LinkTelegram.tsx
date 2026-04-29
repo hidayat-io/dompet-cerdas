@@ -64,16 +64,12 @@ const LinkTelegram: React.FC = () => {
 
             try {
                 setMessage('Mengirim notifikasi ke Telegram...');
-                const functionUrl = 'https://asia-southeast1-expensetracker-test-1.cloudfunctions.net/notifyLinkSuccess';
-                console.log('Calling notifyLinkSuccess:', { telegramId, userId: user.uid });
-                const response = await fetch(functionUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegramId, userId: user.uid, accountName }),
-                });
-                const notifyResult = await response.json();
-                console.log('notifyLinkSuccess response:', notifyResult);
-                if (!response.ok) console.warn('Bot notification failed, but linking was successful');
+                console.log('Calling notifyLinkSuccess:', { telegramId });
+                await callCloudFunction<{ telegramId: number; accountName?: string }, { success: boolean }>(
+                    'notifyLinkSuccess',
+                    { telegramId: telegramId!, accountName }
+                );
+                console.log('notifyLinkSuccess completed');
             } catch (notifyError) {
                 console.error('Failed to notify bot:', notifyError);
             }

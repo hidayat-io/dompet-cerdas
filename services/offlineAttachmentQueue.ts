@@ -12,6 +12,8 @@ export type OfflineAttachmentUploadJob = {
   previousAttachmentPath?: string | null;
   queuedAt: string;
   updatedAt: string;
+  retryCount?: number;
+  status?: 'pending' | 'failed';
 };
 
 const DB_NAME = 'dompetcerdas-offline-attachments';

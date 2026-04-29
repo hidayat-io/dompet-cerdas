@@ -23,6 +23,7 @@ import { getDb } from '../index';
 import { sanitizeFirestoreData } from '../utils/firestore';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const ENABLE_GEMINI_CAPTION_CATEGORY = process.env.ENABLE_GEMINI_CAPTION_CATEGORY === 'true';
 
 let bot: TelegramBot | null = null;
 
@@ -123,9 +124,11 @@ async function resolveCaptionCategoryName(caption: string, categories: UserCateg
     });
     if (fuzzyMatch) return fuzzyMatch.name;
 
-    // 3. Use AI classification for dynamic matching (supports any custom category)
+    if (!ENABLE_GEMINI_CAPTION_CATEGORY) {
+        return undefined;
+    }
+
     try {
-        const { classifyCategory } = await import('../services/nluService');
         const classification = await classifyCategory(hint, categories);
         return classification.categoryName;
     } catch (error) {

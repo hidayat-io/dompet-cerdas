@@ -1,7 +1,9 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
+import { logGeminiError } from './geminiService';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 export interface ParsedTransactionDraft {
     amount: number;
@@ -356,9 +358,11 @@ Contoh:
 `.trim();
 
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const result = await model.generateContent(prompt);
-        const response = result.response.text();
+        const result = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: prompt
+        });
+        const response = result.text || '';
         const firstBrace = response.indexOf('{');
         const lastBrace = response.lastIndexOf('}');
         const jsonString = firstBrace !== -1 && lastBrace !== -1
@@ -390,7 +394,7 @@ Contoh:
             clarificationNeeded: parsed.clarification_needed || undefined,
         };
     } catch (error) {
-        console.error('AI transaction parsing failed:', error);
+        logGeminiError('parseTransactionMessageHybrid', GEMINI_MODEL, error);
         return null;
     }
 }

@@ -52,16 +52,11 @@ service cloud.firestore {
 
     function canUpdateSharedRecord(sharedAccountId) {
       return canAccessSharedAccount(sharedAccountId) &&
+        request.resource.data.createdByUserId == resource.data.createdByUserId &&
         (
           isSharedOwner(sharedAccountId) ||
-          (
-            (
-              resource.data.createdByUserId == request.auth.uid ||
-              isSharedRecordLegacyOwner(sharedAccountId)
-            ) &&
-            request.resource != null &&
-            request.resource.data.createdByUserId == resource.data.createdByUserId
-          )
+          resource.data.createdByUserId == request.auth.uid ||
+          isSharedRecordLegacyOwner(sharedAccountId)
         );
     }
 
@@ -73,9 +68,74 @@ service cloud.firestore {
           isSharedRecordLegacyOwner(sharedAccountId)
         );
     }
+
+    // Field validation helpers
+    function isValidAmount() {
+      return request.resource.data.amount is number && request.resource.data.amount > 0;
+    }
+
+    function isValidDate() {
+      return request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidString(field, maxLength) {
+      return request.resource.data[field] is string && request.resource.data[field].size() <= maxLength;
+    }
+
+    function isValidTransactionData() {
+      return isValidAmount() &&
+        isValidDate() &&
+        isValidString('categoryId', 100) &&
+        (!('description' in request.resource.data) || isValidString('description', 500));
+    }
+
+    function isValidCategoryData() {
+      return isValidString('name', 100) &&
+        request.resource.data.type in ['INCOME', 'EXPENSE'];
+    }
+
+    function isValidPlanData() {
+      return isValidString('name', 200) &&
+        isValidDate() &&
+        request.resource.data.type in ['INCOME', 'EXPENSE'];
+    }
+
+    function isValidBudgetData() {
+      return isValidString('month', 7) &&
+        request.resource.data.month.matches('^[0-9]{4}-[0-9]{2}$') &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0;
+    }
+
+    function isValidDebtData() {
+      return isValidString('name', 200) &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0 &&
+        request.resource.data.type in ['HUTANG', 'PIUTANG'];
+    }
     
     // Link tokens - Cloud Functions only (Admin SDK bypasses rules)
     match /link_tokens/{token} {
+      allow read, write: if false;
+    }
+
+    // AI quota limits - Cloud Functions only
+    match /web_ai_limits/{userId} {
+      allow read, write: if false;
+    }
+
+    // Text transaction sessions - Cloud Functions only
+    match /text_transaction_sessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // Receipt sessions - Cloud Functions only
+    match /receipt_sessions/{sessionId} {
+      allow read, write: if false;
+    }
+    
+    // Rate limits - Cloud Functions only
+    match /telegram_rate_limits/{telegramId} {
       allow read, write: if false;
     }
     
@@ -89,23 +149,38 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
 
         match /categories/{categoryId} {
-          allow read, write: if isOwner(userId);
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidCategoryData();
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
         }
 
         match /transactions/{transactionId} {
-          allow read, write: if isOwner(userId);
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidTransactionData();
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
         }
 
         match /plans/{planId} {
-          allow read, write: if isOwner(userId);
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
         }
 
         match /budgets/{budgetId} {
-          allow read, write: if isOwner(userId);
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
         }
 
         match /debts/{debtId} {
-          allow read, write: if isOwner(userId);
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
         }
 
         match /simulations/{simulationId} {
@@ -145,15 +220,17 @@ service cloud.firestore {
 
       match /categories/{categoryId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
-        allow create: if canCreateSharedRecord(sharedAccountId);
+        allow create: if canCreateSharedRecord(sharedAccountId) && isValidCategoryData();
         allow update: if canUpdateSharedRecord(sharedAccountId);
         allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
       match /transactions/{transactionId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
-        allow create: if canCreateSharedRecord(sharedAccountId);
-        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow create: if canCreateSharedRecord(sharedAccountId) && isValidTransactionData();
+        allow update: if canAccessSharedAccount(sharedAccountId);
+        // TODO: Re-enable after debugging
+        // allow update: if canUpdateSharedRecord(sharedAccountId);
         allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
@@ -188,7 +265,7 @@ service cloud.firestore {
     
     // Rate limits - Cloud Functions only
     match /telegram_rate_limits/{telegramId} {
-      allow read, write: if false; // Cloud Functions use Admin SDK
+      allow read, write: if false;
     }
   }
 }

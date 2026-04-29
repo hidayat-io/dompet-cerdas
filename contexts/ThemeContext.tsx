@@ -34,6 +34,10 @@ export interface ThemeColors {
     expense: string;
     expenseBg: string;
 
+    // Error
+    error: string;
+    errorLight: string;
+
     // Sidebar
     sidebarBg: string;
     sidebarText: string;
@@ -79,6 +83,9 @@ export const themes: Record<ThemeName, Theme> = {
             expense: '#dc2626',
             expenseBg: '#fee2e2',
 
+            error: '#dc2626',
+            errorLight: '#fee2e2',
+
             sidebarBg: '#ffffff',
             sidebarText: '#4b5563',
             sidebarActive: '#4f46e5',
@@ -113,6 +120,9 @@ export const themes: Record<ThemeName, Theme> = {
             incomeBg: '#1e3a5f',
             expense: '#f87171',
             expenseBg: '#7f1d1d',
+
+            error: '#f87171',
+            errorLight: '#7f1d1d',
 
             sidebarBg: '#1e293b',
             sidebarText: '#cbd5e1',

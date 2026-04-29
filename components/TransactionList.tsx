@@ -814,13 +814,13 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                                   {pendingAttachmentUpload && (
                                     <Chip
                                       size="small"
-                                      icon={<IconDisplay name="Loader" size={12} />}
-                                      label="Menunggu upload"
+                                      icon={<IconDisplay name={pendingAttachmentUpload.status === 'failed' ? 'AlertCircle' : 'Loader'} size={12} />}
+                                      label={pendingAttachmentUpload.status === 'failed' ? 'Upload gagal' : 'Menunggu upload'}
                                       sx={{
                                         height: 20,
                                         fontSize: 10,
-                                        color: theme.colors.accent,
-                                        bgcolor: theme.colors.accentLight,
+                                        color: pendingAttachmentUpload.status === 'failed' ? theme.colors.error : theme.colors.accent,
+                                        bgcolor: pendingAttachmentUpload.status === 'failed' ? theme.colors.errorLight : theme.colors.accentLight,
                                         '& .MuiChip-label': { px: 1 },
                                       }}
                                     />

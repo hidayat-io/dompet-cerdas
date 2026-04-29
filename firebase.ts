@@ -13,14 +13,14 @@ import {
 // PENTING: authDomain menggunakan custom domain untuk menghindari
 // masalah third-party cookie di iOS Safari dan in-app browsers
 const firebaseConfig = {
-    apiKey: "AIzaSyBCCBireEUYJh9OR-kMCDkTY38eTOXXVZE",
-    authDomain: "dompas.indoomega.my.id", // Custom domain untuk iOS compatibility
-    databaseURL: "https://expensetracker-test-1-default-rtdb.firebaseio.com",
-    projectId: "expensetracker-test-1",
-    storageBucket: "expensetracker-test-1.firebasestorage.app",
-    messagingSenderId: "192680721146",
-    appId: "1:192680721146:web:84049577f6e2de212f6743",
-    measurementId: "G-DVEH6873YX"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';

@@ -8,6 +8,7 @@ import { ReceiptData } from './geminiService';
 import { classifyCategory } from './nluService';
 import { getJakartaDateString } from '../utils/date';
 import { getAccountContext, getCategoriesCollection, getTransactionsCollection } from './accountService';
+import { sanitizeFirestoreData } from '../utils/firestore';
 
 const CATEGORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const categoryCache = new Map<string, { expiresAt: number; categories: UserCategory[] }>();
@@ -321,9 +322,12 @@ export async function createTransactionFromReceipt(
     console.log('[TRANSACTION] Transaction object:', JSON.stringify(transaction));
     console.log('[TRANSACTION] About to write to Firestore path:', transactionsCollection.path);
 
+    // Sanitize transaction object before adding to Firestore
+    const sanitizedTransaction = sanitizeFirestoreData(transaction);
+
     // Add to user's transactions collection
     try {
-        const docRef = await transactionsCollection.add(transaction);
+        const docRef = await transactionsCollection.add(sanitizedTransaction);
 
         console.log('[TRANSACTION] Firestore write completed successfully');
         console.log('[TRANSACTION] Document path:', docRef.path);
@@ -380,7 +384,8 @@ export async function createManualTransaction(
         name: creatorName,
     });
 
-    const docRef = await transactionsCollection.add(transaction);
+    const sanitizedTransaction = sanitizeFirestoreData(transaction);
+    const docRef = await transactionsCollection.add(sanitizedTransaction);
 
     console.log(`Created manual transaction ${docRef.id} for user ${userId}`);
 
@@ -415,7 +420,8 @@ export async function createManualTransactionsBatch(
             categories
         );
         const docRef = transactionsCollection.doc();
-        batch.set(docRef, buildManualTransactionPayload(item.amount, categoryId, item.description, creator));
+        const payload = buildManualTransactionPayload(item.amount, categoryId, item.description, creator);
+        batch.set(docRef, sanitizeFirestoreData(payload));
         docIds.push(docRef.id);
     }
 

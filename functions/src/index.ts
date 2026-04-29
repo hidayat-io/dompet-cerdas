@@ -44,9 +44,46 @@ export const telegramWebhook = functions
                 return;
             }
 
-            // Process the update
             const update = req.body;
-            await processUpdate(update);
+            const updateId = update?.update_id;
+            let processedUpdateRef: FirebaseFirestore.DocumentReference | null = null;
+
+            if (updateId !== undefined && updateId !== null) {
+                processedUpdateRef = firestore.collection('telegram_processed_updates').doc(String(updateId));
+                try {
+                    await processedUpdateRef.create({
+                        updateId,
+                        status: 'processing',
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                } catch (error: any) {
+                    if (error?.code === 6 || error?.code === 'already-exists' || error?.message?.includes('ALREADY_EXISTS')) {
+                        console.log('Duplicate Telegram update ignored:', { updateId });
+                        res.status(200).send('OK');
+                        return;
+                    }
+                    throw error;
+                }
+            }
+
+            try {
+                await processUpdate(update);
+                if (processedUpdateRef) {
+                    await processedUpdateRef.set({
+                        status: 'processed',
+                        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    }, { merge: true });
+                }
+            } catch (error) {
+                if (processedUpdateRef) {
+                    await processedUpdateRef.set({
+                        status: 'failed',
+                        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        error: error instanceof Error ? error.message : String(error),
+                    }, { merge: true });
+                }
+                throw error;
+            }
 
             // Respond to Telegram
             res.status(200).send('OK');
@@ -62,35 +99,22 @@ export const telegramWebhook = functions
  */
 export const notifyLinkSuccess = functions
     .region('asia-southeast1')
-    .https.onRequest(async (req, res) => {
-        // Set CORS headers
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-        res.set('Access-Control-Allow-Headers', 'Content-Type');
+    .https.onCall(async (data, context) => {
+        // Enforce authentication
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+        }
 
-        // Handle preflight request
-        if (req.method === 'OPTIONS') {
-            res.status(204).send('');
-            return;
+        const userId = context.auth.uid;
+        const { telegramId, accountName: accountNameFromRequest } = data;
+
+        console.log('notifyLinkSuccess called:', { telegramId, userId });
+
+        if (!telegramId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Missing telegramId');
         }
 
         try {
-            // Only accept POST requests
-            if (req.method !== 'POST') {
-                res.status(405).send('Method Not Allowed');
-                return;
-            }
-
-            const { telegramId, userId, accountName: accountNameFromRequest } = req.body;
-
-            console.log('notifyLinkSuccess called:', { telegramId, userId });
-
-            if (!telegramId || !userId) {
-                console.error('Missing parameters');
-                res.status(400).json({ error: 'Missing telegramId or userId' });
-                return;
-            }
-
             const accountSummary = await getActiveAccountSummary(userId);
             const accountName = accountNameFromRequest || accountSummary.name;
 
@@ -108,13 +132,13 @@ export const notifyLinkSuccess = functions
                 { parse_mode: 'Markdown' }
             );
 
-            res.status(200).json({ success: true });
+            return { success: true };
         } catch (error) {
             console.error('Error in notifyLinkSuccess:', error);
-            res.status(500).json({
-                error: 'Internal Server Error',
-                message: error instanceof Error ? error.message : String(error)
-            });
+            throw new functions.https.HttpsError(
+                'internal',
+                error instanceof Error ? error.message : 'Internal Server Error'
+            );
         }
     });
 
@@ -320,52 +344,67 @@ export const shareExistingAccount = functions
         const now = new Date().toISOString();
         const sharedAccountRef = firestore.collection('sharedAccounts').doc();
 
-        await copyPrivateAccountScopedDataToSharedWorkspace(userId, accountId, sharedAccountRef.id);
+        try {
+            // Step 1: Create shared account doc first
+            const batch = firestore.batch();
 
-        const batch = firestore.batch();
+            batch.set(sharedAccountRef, {
+                name: accountName,
+                ownerUserId: userId,
+                inviteCode: null,
+                inviteCodeUpdatedAt: null,
+                createdAt: accountData.createdAt || now,
+                updatedAt: now,
+                sourceAccountId: accountId,
+            });
 
-        batch.set(sharedAccountRef, {
-            name: accountName,
-            ownerUserId: userId,
-            inviteCode: null,
-            inviteCodeUpdatedAt: null,
-            createdAt: accountData.createdAt || now,
-            updatedAt: now,
-            sourceAccountId: accountId,
-        });
+            batch.set(sharedAccountRef.collection('members').doc(userId), buildSharedMemberPayload({
+                userId,
+                role: 'OWNER',
+                now,
+                email: context.auth.token.email || null,
+                displayName: context.auth.token.name || null,
+            }));
 
-        batch.set(sharedAccountRef.collection('members').doc(userId), buildSharedMemberPayload({
-            userId,
-            role: 'OWNER',
-            now,
-            email: context.auth.token.email || null,
-            displayName: context.auth.token.name || null,
-        }));
+            batch.set(userAccountRef, {
+                name: accountName,
+                role: 'OWNER',
+                ownerUserId: userId,
+                sharedAccountId: sharedAccountRef.id,
+                createdAt: accountData.createdAt || now,
+                updatedAt: now,
+            }, { merge: true });
 
-        batch.set(userAccountRef, {
-            name: accountName,
-            role: 'OWNER',
-            ownerUserId: userId,
-            sharedAccountId: sharedAccountRef.id,
-            createdAt: accountData.createdAt || now,
-            updatedAt: now,
-        }, { merge: true });
+            batch.set(userRef, {
+                activeAccountId: accountId,
+                updatedAt: now,
+            }, { merge: true });
 
-        batch.set(userRef, {
-            activeAccountId: accountId,
-            updatedAt: now,
-        }, { merge: true });
+            await batch.commit();
 
-        await batch.commit();
-        await deletePrivateAccountScopedData(userId, accountId);
+            // Step 2: Copy data to shared workspace
+            await copyPrivateAccountScopedDataToSharedWorkspace(userId, accountId, sharedAccountRef.id);
 
-        return {
-            success: true,
-            accountId,
-            sharedAccountId: sharedAccountRef.id,
-            name: accountName,
-            role: 'OWNER',
-        };
+            // Step 3: Delete private data
+            await deletePrivateAccountScopedData(userId, accountId);
+
+            return {
+                success: true,
+                accountId,
+                sharedAccountId: sharedAccountRef.id,
+                name: accountName,
+                role: 'OWNER',
+            };
+        } catch (error) {
+            // Rollback: delete shared account if copy/delete failed
+            try {
+                await sharedAccountRef.delete();
+                await sharedAccountRef.collection('members').doc(userId).delete();
+            } catch (rollbackError) {
+                console.error('Rollback failed:', rollbackError);
+            }
+            throw error;
+        }
     });
 
 export const deleteSharedAccountAccess = functions
@@ -428,13 +467,17 @@ export const createSharedInviteCode = functions
             throw new functions.https.HttpsError('resource-exhausted', 'Gagal membuat kode gabung baru.');
         }
 
+        const now = new Date().toISOString();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
         await firestore.collection('sharedAccounts').doc(accountData.sharedAccountId).set({
             inviteCode: code,
-            inviteCodeUpdatedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            inviteCodeUpdatedAt: now,
+            inviteCodeExpiresAt: expiresAt,
+            updatedAt: now,
         }, { merge: true });
 
-        return { success: true, code };
+        return { success: true, code, expiresAt };
     });
 
 export const joinSharedAccountByCode = functions
@@ -459,7 +502,20 @@ export const joinSharedAccountByCode = functions
         }
 
         const sharedAccountDoc = sharedSnapshot.docs[0];
-        const sharedData = sharedAccountDoc.data() as { name?: string; ownerUserId?: string };
+        const sharedData = sharedAccountDoc.data() as {
+            name?: string;
+            ownerUserId?: string;
+            inviteCodeExpiresAt?: string;
+        };
+
+        // Check expiry
+        if (sharedData.inviteCodeExpiresAt) {
+            const expiresAt = new Date(sharedData.inviteCodeExpiresAt).getTime();
+            if (Date.now() > expiresAt) {
+                throw new functions.https.HttpsError('failed-precondition', 'Kode gabung sudah kadaluarsa.');
+            }
+        }
+
         const userId = context.auth.uid;
         const userRef = firestore.collection('users').doc(userId);
         const existingStubSnapshot = await userRef.collection('accounts')

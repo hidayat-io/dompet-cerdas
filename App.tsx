@@ -648,27 +648,34 @@ function App() {
     if (isOffline || !user) return undefined;
 
     let cancelled = false;
+    const MAX_RETRY_COUNT = 5;
 
     const flushOfflineQueues = async () => {
-      if (!isFlushingAttachmentQueueRef.current) {
-        isFlushingAttachmentQueueRef.current = true;
+      if (isFlushingAttachmentQueueRef.current) return;
+      isFlushingAttachmentQueueRef.current = true;
 
-        try {
-          const jobs = await getOfflineAttachmentUploadJobsForUser(user.uid);
+      try {
+        const jobs = await getOfflineAttachmentUploadJobsForUser(user.uid);
+        let anyChange = false;
 
-          for (const job of jobs) {
-            if (cancelled) break;
+        for (const job of jobs) {
+          if (cancelled) break;
 
-            const accountScope = { id: job.accountId, sharedAccountId: job.sharedAccountId || undefined };
-            const transactionsRef = getScopedCollectionRefForAccount<Transaction>(db, user.uid, accountScope, 'transactions');
-            const txRef = doc(transactionsRef, job.transactionId);
-            const txSnap = await getDoc(txRef);
+          // Skip permanently failed jobs
+          if (job.status === 'failed') continue;
 
-            if (!txSnap.exists()) {
-              await deleteOfflineAttachmentUploadJob(job.id);
-              continue;
-            }
+          const accountScope = { id: job.accountId, sharedAccountId: job.sharedAccountId || undefined };
+          const transactionsRef = getScopedCollectionRefForAccount<Transaction>(db, user.uid, accountScope, 'transactions');
+          const txRef = doc(transactionsRef, job.transactionId);
+          const txSnap = await getDoc(txRef);
 
+          if (!txSnap.exists()) {
+            await deleteOfflineAttachmentUploadJob(job.id);
+            anyChange = true;
+            continue;
+          }
+
+          try {
             const fileExt = job.fileName.split('.').pop();
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const fileToUpload = new File([job.file], job.fileName, {
@@ -696,14 +703,52 @@ function App() {
             }
 
             await deleteOfflineAttachmentUploadJob(job.id);
-          }
+            anyChange = true;
+          } catch (uploadError) {
+            console.error(`Failed to upload attachment for transaction ${job.transactionId}:`, uploadError);
+            console.error("Upload error details:", {
+              message: uploadError instanceof Error ? uploadError.message : String(uploadError),
+              code: (uploadError as any)?.code,
+              name: (uploadError as any)?.name,
+              jobId: job.id,
+              accountId: job.accountId,
+              sharedAccountId: job.sharedAccountId,
+              fileName: job.fileName
+            });
 
-          bumpAttachmentQueueVersion();
-        } catch (error) {
-          console.error('Failed to flush pending attachment uploads:', error);
-        } finally {
-          isFlushingAttachmentQueueRef.current = false;
+            const retryCount = (job.retryCount || 0) + 1;
+            if (retryCount >= MAX_RETRY_COUNT) {
+              await putOfflineAttachmentUploadJob({
+                ...job,
+                retryCount,
+                status: 'failed',
+                updatedAt: new Date().toISOString(),
+              });
+              anyChange = true;
+              showNotification(
+                'error',
+                'Upload Lampiran Gagal',
+                `Upload lampiran untuk transaksi gagal setelah ${MAX_RETRY_COUNT} percobaan. Silakan upload ulang secara manual.`,
+                true
+              );
+            } else {
+              await putOfflineAttachmentUploadJob({
+                ...job,
+                retryCount,
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          }
         }
+
+        // Only bump version if something actually changed, to avoid infinite loop
+        if (anyChange && !cancelled) {
+          bumpAttachmentQueueVersion();
+        }
+      } catch (error) {
+        console.error('Failed to flush pending attachment uploads:', error);
+      } finally {
+        isFlushingAttachmentQueueRef.current = false;
       }
 
       if (hasPendingStorageCleanup()) {
@@ -727,7 +772,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [isOffline, user]);
+  }, [isOffline, user, attachmentQueueVersion]);
 
   useEffect(() => {
     if (!user || isLinkTelegramRoute) return;
@@ -1515,6 +1560,10 @@ function App() {
         return;
       }
 
+      // Clean up offline attachment queue for this account
+      const pendingJobs = await getOfflineAttachmentUploadJobsForScope(user.uid, targetAccount.id);
+      await Promise.all(pendingJobs.map((job) => deleteOfflineAttachmentUploadJob(job.id)));
+
       const collectionsToClear = [
         getCategoriesCollectionRef(db, user.uid, targetAccount.id),
         getPlansCollectionRef(db, user.uid, targetAccount.id),
@@ -1537,6 +1586,7 @@ function App() {
         }, { merge: true });
       }
 
+      bumpAttachmentQueueVersion();
       showNotification('success', 'Akun Dihapus', `Akun Keuangan "${targetAccount.name}" berhasil dihapus.`, true);
     } catch (error) {
       setAccounts(previousAccounts);
@@ -1596,7 +1646,13 @@ function App() {
           };
         }
       } catch (err) {
-        console.error("Upload failed", err);
+        console.error("Upload failed:", err);
+        console.error("Error details:", {
+          message: err instanceof Error ? err.message : String(err),
+          code: (err as any)?.code,
+          name: (err as any)?.name,
+          stack: err instanceof Error ? err.stack : undefined
+        });
         await queueOfflineAttachmentUpload(txRef.id, attachment);
         showNotification('warning', 'Upload Lampiran Ditunda', 'Transaksi sudah disimpan. Lampiran akan dicoba lagi otomatis saat koneksi lebih stabil.', true);
       }
@@ -1691,7 +1747,13 @@ function App() {
           };
           await clearOfflineAttachmentUpload(id);
         } catch (err) {
-          console.error("Upload update failed", err);
+          console.error("Upload update failed:", err);
+          console.error("Error details:", {
+            message: err instanceof Error ? err.message : String(err),
+            code: (err as any)?.code,
+            name: (err as any)?.name,
+            stack: err instanceof Error ? err.stack : undefined
+          });
           await queueOfflineAttachmentUpload(id, attachment, currentAttachmentPath);
           showNotification('warning', 'Upload Lampiran Ditunda', 'Perubahan transaksi sudah disimpan. Lampiran baru akan dicoba lagi otomatis saat koneksi lebih stabil.', true);
         }

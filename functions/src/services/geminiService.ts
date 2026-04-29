@@ -3,10 +3,33 @@
  * Handles receipt analysis using Gemini Vision API
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
+import { escapeMarkdown } from './responseFormatter';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+export function logGeminiError(operation: string, model: string, error: unknown): void {
+    const candidate = error as {
+        status?: unknown;
+        code?: unknown;
+        message?: unknown;
+        response?: { status?: unknown; data?: unknown; body?: unknown; text?: unknown };
+        body?: unknown;
+        data?: unknown;
+    };
+    const body = candidate.response?.data ?? candidate.response?.body ?? candidate.response?.text ?? candidate.body ?? candidate.data;
+
+    console.error('[Gemini] operation failed', {
+        operation,
+        model,
+        status: candidate.status ?? candidate.response?.status,
+        code: candidate.code,
+        message: candidate.message ?? (error instanceof Error ? error.message : String(error)),
+        body: typeof body === 'string' ? body : body ? JSON.stringify(body) : undefined,
+    });
+}
 
 /**
  * Receipt data structure returned by Gemini Vision
@@ -46,20 +69,22 @@ Aturan:
 - Jika audio terlalu tidak jelas untuk ditranskripsikan, return string kosong.
 `.trim();
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: audioBuffer.toString('base64'),
-                    mimeType,
+        const result = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: [
+                prompt,
+                {
+                    inlineData: {
+                        data: audioBuffer.toString('base64'),
+                        mimeType,
+                    }
                 }
-            }
-        ]);
+            ]
+        });
 
-        return result.response.text().replace(/```[\s\S]*?```/g, '').trim();
+        return (result.text || '').replace(/```[\s\S]*?```/g, '').trim();
     } catch (error) {
-        console.error('Error transcribing audio:', error);
+        logGeminiError('transcribeAudioToText', GEMINI_MODEL, error);
         throw new Error('Failed to transcribe audio: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
 }
@@ -105,20 +130,20 @@ Examples:
 - Cat photo → is_receipt: false
 `.trim();
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: imageBuffer.toString('base64'),
-                    mimeType: 'image/jpeg'
+        const result = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: [
+                prompt,
+                {
+                    inlineData: {
+                        data: imageBuffer.toString('base64'),
+                        mimeType: 'image/jpeg'
+                    }
                 }
-            }
-        ]);
+            ]
+        });
 
-        const response = result.response;
-        const text = response.text();
+        const text = result.text || '';
 
         // Clean response - remove markdown code blocks if present
         const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -130,7 +155,7 @@ Examples:
         return receiptData;
 
     } catch (error) {
-        console.error('Error analyzing receipt:', error);
+        logGeminiError('analyzeReceipt', GEMINI_MODEL, error);
         throw new Error('Failed to analyze receipt: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
 }
@@ -147,18 +172,19 @@ export function formatReceiptData(data: ReceiptData, caption?: string, categoryO
     let message = `📸 *Struk berhasil dianalisis!*
 
 💰 Total: Rp ${formattedAmount}
-🏪 Merchant: ${data.merchant}
+🏪 Merchant: ${escapeMarkdown(data.merchant)}
 📅 Tanggal: ${formatDate(data.date)}
-🏷️ Kategori: ${displayCategory}`;
+🏷️ Kategori: ${escapeMarkdown(displayCategory)}`;
 
     // Add caption/description if provided
     if (caption && caption.trim()) {
-        message += `\n📝 Deskripsi: _${caption.trim()}_`;
+        message += `\n📝 Deskripsi: _${escapeMarkdown(caption.trim())}_`;
     }
 
     // Add items if available
     if (data.items && data.items.length > 0) {
-        message += `\n\n📦 Items: ${data.items.slice(0, 3).join(', ')}${data.items.length > 3 ? '...' : ''}`;
+        const escapedItems = data.items.slice(0, 3).map(item => escapeMarkdown(item)).join(', ');
+        message += `\n\n📦 Items: ${escapedItems}${data.items.length > 3 ? '...' : ''}`;
     }
 
     // Add confidence level
@@ -185,7 +211,7 @@ function formatDate(dateStr: string): string {
 /**
  * Generate financial insights using Gemini AI
  * Optimized for financial advisor with strict scope limiting
- * Updated: Using stable gemini-2.0-flash model (Jan 2026)
+ * Updated: Using stable gemini-2.5-flash model (Jan 2026)
  */
 export async function generateFinancialInsights(dataPrompt: string): Promise<string> {
     const result = await generateFinancialInsightsWithUsage(dataPrompt);
@@ -197,12 +223,7 @@ export async function generateFinancialInsights(dataPrompt: string): Promise<str
  */
 export async function generateFinancialInsightsWithUsage(dataPrompt: string): Promise<FinancialInsightsResult> {
     try {
-        const model = genAI.getGenerativeModel({ 
-            model: 'gemini-2.0-flash',
-            systemInstruction: {
-                role: 'system',
-                parts: [{
-                    text: `Kamu adalah AI Financial Advisor untuk DompetCerdas, aplikasi manajemen keuangan personal.
+        const systemInstruction = `Kamu adalah AI Financial Advisor untuk DompetCerdas, aplikasi manajemen keuangan personal.
 
 ATURAN KETAT (WAJIB DIIKUTI):
 1. Kamu HANYA boleh menganalisis data transaksi yang diberikan user
@@ -242,20 +263,21 @@ ATURAN KETAT (WAJIB DIIKUTI):
    - Identifikasi outlier & anomali
    - Berikan rekomendasi spesifik dengan estimasi saving
    - Referensi kategori & transaksi konkret
-   - Gunakan bahasa yang encouraging tapi honest`
-                }]
-            },
-            generationConfig: {
+   - Gunakan bahasa yang encouraging tapi honest`;
+
+        const result = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: dataPrompt,
+            config: {
+                systemInstruction,
                 temperature: 0.7,
                 maxOutputTokens: 1000,
                 topP: 0.9,
                 topK: 40
             }
         });
-        
-        const result = await model.generateContent(dataPrompt);
-        const response = result.response.text();
-        const usage = (result.response as any)?.usageMetadata;
+        const response = result.text || '';
+        const usage = result.usageMetadata;
         const estimatedPromptTokens = Math.ceil(dataPrompt.length / 4);
         const estimatedResponseTokens = Math.ceil(response.length / 4);
         const promptTokens = usage?.promptTokenCount ?? estimatedPromptTokens;
@@ -280,7 +302,7 @@ ATURAN KETAT (WAJIB DIIKUTI):
         };
         
     } catch (error) {
-        console.error('Error generating financial insights:', error);
+        logGeminiError('generateFinancialInsightsWithUsage', GEMINI_MODEL, error);
         throw new Error('Gagal menghasilkan insight keuangan. Coba lagi atau hubungi support.');
     }
 }

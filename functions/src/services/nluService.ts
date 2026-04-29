@@ -3,11 +3,13 @@
  * Parses Indonesian natural language messages into structured intents using Gemini AI
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { getJakartaDateString, getJakartaDate } from '../utils/date';
+import { logGeminiError } from './geminiService';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 /**
  * Supported intent types
@@ -805,10 +807,11 @@ Contoh:
 "pengeluaran apa yang bisa aku potong tanpa suffering?" → intent: expense_analysis, time_range: this_month, confidence: high
 `.trim();
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-        const text = response.text();
+        const result = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: prompt
+        });
+        const text = result.text || '';
 
         // Clean response - extract JSON object specifically
         const firstBrace = text.indexOf('{');
@@ -869,7 +872,7 @@ Contoh:
         return parsedIntent;
 
     } catch (error) {
-        console.error('Error parsing intent:', error);
+        logGeminiError('parseIntent', GEMINI_MODEL, error);
 
         const simpleFallback = detectSimpleIntent(message);
         if (simpleFallback) {
@@ -921,25 +924,31 @@ Return ONLY valid JSON (no markdown, no code blocks):
 }
 `.trim();
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
+    try {
+        const result = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: prompt
+        });
+        const text = result.text || '';
 
-    const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleanText) as {
-        categoryId?: string;
-        categoryName?: string;
-        confidence?: 'high' | 'medium' | 'low';
-    };
+        const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const parsed = JSON.parse(cleanText) as {
+            categoryId?: string;
+            categoryName?: string;
+            confidence?: 'high' | 'medium' | 'low';
+        };
 
-    if (!parsed.categoryId || !parsed.categoryName) {
-        throw new Error('Invalid category classification response');
+        if (!parsed.categoryId || !parsed.categoryName) {
+            throw new Error('Invalid category classification response');
+        }
+
+        return {
+            categoryId: parsed.categoryId,
+            categoryName: parsed.categoryName,
+            confidence: parsed.confidence || 'medium'
+        };
+    } catch (error) {
+        logGeminiError('classifyCategory', GEMINI_MODEL, error);
+        throw error;
     }
-
-    return {
-        categoryId: parsed.categoryId,
-        categoryName: parsed.categoryName,
-        confidence: parsed.confidence || 'medium'
-    };
 }

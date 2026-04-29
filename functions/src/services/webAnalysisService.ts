@@ -285,47 +285,50 @@ function getLimitDocRef(userId: string) {
 
 async function checkAndReserveDailyBudget(userId: string) {
     const ref = getLimitDocRef(userId);
-    const snapshot = await ref.get();
     const now = Date.now();
 
-    let data = snapshot.exists ? snapshot.data() || {} : {};
-    let dayStart = typeof data.dayStart === 'number' ? data.dayStart : now;
-    let dailyTokensUsed = typeof data.dailyTokensUsed === 'number' ? data.dailyTokensUsed : 0;
-    let dailyRequests = typeof data.dailyRequests === 'number' ? data.dailyRequests : 0;
-    const lastRequest = typeof data.lastRequest === 'number' ? data.lastRequest : 0;
+    return getDb().runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(ref);
 
-    if (now - dayStart >= 86400000) {
-        dayStart = now;
-        dailyTokensUsed = 0;
-        dailyRequests = 0;
-    }
+        let data = snapshot.exists ? snapshot.data() || {} : {};
+        let dayStart = typeof data.dayStart === 'number' ? data.dayStart : now;
+        let dailyTokensUsed = typeof data.dailyTokensUsed === 'number' ? data.dailyTokensUsed : 0;
+        let dailyRequests = typeof data.dailyRequests === 'number' ? data.dailyRequests : 0;
+        const lastRequest = typeof data.lastRequest === 'number' ? data.lastRequest : 0;
 
-    if (lastRequest && now - lastRequest < WEB_ANALYSIS_LIMITS.cooldownMs) {
-        const waitSeconds = Math.ceil((WEB_ANALYSIS_LIMITS.cooldownMs - (now - lastRequest)) / 1000);
-        throw new Error(`Mohon tunggu ${waitSeconds} detik sebelum analisis berikutnya.`);
-    }
+        if (now - dayStart >= 86400000) {
+            dayStart = now;
+            dailyTokensUsed = 0;
+            dailyRequests = 0;
+        }
 
-    if (dailyRequests >= WEB_ANALYSIS_LIMITS.dailyRequestLimit) {
-        throw new Error(`Batas analisis harian tercapai (${WEB_ANALYSIS_LIMITS.dailyRequestLimit} analisis per hari).`);
-    }
+        if (lastRequest && now - lastRequest < WEB_ANALYSIS_LIMITS.cooldownMs) {
+            const waitSeconds = Math.ceil((WEB_ANALYSIS_LIMITS.cooldownMs - (now - lastRequest)) / 1000);
+            throw new Error(`Mohon tunggu ${waitSeconds} detik sebelum analisis berikutnya.`);
+        }
 
-    const estimatedRequestTokens = WEB_ANALYSIS_LIMITS.estimatedMaxPromptTokens + WEB_ANALYSIS_LIMITS.estimatedMaxResponseTokens;
-    if (dailyTokensUsed + estimatedRequestTokens > WEB_ANALYSIS_LIMITS.dailyTokenLimit) {
-        throw new Error(`Batas token harian tercapai (${WEB_ANALYSIS_LIMITS.dailyTokenLimit.toLocaleString('id-ID')} token per hari).`);
-    }
+        if (dailyRequests >= WEB_ANALYSIS_LIMITS.dailyRequestLimit) {
+            throw new Error(`Batas analisis harian tercapai (${WEB_ANALYSIS_LIMITS.dailyRequestLimit} analisis per hari).`);
+        }
 
-    await ref.set({
-        dayStart,
-        dailyTokensUsed,
-        dailyRequests: dailyRequests + 1,
-        lastRequest: now,
-        updatedAt: now,
-    }, { merge: true });
+        const estimatedRequestTokens = WEB_ANALYSIS_LIMITS.estimatedMaxPromptTokens + WEB_ANALYSIS_LIMITS.estimatedMaxResponseTokens;
+        if (dailyTokensUsed + estimatedRequestTokens > WEB_ANALYSIS_LIMITS.dailyTokenLimit) {
+            throw new Error(`Batas token harian tercapai (${WEB_ANALYSIS_LIMITS.dailyTokenLimit.toLocaleString('id-ID')} token per hari).`);
+        }
 
-    return {
-        dayStart,
-        dailyTokensUsed,
-    };
+        transaction.set(ref, {
+            dayStart,
+            dailyTokensUsed,
+            dailyRequests: dailyRequests + 1,
+            lastRequest: now,
+            updatedAt: now,
+        }, { merge: true });
+
+        return {
+            dayStart,
+            dailyTokensUsed,
+        };
+    });
 }
 
 async function commitUsage(userId: string, previousDailyTokensUsed: number, totalTokens: number) {
