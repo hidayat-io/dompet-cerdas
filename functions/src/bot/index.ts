@@ -286,7 +286,17 @@ async function resolveCategoryChoice(
     }
 
     try {
-        return await classifyCategory(description, categories);
+        const result = await classifyCategory(description, categories);
+        if (result.confidence === 'low') {
+            const isIncome = normalizedHint === 'income' || /gaji|salary|bonus|thr|fee|bayaran|komisi|income|pemasukan/i.test(description);
+            const fallbackCategory = getFallbackCategory(categories, isIncome ? 'INCOME' : 'EXPENSE');
+            return {
+                categoryId: fallbackCategory.id,
+                categoryName: fallbackCategory.name,
+                confidence: 'low'
+            };
+        }
+        return result;
     } catch (classificationError) {
         console.error('Category classification failed:', classificationError);
         const fallbackCategory = getFallbackCategory(

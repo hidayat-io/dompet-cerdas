@@ -121,12 +121,25 @@ export function getFallbackCategory(
     categories: UserCategory[],
     preferredType: CategoryTypePreference = 'EXPENSE'
 ): UserCategory {
+    // Priority 1: Belanja/Shopping category (default for unrecognized expense)
+    if (preferredType === 'EXPENSE') {
+        const belanjaNames = new Set(['belanja', 'shopping', 'belanja harian']);
+        const belanjaCategory = categories.find((category) =>
+            category.type === 'EXPENSE' && belanjaNames.has(category.name.toLowerCase())
+        );
+        if (belanjaCategory) {
+            return belanjaCategory;
+        }
+    }
+
+    // Priority 2: Lainnya/Other category
     const fallbackNames = new Set(['lainnya', 'other', 'others']);
     const otherCategory = categories.find((category) => fallbackNames.has(category.name.toLowerCase()));
     if (otherCategory) {
         return otherCategory;
     }
 
+    // Priority 3: First category matching preferred type
     const preferredCategory = categories.find((category) => category.type === preferredType);
     if (preferredCategory) {
         return preferredCategory;

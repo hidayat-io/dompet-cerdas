@@ -75,7 +75,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const { theme } = useTheme();
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [displayAmount, setDisplayAmount] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [categoryId, setCategoryId] = useState(() => {
+    if (initialData) return initialData.categoryId || '';
+    const belanja = categories.find(c => c.type === 'EXPENSE' && c.name.toLowerCase() === 'belanja');
+    return belanja?.id || '';
+  });
   const [date, setDate] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -156,7 +160,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   useEffect(() => {
     if (!initialData || categories.find(c => c.id === initialData.categoryId)?.type !== type) {
       const currentCat = categories.find(c => c.id === categoryId);
-      if (currentCat && currentCat.type !== type) setCategoryId('');
+      if (currentCat && currentCat.type !== type) {
+        const belanja = categories.find(c => c.type === 'EXPENSE' && c.name.toLowerCase() === 'belanja');
+        setCategoryId(type === 'EXPENSE' ? (belanja?.id || '') : '');
+      }
     }
     setError('');
   }, [type, categories, categoryId, initialData]);
