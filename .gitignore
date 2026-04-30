@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output (dist is included for deployment)
-# dist/
+# Build output
+dist/
 build/
 
 # Environment variables
