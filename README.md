@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.3
+# DompetCerdas - Smart Expense Tracker v2.8.4
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -53,11 +53,21 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.3`
-- **Build Date**: `April 5, 2026`
-- **Status**: Release dengan toggle tema global yang lebih natural di desktop/mobile dan halaman Settings yang lebih fokus
+- **Version**: `v2.8.4`
+- **Build Date**: `April 30, 2026`
+- **Status**: Fix Telegram bot photo upload, migrasi Gemini SDK terbaru, dan perbaikan default kategori
 
 ## Changelog
+
+### v2.8.4 - April 30, 2026
+- Fix Telegram bot gagal scan foto struk: migrasi dari SDK deprecated `@google/generative-ai` ke `@google/genai`, dan update model dari `gemini-2.0-flash` ke `gemini-2.5-flash`.
+- Tambah idempotency lock berbasis Firestore untuk Telegram `update_id` agar retry dari Telegram tidak memanggil Gemini berulang dan memicu 429.
+- Tambah structured error logging untuk Gemini API agar error 429/quota lebih mudah didiagnosis dari log.
+- Matikan Gemini fallback untuk caption category secara default sehingga upload struk hanya melakukan 1 call Gemini.
+- Fix Markdown escaping di pesan konfirmasi struk bot agar tidak ditolak Telegram karena karakter spesial.
+- Sanitize objek transaksi sebelum disimpan ke Firestore untuk mencegah error field undefined.
+- Default kategori form web dan bot Telegram sekarang **Belanja** untuk transaksi EXPENSE yang tidak dikenali.
+- Kategori Belanja/Shopping ditampilkan di urutan pertama di pilihan kategori form transaksi.
 
 ### v2.8.3 - April 5, 2026
 - Toggle tema dipindah keluar dari Settings dan ditempatkan di shell aplikasi supaya user bisa ganti tema langsung dari desktop sidebar atau bar akun mobile.

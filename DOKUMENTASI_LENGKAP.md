@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.3
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.4
 
 **Status**: ✅ Fully Documented
-**Last Updated**: April 5, 2026
-**Version**: 2.8.3
+**Last Updated**: April 30, 2026
+**Version**: 2.8.4
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -905,6 +905,16 @@ firebase functions:log
 - Toggle tema dipindah keluar dari Settings dan ditempatkan di shell aplikasi supaya user bisa ganti tema langsung dari desktop sidebar atau bar akun mobile.
 - Desktop sidebar dirapikan lagi agar aksi tema menyatu dengan kartu user, bukan berdiri sendiri di bar logo.
 - Panel tema di Settings dihapus supaya halaman fokus ke pengaturan akun, Telegram, export, dan tindakan administratif.
+
+### v2.8.4 - April 30, 2026
+- Fix Telegram bot gagal scan foto struk: migrasi SDK `@google/generative-ai` ke `@google/genai`, dan model dari `gemini-2.0-flash` ke `gemini-2.5-flash`.
+- Tambah idempotency lock berbasis Firestore untuk Telegram `update_id` agar retry tidak memanggil Gemini berulang dan memicu 429.
+- Tambah structured error logging untuk Gemini API agar error 429/quota lebih mudah didiagnosis dari Cloud Logging.
+- Matikan Gemini fallback untuk caption category secara default sehingga upload struk hanya 1 call Gemini.
+- Fix Markdown escaping di pesan konfirmasi struk bot agar tidak ditolak Telegram karena karakter spesial.
+- Sanitize objek transaksi sebelum disimpan ke Firestore untuk mencegah error field undefined.
+- Default kategori form web dan bot Telegram sekarang **Belanja** untuk transaksi EXPENSE yang tidak dikenali atau confidence rendah.
+- Kategori Belanja/Shopping ditampilkan di urutan pertama di pilihan kategori form transaksi.
 
 ### v2.8.0 - March 30, 2026
 - Fondasi PWA diselesaikan dengan service worker, offline fallback, prompt update versi, dan Firestore local persistence.
