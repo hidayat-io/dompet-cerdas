@@ -155,7 +155,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, categories]);
 
-  const filteredCategories = categories.filter(c => c.type === type);
+  const filteredCategories = categories
+    .filter(c => c.type === type)
+    .sort((a, b) => {
+      const isBelanjaA = ['belanja', 'shopping'].includes(a.name.toLowerCase());
+      const isBelanjaB = ['belanja', 'shopping'].includes(b.name.toLowerCase());
+      if (isBelanjaA && !isBelanjaB) return -1;
+      if (!isBelanjaA && isBelanjaB) return 1;
+      return 0;
+    });
 
   useEffect(() => {
     if (!initialData || categories.find(c => c.id === initialData.categoryId)?.type !== type) {
