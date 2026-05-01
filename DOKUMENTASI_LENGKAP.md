@@ -509,7 +509,7 @@ Kalau instruksi yang dipakai adalah `Lakukan finishing`, artinya langkah berikut
 1. cek dokumentasi yang relevan dan pastikan perubahan terbaru sudah tercatat
 2. baca seluruh `git diff` dan pahami semua perubahan yang ada di worktree, termasuk yang bukan hasil kerja agent saat ini
 3. commit semua perubahan di worktree agar hasil akhir kembali clean, bukan hanya file yang disentuh pada sesi ini
-4. update versi app dan dokumentasi, lalu tambahkan changelog untuk versi terbaru
+4. update versi app dan dokumentasi, update tanggal build di `constants.ts`, lalu tambahkan changelog untuk versi terbaru
 5. `git commit` dan `git push`
 6. deploy bila perubahan belum dirilis
 
