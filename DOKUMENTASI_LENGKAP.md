@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.4
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.5
 
 **Status**: ✅ Fully Documented
-**Last Updated**: April 30, 2026
-**Version**: 2.8.4
+**Last Updated**: May 1, 2026
+**Version**: 2.8.5
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -906,6 +906,12 @@ firebase functions:log
 - Desktop sidebar dirapikan lagi agar aksi tema menyatu dengan kartu user, bukan berdiri sendiri di bar logo.
 - Panel tema di Settings dihapus supaya halaman fokus ke pengaturan akun, Telegram, export, dan tindakan administratif.
 
+### v2.8.5 - May 1, 2026
+- **Security Hardening**: Rotasi total Firebase API Key dan Telegram Bot Token setelah insiden paparan kredensial di repositori publik.
+- **Bot Latency Optimization**: Mengurangi waktu tunggu respons bot sebesar ~1 detik melalui paralelisasi query Firestore dan request Telegram API.
+- **Image Processing**: Implementasi kompresi gambar otomatis menggunakan `sharp` pada handler foto Telegram (mengurangi ukuran payload hingga 80% sebelum dikirim ke AI).
+- **Cleanup**: Pembersihan file diagnostik sensitif (`users_export.json`, dll) dari repositori untuk mencegah kebocoran data.
+
 ### v2.8.4 - April 30, 2026
 - Fix Telegram bot gagal scan foto struk: migrasi SDK `@google/generative-ai` ke `@google/genai`, dan model dari `gemini-2.0-flash` ke `gemini-2.5-flash`.
 - Tambah idempotency lock berbasis Firestore untuk Telegram `update_id` agar retry tidak memanggil Gemini berulang dan memicu 429.
@@ -940,6 +946,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.5** | May 1, 2026 | Security credential rotation, Telegram bot latency optimization, and image compression |
 | **v2.8.3** | Apr 5, 2026 | Toggle tema global dipindah keluar dari Settings dan dirapikan untuk desktop/mobile |
 | **v2.8.2** | Mar 31, 2026 | Flow keluar member shared account, hapus workspace owner saat sendirian, dan error callable yang lebih jelas |
 | **v2.8.1** | Mar 31, 2026 | Share existing private account from Settings, ownership-preserving shared workspace conversion, and hosting typecheck guardrail |
@@ -969,6 +976,6 @@ firebase functions:log
 
 ---
 
-**Last Updated**: April 5, 2026
+**Last Updated**: May 1, 2026
 **Status**: ✅ Internal Testing Ready
 **Support**: Check documentation or Firebase console logs

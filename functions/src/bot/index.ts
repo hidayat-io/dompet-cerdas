@@ -568,18 +568,26 @@ async function handleMessage(msg: TelegramBot.Message): Promise<void> {
         return;
     }
 
-    // Update last interaction
-    await updateLastInteraction(telegramId);
-
-    // Handle commands
+    // Handle commands first (no DB query needed for simple command routing)
     if (text.startsWith('/')) {
+        // Fire-and-forget: update timestamp without blocking the user
+        updateLastInteraction(telegramId).catch(err => 
+            console.error('[BOT] updateLastInteraction failed (background):', err)
+        );
         await handleCommand(msg);
         return;
     }
 
-    // Check if user is linked
-    const userId = await checkTelegramLink(telegramId);
-    if (!userId) {
+    // ✅ Optimization: SINGLE query for all needs
+    const telegramAccountState = await getTelegramAccountState(telegramId);
+    
+    // Fire-and-forget: update timestamp in background
+    updateLastInteraction(telegramId).catch(err => 
+        console.error('[BOT] updateLastInteraction failed (background):', err)
+    );
+
+    // Check if user is linked (using data we already have)
+    if (!telegramAccountState) {
         await getBot().sendMessage(
             chatId,
             '⚠️ Akun belum terhubung. Ketik /start untuk menghubungkan akun.'
@@ -587,7 +595,7 @@ async function handleMessage(msg: TelegramBot.Message): Promise<void> {
         return;
     }
 
-    const telegramAccountState = await getTelegramAccountState(telegramId);
+    const userId = telegramAccountState.userId;
 
     // Handle photo (receipt upload)
     if (msg.photo) {
@@ -785,14 +793,15 @@ async function handlePhotoMessage(
             return;
         }
 
-        // Send analyzing message
-        const analyzingMsg = await getBot().sendMessage(
-            chatId,
-            '📸 Menganalisis struk...\n\nMohon tunggu beberapa detik...'
-        );
+        // Send analyzing message and get file link in parallel
+        const [analyzingMsg, fileLink] = await Promise.all([
+            getBot().sendMessage(
+                chatId,
+                '📸 Menganalisis struk...\n\nMohon tunggu beberapa detik...'
+            ),
+            getBot().getFileLink(photo.file_id)
+        ]);
 
-        // Download photo from Telegram
-        const fileLink = await getBot().getFileLink(photo.file_id);
         const response = await fetch(fileLink);
 
         if (!response.ok) {
@@ -800,10 +809,31 @@ async function handlePhotoMessage(
         }
 
         const arrayBuffer = await response.arrayBuffer();
-        const imageBuffer = Buffer.from(arrayBuffer);
+        let imageBuffer = Buffer.from(arrayBuffer);
 
-        // Analyze receipt with Gemini Vision
-        const receiptData = await analyzeReceipt(imageBuffer);
+        // Compress image before sending to Gemini to speed up upload and processing
+        const sharp = require('sharp');
+        try {
+            const originalSize = imageBuffer.length;
+            imageBuffer = await sharp(imageBuffer)
+                .resize(1600, 1600, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .jpeg({ quality: 80 })
+                .toBuffer();
+            
+            console.log(`[PHOTO] Image compressed: ${(originalSize / 1024).toFixed(1)}KB -> ${(imageBuffer.length / 1024).toFixed(1)}KB`);
+        } catch (sharpError) {
+            console.error('[PHOTO] Sharp compression failed, falling back to original image:', sharpError);
+            // Fallback to original buffer if compression fails
+        }
+
+        // Analyze receipt with Gemini Vision and fetch categories in parallel to save time
+        const [receiptData, categories] = await Promise.all([
+            analyzeReceipt(imageBuffer),
+            getUserCategories(userId, false, telegramAccountState?.defaultAccountId)
+        ]);
 
         // Validation: Check if it's a receipt
         if (receiptData.is_receipt === false) {
@@ -825,7 +855,6 @@ async function handlePhotoMessage(
             return;
         }
 
-        const categories = await getUserCategories(userId, false, telegramAccountState?.defaultAccountId);
         const captionCategoryName = await resolveCaptionCategoryName(photoCaption, categories);
         const cleanedCaption = cleanCaptionDescription(photoCaption);
 
@@ -833,40 +862,43 @@ async function handlePhotoMessage(
         // Create session ID (short random string max 10 chars)
         const sessionId = require('crypto').randomBytes(4).toString('hex');
 
-        // Store in Firestore temporary session
-        await getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
-            userId,
-            telegramId: msg.from!.id,
-            receiptData,
-            photoFileId: photo.file_id,
-            photoCaption: cleanedCaption, // Store cleaned caption without category keyword
-            status: 'pending',
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-        }));
-
-        // Format confirmation message with caption
+        // Format confirmation message with caption (synchronous)
         const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
         const messageWithHeader = responseFormatter.withAccountHeader(
             confirmationText,
             telegramAccountState?.defaultAccountName
         );
 
-        // Edit analyzing message with confirmation
-        await getBot().editMessageText(
-            messageWithHeader,
-            {
-                chat_id: chatId,
-                message_id: analyzingMsg.message_id,
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [[
-                        { text: '✅ Ya, Simpan', callback_data: `c_${sessionId}` },
-                        { text: '❌ Batal', callback_data: `x_${sessionId}` }
-                    ]]
+        // ✅ Optimization: Execute session write and message edit in parallel
+        await Promise.all([
+            // 1. Store in Firestore temporary session
+            getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
+                userId,
+                telegramId: msg.from!.id,
+                receiptData,
+                photoFileId: photo.file_id,
+                photoCaption: cleanedCaption,
+                status: 'pending',
+                createdAt: new Date(),
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+            })),
+            
+            // 2. Edit analyzing message with confirmation
+            getBot().editMessageText(
+                messageWithHeader,
+                {
+                    chat_id: chatId,
+                    message_id: analyzingMsg.message_id,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: '✅ Ya, Simpan', callback_data: `c_${sessionId}` },
+                            { text: '❌ Batal', callback_data: `x_${sessionId}` }
+                        ]]
+                    }
                 }
-            }
-        );
+            )
+        ]);
 
     } catch (error) {
         console.error('Error handling photo:', error);
@@ -920,14 +952,15 @@ async function handleDocumentMessage(
             return;
         }
 
-        // Send analyzing message
-        const analyzingMsg = await getBot().sendMessage(
-            chatId,
-            '📄 Menganalisis file...\n\nMohon tunggu beberapa detik...'
-        );
+        // Send analyzing message and get file link in parallel
+        const [analyzingMsg, fileLink] = await Promise.all([
+            getBot().sendMessage(
+                chatId,
+                '📄 Menganalisis file...\n\nMohon tunggu beberapa detik...'
+            ),
+            getBot().getFileLink(document.file_id)
+        ]);
 
-        // Download file from Telegram
-        const fileLink = await getBot().getFileLink(document.file_id);
         const response = await fetch(fileLink);
 
         if (!response.ok) {
@@ -974,8 +1007,11 @@ async function handleDocumentMessage(
             return;
         }
 
-        // Analyze receipt with Gemini Vision
-        const receiptData = await analyzeReceipt(imageBuffer);
+        // Analyze receipt with Gemini Vision and fetch categories in parallel to save time
+        const [receiptData, categories] = await Promise.all([
+            analyzeReceipt(imageBuffer),
+            getUserCategories(userId, false, telegramAccountState?.defaultAccountId)
+        ]);
 
         // Validation: Check if it's a receipt/invoice/proof
         if (receiptData.is_receipt === false) {
@@ -1007,48 +1043,50 @@ async function handleDocumentMessage(
             return;
         }
 
-        const categories = await getUserCategories(userId, false, telegramAccountState?.defaultAccountId);
         const captionCategoryName = await resolveCaptionCategoryName(documentCaption, categories);
         const cleanedCaption = cleanCaptionDescription(documentCaption);
 
         // Create session ID for confirmation
         const sessionId = require('crypto').randomBytes(4).toString('hex');
 
-        // Store in Firestore temporary session
-        await getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
-            userId,
-            telegramId: msg.from!.id,
-            receiptData,
-            photoFileId: document.file_id,
-            photoCaption: cleanedCaption, // Store cleaned caption without category keyword
-            status: 'pending',
-            source: 'document', // Mark as document source
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-        }));
-
-        // Format confirmation message with caption
+        // Format confirmation message with caption (synchronous)
         const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
         const messageWithHeader = responseFormatter.withAccountHeader(
             confirmationText,
             telegramAccountState?.defaultAccountName
         );
 
-        // Edit analyzing message with confirmation
-        await getBot().editMessageText(
-            messageWithHeader,
-            {
-                chat_id: chatId,
-                message_id: analyzingMsg.message_id,
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [[
-                        { text: '✅ Ya, Simpan', callback_data: `c_${sessionId}` },
-                        { text: '❌ Batal', callback_data: `x_${sessionId}` }
-                    ]]
+        // ✅ Optimization: Execute session write and message edit in parallel
+        await Promise.all([
+            // 1. Store in Firestore temporary session
+            getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
+                userId,
+                telegramId: msg.from!.id,
+                receiptData,
+                photoFileId: document.file_id,
+                photoCaption: cleanedCaption,
+                status: 'pending',
+                source: 'document',
+                createdAt: new Date(),
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+            })),
+            
+            // 2. Edit analyzing message with confirmation
+            getBot().editMessageText(
+                messageWithHeader,
+                {
+                    chat_id: chatId,
+                    message_id: analyzingMsg.message_id,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: '✅ Ya, Simpan', callback_data: `c_${sessionId}` },
+                            { text: '❌ Batal', callback_data: `x_${sessionId}` }
+                        ]]
+                    }
                 }
-            }
-        );
+            )
+        ]);
 
     } catch (error) {
         console.error('Error handling document:', error);
