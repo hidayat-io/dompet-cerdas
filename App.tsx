@@ -1233,7 +1233,8 @@ function App() {
         (snapshot) => {
           if (!isCurrentListener()) return;
           updatePendingSyncKey('categories', snapshot.metadata.hasPendingWrites);
-          const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category));
+          const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category))
+            .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
           setCategories(data);
         },
         (error) => {
@@ -1851,6 +1852,20 @@ function App() {
     const categoriesRef = getActiveScopedCollection<Category>('categories');
     if (!categoriesRef) return;
     await deleteDoc(doc(categoriesRef, id));
+    await refreshCategoryCache();
+  };
+
+  const reorderCategories = async (orderedCategories: Category[]) => {
+    if (!user || !activeAccount) return;
+    const categoriesRef = getActiveScopedCollection<Category>('categories');
+    if (!categoriesRef) return;
+    
+    const batch = writeBatch(db);
+    orderedCategories.forEach((cat, index) => {
+      const catRef = doc(categoriesRef, cat.id);
+      batch.update(catRef as any, { order: index });
+    });
+    await batch.commit();
     await refreshCategoryCache();
   };
 
@@ -2760,6 +2775,7 @@ function App() {
                   onAddCategory={addCategory}
                   onUpdateCategory={updateCategory}
                   onDeleteCategory={deleteCategory}
+                  onReorderCategories={reorderCategories}
                 />
               )}
               {currentView === 'AI_ADVISOR' && (

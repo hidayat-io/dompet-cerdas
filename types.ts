@@ -40,6 +40,7 @@ export interface Category {
   color: string; // Hex color
   createdByUserId?: string;
   createdByName?: string;
+  order?: number;
 }
 
 // Attachment structure

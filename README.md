@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.6
+# DompetCerdas - Smart Expense Tracker v2.8.7
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -53,11 +53,14 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.6`
+- **Version**: `v2.8.7`
 - **Build Date**: `May 14, 2026`
-- **Status**: Fitur edit transaksi oleh Owner pada akun bersama dengan pelacakan riwayat updater.
+- **Status**: Fitur pengurutan kategori dengan drag and drop.
 
 ## Changelog
+
+### v2.8.7 - May 14, 2026
+- Fitur *drag and drop* kategori di Master Kategori yang otomatis tersinkronisasi ke daftar urutan kategori pada Form Transaksi.
 
 ### v2.8.6 - May 14, 2026
 - Tambah kondisi bagi owner dari akun bersama untuk bisa mengedit transaksi buatan member lain.

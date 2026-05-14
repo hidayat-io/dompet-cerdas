@@ -21,13 +21,63 @@ interface CategoryManagerProps {
   onAddCategory: (category: Omit<Category, 'id'>) => Promise<string | undefined>;
   onUpdateCategory: (id: string, category: Omit<Category, 'id'>) => void;
   onDeleteCategory: (id: string) => void;
+  onReorderCategories?: (orderedCategories: Category[]) => void;
 }
 
-const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, currentUserId, onAddCategory, onUpdateCategory, onDeleteCategory }) => {
+const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, currentUserId, onAddCategory, onUpdateCategory, onDeleteCategory, onReorderCategories }) => {
   const { theme } = useTheme();
   const [isAdding, setIsAdding] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    setDraggedCategoryId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== dragOverCategoryId) {
+      setDragOverCategoryId(id);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    e.preventDefault();
+    setDragOverCategoryId(id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCategoryId(null);
+    setDragOverCategoryId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string, type: 'INCOME' | 'EXPENSE') => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    setDraggedCategoryId(null);
+    setDragOverCategoryId(null);
+
+    if (!draggedId || draggedId === targetId) return;
+
+    const filtered = categories.filter(c => c.type === type);
+    const draggedIndex = filtered.findIndex(c => c.id === draggedId);
+    const targetIndex = filtered.findIndex(c => c.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newFiltered = [...filtered];
+    const [removed] = newFiltered.splice(draggedIndex, 1);
+    newFiltered.splice(targetIndex, 0, removed);
+
+    if (onReorderCategories) {
+      onReorderCategories(newFiltered);
+    }
+  };
 
   const handleCloseModal = () => {
     setIsAdding(false);
@@ -75,6 +125,12 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, currentUs
             {filtered.map(cat => (
               <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={cat.id}>
                 <Card
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, cat.id)}
+                  onDragOver={(e) => handleDragOver(e, cat.id)}
+                  onDragEnter={(e) => handleDragEnter(e, cat.id)}
+                  onDragEnd={handleDragEnd}
+                  onDrop={(e) => handleDrop(e, cat.id, type)}
                   variant="outlined"
                   sx={{
                     p: 2,
@@ -82,6 +138,10 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, currentUs
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     borderRadius: 3,
+                    cursor: 'grab',
+                    opacity: draggedCategoryId === cat.id ? 0.4 : 1,
+                    transform: dragOverCategoryId === cat.id && draggedCategoryId !== cat.id ? 'scale(1.02)' : 'none',
+                    border: dragOverCategoryId === cat.id && draggedCategoryId !== cat.id ? `2px dashed ${color}` : undefined,
                     transition: 'all 0.2s',
                     '&:hover': { 
                       boxShadow: 2, 
