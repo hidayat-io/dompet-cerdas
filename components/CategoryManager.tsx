@@ -1,4 +1,22 @@
 import React, { useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -15,6 +33,101 @@ import ConfirmDialog from './ConfirmDialog';
 import CategoryFormModal from './CategoryFormModal';
 import PageHeader from './PageHeader';
 
+interface SortableCategoryItemProps {
+  cat: Category;
+  color: string;
+  bgColor: string;
+  type: 'INCOME' | 'EXPENSE';
+  canEdit: boolean;
+  onEdit: (cat: Category) => void;
+  onDelete: (cat: Category) => void;
+}
+
+const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ cat, color, bgColor, type, canEdit, onEdit, onDelete }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: cat.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 0,
+    position: 'relative' as const,
+  };
+
+  return (
+    <Grid size={{ xs: 12, sm: 6, lg: 4 }} ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <Card
+        variant="outlined"
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderRadius: 3,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          border: isDragging ? `2px dashed ${color}` : undefined,
+          transition: 'box-shadow 0.2s',
+          '&:hover': { 
+            boxShadow: 2, 
+            borderColor: color,
+            bgcolor: type === 'INCOME' ? 'rgba(16, 185, 129, 0.02)' : 'rgba(239, 68, 68, 0.02)'
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
+          <Avatar
+            sx={{
+              width: 48,
+              height: 48,
+              bgcolor: cat.color,
+              flexShrink: 0,
+            }}
+          >
+            <IconDisplay name={cat.icon} size={24} sx={{ color: '#fff' }} />
+          </Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography fontWeight={700} variant="subtitle2" noWrap>{cat.name}</Typography>
+            <Chip
+              label={type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
+              size="small"
+              sx={{ bgcolor: bgColor, color, fontWeight: 700, fontSize: 10, height: 20, mt: 0.5 }}
+            />
+          </Box>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, pl: 1 }}>
+          <IconButton
+            size="small"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onEdit(cat); }}
+            disabled={!canEdit}
+            title="Edit Kategori"
+            sx={{ color: 'text.secondary', bgcolor: 'action.hover', '&:hover': { color: 'info.main', bgcolor: 'info.main' + '14' } }}
+          >
+            <IconDisplay name="Edit2" size={16} />
+          </IconButton>
+          <IconButton
+            size="small"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onDelete(cat); }}
+            disabled={!canEdit}
+            title="Hapus Kategori"
+            sx={{ color: 'text.secondary', bgcolor: 'action.hover', '&:hover': { color: 'error.main', bgcolor: 'error.main' + '14' } }}
+          >
+            <IconDisplay name="Trash2" size={16} />
+          </IconButton>
+        </Box>
+      </Card>
+    </Grid>
+  );
+};
+
 interface CategoryManagerProps {
   categories: Category[];
   currentUserId?: string | null;
@@ -29,53 +142,26 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, currentUs
   const [isAdding, setIsAdding] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
-  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
-  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    setDraggedCategoryId(id);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (id !== dragOverCategoryId) {
-      setDragOverCategoryId(id);
-    }
-  };
+  const handleDragEnd = (event: DragEndEvent, type: 'INCOME' | 'EXPENSE') => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const filtered = categories.filter(c => c.type === type);
+      const oldIndex = filtered.findIndex(c => c.id === active.id);
+      const newIndex = filtered.findIndex(c => c.id === over.id);
 
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    e.preventDefault();
-    setDragOverCategoryId(id);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedCategoryId(null);
-    setDragOverCategoryId(null);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string, type: 'INCOME' | 'EXPENSE') => {
-    e.preventDefault();
-    const draggedId = e.dataTransfer.getData('text/plain');
-    setDraggedCategoryId(null);
-    setDragOverCategoryId(null);
-
-    if (!draggedId || draggedId === targetId) return;
-
-    const filtered = categories.filter(c => c.type === type);
-    const draggedIndex = filtered.findIndex(c => c.id === draggedId);
-    const targetIndex = filtered.findIndex(c => c.id === targetId);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    const newFiltered = [...filtered];
-    const [removed] = newFiltered.splice(draggedIndex, 1);
-    newFiltered.splice(targetIndex, 0, removed);
-
-    if (onReorderCategories) {
-      onReorderCategories(newFiltered);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newFiltered = arrayMove(filtered, oldIndex, newIndex);
+        if (onReorderCategories) {
+          onReorderCategories(newFiltered);
+        }
+      }
     }
   };
 
@@ -121,79 +207,31 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, currentUs
             </Typography>
           </Card>
         ) : (
-          <Grid container spacing={2}>
-            {filtered.map(cat => (
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={cat.id}>
-                <Card
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, cat.id)}
-                  onDragOver={(e) => handleDragOver(e, cat.id)}
-                  onDragEnter={(e) => handleDragEnter(e, cat.id)}
-                  onDragEnd={handleDragEnd}
-                  onDrop={(e) => handleDrop(e, cat.id, type)}
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    borderRadius: 3,
-                    cursor: 'grab',
-                    opacity: draggedCategoryId === cat.id ? 0.4 : 1,
-                    transform: dragOverCategoryId === cat.id && draggedCategoryId !== cat.id ? 'scale(1.02)' : 'none',
-                    border: dragOverCategoryId === cat.id && draggedCategoryId !== cat.id ? `2px dashed ${color}` : undefined,
-                    transition: 'all 0.2s',
-                    '&:hover': { 
-                      boxShadow: 2, 
-                      borderColor: color,
-                      bgcolor: type === 'INCOME' ? 'rgba(16, 185, 129, 0.02)' : 'rgba(239, 68, 68, 0.02)'
-                    },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'hidden' }}>
-                    <Avatar
-                      sx={{
-                        width: 48,
-                        height: 48,
-                        bgcolor: cat.color,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <IconDisplay name={cat.icon} size={24} sx={{ color: '#fff' }} />
-                    </Avatar>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography fontWeight={700} variant="subtitle2" noWrap>{cat.name}</Typography>
-                      <Chip
-                        label={type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
-                        size="small"
-                        sx={{ bgcolor: bgColor, color, fontWeight: 700, fontSize: 10, height: 20, mt: 0.5 }}
-                      />
-                    </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, pl: 1 }}>
-                    <IconButton
-                      size="small"
-                      onClick={() => setEditingCategory(cat)}
-                      disabled={!canEditCategory(cat)}
-                      title="Edit Kategori"
-                      sx={{ color: 'text.secondary', bgcolor: 'action.hover', '&:hover': { color: 'info.main', bgcolor: 'info.main' + '14' } }}
-                    >
-                      <IconDisplay name="Edit2" size={16} />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => setDeletingCategory(cat)}
-                      disabled={!canEditCategory(cat)}
-                      title="Hapus Kategori"
-                      sx={{ color: 'text.secondary', bgcolor: 'action.hover', '&:hover': { color: 'error.main', bgcolor: 'error.main' + '14' } }}
-                    >
-                      <IconDisplay name="Trash2" size={16} />
-                    </IconButton>
-                  </Box>
-                </Card>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(e) => handleDragEnd(e, type)}
+          >
+            <SortableContext
+              items={filtered.map(c => c.id)}
+              strategy={rectSortingStrategy}
+            >
+              <Grid container spacing={2}>
+                {filtered.map(cat => (
+                  <SortableCategoryItem
+                    key={cat.id}
+                    cat={cat}
+                    color={color}
+                    bgColor={bgColor}
+                    type={type}
+                    canEdit={canEditCategory(cat)}
+                    onEdit={setEditingCategory}
+                    onDelete={setDeletingCategory}
+                  />
+                ))}
               </Grid>
-            ))}
-          </Grid>
+            </SortableContext>
+          </DndContext>
         )}
       </Box>
     );

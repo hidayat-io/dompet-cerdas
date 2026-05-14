@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.7
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.8
 
 **Status**: ✅ Fully Documented
 **Last Updated**: May 14, 2026
-**Version**: 2.8.7
+**Version**: 2.8.8
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -946,6 +946,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.8** | May 14, 2026 | Refactored drag and drop using @dnd-kit for smooth PWA touch support |
 | **v2.8.7** | May 14, 2026 | Native HTML5 Drag and drop category sorting feature |
 | **v2.8.6** | May 14, 2026 | Owner edit permission for shared transactions with updater tracking |
 | **v2.8.5** | May 1, 2026 | Security credential rotation, Telegram bot latency optimization, and image compression |
