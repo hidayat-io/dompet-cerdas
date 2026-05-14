@@ -1765,7 +1765,9 @@ function App() {
       categoryId,
       date,
       description,
-      attachment: attachmentData || null
+      attachment: attachmentData || null,
+      updatedByUserId: user.uid,
+      updatedByName: currentUserLabel
     });
   };
 
@@ -2702,7 +2704,8 @@ function App() {
                 <TransactionList
                   transactions={transactions}
                   categories={categories}
-                  currentUserId={user.uid}
+                  currentUserId={user?.uid}
+                  activeAccountRole={activeAccount?.role}
                   pendingAttachmentUploads={pendingAttachmentUploads}
                   onUpdate={updateTransaction}
                   onDelete={deleteTransaction}

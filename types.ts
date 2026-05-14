@@ -60,6 +60,8 @@ export interface Transaction {
   createdAt?: string; // ISO timestamp for sorting
   createdByUserId?: string;
   createdByName?: string;
+  updatedByUserId?: string;
+  updatedByName?: string;
   source?: 'app' | 'telegram';
   // New structured attachment
   attachment?: Attachment;

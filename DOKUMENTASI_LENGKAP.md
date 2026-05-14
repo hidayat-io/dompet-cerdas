@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.5
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.6
 
 **Status**: ✅ Fully Documented
-**Last Updated**: May 1, 2026
-**Version**: 2.8.5
+**Last Updated**: May 14, 2026
+**Version**: 2.8.6
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -946,6 +946,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.6** | May 14, 2026 | Owner edit permission for shared transactions with updater tracking |
 | **v2.8.5** | May 1, 2026 | Security credential rotation, Telegram bot latency optimization, and image compression |
 | **v2.8.3** | Apr 5, 2026 | Toggle tema global dipindah keluar dari Settings dan dirapikan untuk desktop/mobile |
 | **v2.8.2** | Mar 31, 2026 | Flow keluar member shared account, hapus workspace owner saat sendirian, dan error callable yang lebih jelas |

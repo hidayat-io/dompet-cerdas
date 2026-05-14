@@ -35,6 +35,7 @@ interface TransactionListProps {
   transactions: Transaction[];
   categories: Category[];
   currentUserId?: string | null;
+  activeAccountRole?: 'OWNER' | 'MEMBER';
   pendingAttachmentUploads?: Record<string, OfflineAttachmentUploadJob>;
   onDelete: (id: string) => void;
   onUpdate?: (
@@ -134,7 +135,7 @@ const generateYearOptions = (): number[] => {
 
 type FilterMode = 'month' | 'range';
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, currentUserId, pendingAttachmentUploads = {}, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, currentUserId, activeAccountRole, pendingAttachmentUploads = {}, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
   const { theme } = useTheme();
 
   const [viewingAttachment, setViewingAttachment] = useState<{
@@ -856,6 +857,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           initialData={editingTransaction}
           latestData={transactions.find((transaction) => transaction.id === editingTransaction.id) || editingTransaction}
           currentUserId={currentUserId}
+          activeAccountRole={activeAccountRole}
           onUpdate={onUpdate}
           onDelete={onDelete}
           onAddCategory={onAddCategory}

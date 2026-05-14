@@ -28,6 +28,7 @@ interface TransactionFormProps {
   initialData?: Transaction;
   latestData?: Transaction | null;
   currentUserId?: string | null;
+  activeAccountRole?: 'OWNER' | 'MEMBER';
   onAdd?: (amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' }) => Promise<void>;
   onUpdate?: (id: string, amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' } | null) => Promise<void>;
   onDelete?: (id: string) => void;
@@ -71,7 +72,7 @@ const getTransactionSnapshot = (transaction?: Transaction | null) => {
   });
 };
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, latestData, currentUserId, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialData, latestData, currentUserId, activeAccountRole, onAdd, onUpdate, onDelete, onAddCategory, onClose, onShowNotification }) => {
   const { theme } = useTheme();
   const [type, setType] = useState<TransactionType>('EXPENSE');
   const [displayAmount, setDisplayAmount] = useState('');
@@ -103,7 +104,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [conflictBaseline, setConflictBaseline] = useState<Transaction | undefined>(initialData);
-  const canEditTransaction = !initialData || !currentUserId || !initialData.createdByUserId || initialData.createdByUserId === currentUserId;
+  const canEditTransaction = !initialData || !currentUserId || !initialData.createdByUserId || initialData.createdByUserId === currentUserId || activeAccountRole === 'OWNER';
   const isReadOnly = !!initialData && !canEditTransaction;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -518,6 +519,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         {initialData?.source && (
           <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
             {initialData.source === 'telegram' ? 'Dicatat lewat Telegram' : 'Dicatat lewat Aplikasi'}
+          </Typography>
+        )}
+        {initialData?.updatedByUserId && initialData.createdByUserId !== initialData.updatedByUserId && (
+          <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5, textAlign: 'center' }}>
+            Dibuat oleh {initialData.createdByName || 'anggota'} dan Diupdate oleh {initialData.updatedByName || 'anggota'}
           </Typography>
         )}
     </Box>

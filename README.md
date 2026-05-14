@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.4
+# DompetCerdas - Smart Expense Tracker v2.8.6
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -53,11 +53,18 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.4`
-- **Build Date**: `April 30, 2026`
-- **Status**: Fix Telegram bot photo upload, migrasi Gemini SDK terbaru, dan perbaikan default kategori
+- **Version**: `v2.8.6`
+- **Build Date**: `May 14, 2026`
+- **Status**: Fitur edit transaksi oleh Owner pada akun bersama dengan pelacakan riwayat updater.
 
 ## Changelog
+
+### v2.8.6 - May 14, 2026
+- Tambah kondisi bagi owner dari akun bersama untuk bisa mengedit transaksi buatan member lain.
+- Tampilkan informasi pembuat dan pengubah transaksi pada form transaksi bila mereka adalah pengguna yang berbeda.
+
+### v2.8.5 - May 1, 2026
+- Security credential rotation, Telegram bot latency optimization, dan image compression.
 
 ### v2.8.4 - April 30, 2026
 - Fix Telegram bot gagal scan foto struk: migrasi dari SDK deprecated `@google/generative-ai` ke `@google/genai`, dan update model dari `gemini-2.0-flash` ke `gemini-2.5-flash`.

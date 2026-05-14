@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/mthidayat/Dev-Labs/dompet_cerdas/*.css)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(grep -iE \"^\\(Lamp|Watch|Anchor|Festival|Egg|Hardware|Draw|MicExternal|WbTwilight|FilterHdr|Thunderstorm|WbCloudy|Nightlight|SoupKitchen|MilitaryTech|DoorFront|Forest|Backpack|Glasses|Highlight|MonitorHeart|Vaccines|Celebration|Handshake|HowToReg|ChildFriendly|Toys|Icecream|SportsBar|WineBar|SoupKitchen|Sell|ConfirmationNumber|Diamond|Checkroom|PedalBike|LocalPizza|Cookie|Fastfood|SetMeal|DinnerDining|Loyalty|WaterDrop|Whatshot|Recycling|Savings|MonetizationOn|CorporateFare|PriceChange|AllInbox|Inventory2|ShowChart|Audiotrack|MicExternalOn|SportsEsports|VideogameAsset|StackedBarChart|Agriculture|Sailing|LocalParking|LocalGasStation|LaptopMac|TabletMac|DesktopMac|ConfirmationNumber\\)\\\\.js$\")",
+      "Bash(grep -iE ^Lamp.js$)",
+      "Bash(grep \"\\\\.js$\")",
+      "Bash(grep .js$)",
+      "Bash(ls /Users/mthidayat/Dev-Labs/dompet_cerdas/*.md)",
+      "Bash(npm run:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
