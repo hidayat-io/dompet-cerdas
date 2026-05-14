@@ -19,6 +19,7 @@ import { parseTransactionMessageHybrid, ParsedTransactionDraft } from '../servic
 import { getTotalExpenses, getTotalIncome, getBalance, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
 import { analyzeFinancialHealth, generateSavingsStrategy, analyzeExpenseReduction } from '../services/advisorService';
 import * as responseFormatter from '../services/responseFormatter';
+import { formatAutoSavedTransaction, formatAutoSavedReceipt } from '../services/responseFormatter';
 import { getDb } from '../index';
 import { sanitizeFirestoreData } from '../utils/firestore';
 
@@ -235,6 +236,20 @@ function isTextTransactionSessionExpired(sessionData: TextTransactionSessionData
     return sessionData.status !== 'pending' || (createdAtMs > 0 && Date.now() - createdAtMs > TEXT_TRANSACTION_SESSION_TTL_MS);
 }
 
+/**
+ * Returns true when bot is confident enough to skip the confirmation step.
+ * Criteria: single item, parse confidence high, category resolved without AI (high).
+ */
+function shouldAutoSaveText(
+    items: TextTransactionSessionItem[],
+    parseConfidence: 'high' | 'medium' | 'low',
+    categoryConfidence: 'high' | 'medium' | 'low'
+): boolean {
+    return items.length === 1
+        && parseConfidence === 'high'
+        && categoryConfidence === 'high';
+}
+
 async function resolveCategoryChoice(
     description: string,
     categories: UserCategory[],
@@ -354,22 +369,46 @@ async function createAndSendTransactionDraftPreview(params: {
     sourceType?: 'text' | 'voice';
     items: ParsedTransactionDraft[];
     usedAI: boolean;
+    parseConfidence?: 'high' | 'medium' | 'low';
 }): Promise<void> {
     const categories = await getUserCategories(params.userId, false, params.accountId);
-    const resolvedItems = await Promise.all(params.items.map(async (item) => {
+    const resolvedWithConfidence = await Promise.all(params.items.map(async (item) => {
         const categoryChoice = await resolveCategoryChoice(item.description, categories, item.category_hint);
         return {
             ...item,
             categoryId: categoryChoice.categoryId,
             categoryName: categoryChoice.categoryName,
+            _catConfidence: categoryChoice.confidence,
         };
     }));
-    const validResolvedItems = normalizeTextTransactionSessionItems(resolvedItems);
+    const validResolvedItems = normalizeTextTransactionSessionItems(resolvedWithConfidence);
 
     if (validResolvedItems.length === 0) {
         throw new Error('Failed to build valid transaction draft items');
     }
 
+    // ⚡ Auto-save path: skip confirmation when bot is fully confident
+    const catConfidence = resolvedWithConfidence[0]?._catConfidence ?? 'low';
+    const parseConfidence = params.parseConfidence ?? (params.usedAI ? 'medium' : 'high');
+    if (shouldAutoSaveText(validResolvedItems, parseConfidence, catConfidence)) {
+        const item = validResolvedItems[0];
+        await createManualTransactionsBatch(
+            params.userId,
+            [{ amount: item.amount, description: item.description, categoryName: item.categoryName, categoryIdOverride: item.categoryId }],
+            params.accountId
+        );
+        await getBot().sendMessage(
+            params.chatId,
+            responseFormatter.withAccountHeader(
+                formatAutoSavedTransaction(item.amount, item.description, item.categoryName),
+                params.accountName || undefined
+            ),
+            { parse_mode: 'Markdown' }
+        );
+        return;
+    }
+
+    // Normal confirmation path
     const sourceType = params.sourceType || 'text';
     const sessionId = await createTextTransactionDraftSession({
         userId: params.userId,
@@ -477,6 +516,7 @@ async function handleVoiceLikeMessage(
                 sourceType: 'voice',
                 items: hybridParse.items,
                 usedAI: hybridParse.usedAI,
+                parseConfidence: hybridParse.confidence,
             });
             return;
         }
@@ -858,11 +898,26 @@ async function handlePhotoMessage(
         const captionCategoryName = await resolveCaptionCategoryName(photoCaption, categories);
         const cleanedCaption = cleanCaptionDescription(photoCaption);
 
-        // Create session ID for confirmation
-        // Create session ID (short random string max 10 chars)
-        const sessionId = require('crypto').randomBytes(4).toString('hex');
+        // ⚡ Auto-save path: skip confirmation when receipt confidence is high and no user caption
+        if (receiptData.confidence === 'high' && !photoCaption.trim()) {
+            const transactionId = await createTransactionFromReceipt(
+                userId, receiptData, msg.from!.id, undefined, undefined,
+                telegramAccountState?.defaultAccountId
+            );
+            console.log('[PHOTO] Auto-saved receipt, transactionId:', transactionId);
+            const resolvedCategoryName = captionCategoryName || receiptData.categorySuggestion || 'Lainnya';
+            await getBot().editMessageText(
+                responseFormatter.withAccountHeader(
+                    formatAutoSavedReceipt(receiptData.totalAmount, receiptData.merchant, resolvedCategoryName),
+                    telegramAccountState?.defaultAccountName
+                ),
+                { chat_id: chatId, message_id: analyzingMsg.message_id, parse_mode: 'Markdown' }
+            );
+            return;
+        }
 
-        // Format confirmation message with caption (synchronous)
+        // Normal confirmation path
+        const sessionId = require('crypto').randomBytes(4).toString('hex');
         const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
         const messageWithHeader = responseFormatter.withAccountHeader(
             confirmationText,
@@ -1046,10 +1101,26 @@ async function handleDocumentMessage(
         const captionCategoryName = await resolveCaptionCategoryName(documentCaption, categories);
         const cleanedCaption = cleanCaptionDescription(documentCaption);
 
-        // Create session ID for confirmation
-        const sessionId = require('crypto').randomBytes(4).toString('hex');
+        // ⚡ Auto-save path: skip confirmation when receipt confidence is high and no user caption
+        if (receiptData.confidence === 'high' && !documentCaption.trim()) {
+            const transactionId = await createTransactionFromReceipt(
+                userId, receiptData, msg.from!.id, undefined, undefined,
+                telegramAccountState?.defaultAccountId
+            );
+            console.log('[DOCUMENT] Auto-saved receipt, transactionId:', transactionId);
+            const resolvedCategoryName = captionCategoryName || receiptData.categorySuggestion || 'Lainnya';
+            await getBot().editMessageText(
+                responseFormatter.withAccountHeader(
+                    formatAutoSavedReceipt(receiptData.totalAmount, receiptData.merchant, resolvedCategoryName),
+                    telegramAccountState?.defaultAccountName
+                ),
+                { chat_id: chatId, message_id: analyzingMsg.message_id, parse_mode: 'Markdown' }
+            );
+            return;
+        }
 
-        // Format confirmation message with caption (synchronous)
+        // Normal confirmation path
+        const sessionId = require('crypto').randomBytes(4).toString('hex');
         const confirmationText = formatReceiptData(receiptData, cleanedCaption, captionCategoryName);
         const messageWithHeader = responseFormatter.withAccountHeader(
             confirmationText,
@@ -1130,6 +1201,7 @@ async function handleTextMessage(
                 sourceType: 'text',
                 items: hybridParse.items,
                 usedAI: hybridParse.usedAI,
+                parseConfidence: hybridParse.confidence,
             });
             return;
         }

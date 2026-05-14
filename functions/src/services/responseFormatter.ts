@@ -506,6 +506,37 @@ export function formatTransactionBatchAdded(
 }
 
 /**
+ * Format auto-saved text/voice transaction (no confirmation needed)
+ */
+export function formatAutoSavedTransaction(
+    amount: number,
+    description: string,
+    categoryName: string
+): string {
+    return `⚡ *Tersimpan otomatis!*\n\n` +
+        `💰 ${formatExactRupiah(amount)} — ${escapeMarkdown(description)}\n` +
+        `🏷️ Kategori: ${escapeMarkdown(categoryName)}\n\n` +
+        `_Ada yang salah? Hapus manual di aplikasi ya._`;
+}
+
+/**
+ * Format auto-saved receipt (no confirmation needed)
+ */
+export function formatAutoSavedReceipt(
+    amount: number,
+    merchant: string,
+    categoryName: string
+): string {
+    const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `⚡ *Struk tersimpan otomatis!*\n\n` +
+        `💰 ${formatExactRupiah(amount)}\n` +
+        `🏪 ${escapeMarkdown(merchant)}\n` +
+        `📅 ${today}\n` +
+        `🏷️ ${escapeMarkdown(categoryName)}\n\n` +
+        `_Ada yang salah? Hapus manual di aplikasi ya._`;
+}
+
+/**
  * Format unknown intent response
  */
 export function formatUnknownIntent(): string {
