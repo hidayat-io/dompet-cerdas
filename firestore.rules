@@ -69,6 +69,12 @@ service cloud.firestore {
         );
     }
 
+    // Allow any shared account member to update only the 'order' field (for category reordering)
+    function canReorderSharedCategory(sharedAccountId) {
+      return canAccessSharedAccount(sharedAccountId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['order']);
+    }
+
     // Field validation helpers
     function isValidAmount() {
       return request.resource.data.amount is number && request.resource.data.amount > 0;
@@ -221,7 +227,7 @@ service cloud.firestore {
       match /categories/{categoryId} {
         allow read: if canAccessSharedAccount(sharedAccountId);
         allow create: if canCreateSharedRecord(sharedAccountId) && isValidCategoryData();
-        allow update: if canUpdateSharedRecord(sharedAccountId);
+        allow update: if canUpdateSharedRecord(sharedAccountId) || canReorderSharedCategory(sharedAccountId);
         allow delete: if canDeleteSharedRecord(sharedAccountId);
       }
 
