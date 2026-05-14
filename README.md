@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.8
+# DompetCerdas - Smart Expense Tracker v2.8.9
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -53,11 +53,14 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.8`
+- **Version**: `v2.8.9`
 - **Build Date**: `May 14, 2026`
-- **Status**: Migrasi fitur drag and drop menggunakan pustaka `@dnd-kit` untuk dukungan layar sentuh dan animasi yang lebih mulus.
+- **Status**: Bugfix: perbaikan Firestore Security Rules untuk mengizinkan reorder kategori di shared account.
 
 ## Changelog
+
+### v2.8.9 - May 14, 2026
+- Fix: tambah rule `canReorderSharedCategory` di Firestore Security Rules agar operasi reorder kategori di akun bersama tidak ditolak.
 
 ### v2.8.8 - May 14, 2026
 - Peningkatan fitur *drag and drop* kategori menggunakan pustaka `@dnd-kit` yang menangani sensor sentuhan dan mouse dengan jauh lebih mulus.
