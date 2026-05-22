@@ -38,12 +38,16 @@ const QUERY_KEYWORDS = [
     'saran',
     'analisa',
     'analisis',
+    'history',
+    'riwayat',
+    'daftar',
+    'list',
 ];
 
 const QUERY_PREFIX_REGEX = /^(tampilkan|tampilin|tunjukkan|lihat(?:kan)?|liat(?:in)?|show|cek)\b/i;
-const TRANSACTION_QUERY_WORD_REGEX = /\b(trans(?:aksi)?|transaski|transaksi|transsaksi|tranaksi)\b/i;
+const TRANSACTION_QUERY_WORD_REGEX = /\b(trans(?:aksi)?s?|transs|transaski|transaksi|transsaksi|tranaksi|transactions?|txs?)\b/i;
 const QUERY_TARGET_REGEX = new RegExp(`${TRANSACTION_QUERY_WORD_REGEX.source}|\\b(riwayat|detail|rincian|pengeluaran|pemasukan|saldo|kategori|breakdown)\\b`, 'i');
-const QUERY_ORDER_OR_TIME_REGEX = /\b(terakhir|sekarang|hari\s+ini|minggu\s+ini|bulan\s+ini|bln\s+ini|bulan\s+ni|kemarin|hari\s+terakhir)\b/i;
+const QUERY_ORDER_OR_TIME_REGEX = /\b(terakhir|sekarang|hari\s+ini|minggu\s+ini|bulan\s+ini|bln\s+ini|bulan\s+ni|kemarin|hari\s+terakhir|last|latest)\b/i;
 const QUERY_RANKING_REGEX = /\b(top|biggest|highest|largest|tertinggi|terbesar|terbanyak)\b/i;
 
 const ENTRY_PREFIX_REGEX = /^(tambah(?:in)?|catat(?:kan)?|input|masukin|masukan|record|log)\s+/i;
@@ -71,7 +75,7 @@ function looksLikeQueryMessage(message: string): boolean {
         return true;
     }
 
-    if (/\b(last|latest)\s+\d+\s*(trans|transaction|transactions)\b/i.test(lower)) {
+    if (/\b(?:(?:last|latest)\s+\d+|\d+\s+(?:last|latest))\s*(trans(?:aksi)?s?|transs|transaski|transaksi|transsaksi|tranaksi|transactions?|txs?)\b/i.test(lower)) {
         return true;
     }
 

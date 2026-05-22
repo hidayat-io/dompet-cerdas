@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.9
+# DompetCerdas - Smart Expense Tracker v2.8.10
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -53,11 +53,14 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.9`
-- **Build Date**: `May 14, 2026`
-- **Status**: Bugfix: perbaikan Firestore Security Rules untuk mengizinkan reorder kategori di shared account.
+- **Version**: `v2.8.10`
+- **Build Date**: `May 22, 2026`
+- **Status**: Bugfix: perbaikan deteksi query bot Telegram agar tidak terdeteksi sebagai transaksi baru yang tersimpan otomatis.
 
 ## Changelog
+
+### v2.8.10 - May 22, 2026
+- Fix: perbaikan regex pencarian & intent pada bot Telegram untuk mengenali format query seperti `show 10 last transs`, `10 last txs`, dsb., serta mencegah false positive parsing transaksi / auto-save.
 
 ### v2.8.9 - May 14, 2026
 - Fix: tambah rule `canReorderSharedCategory` di Firestore Security Rules agar operasi reorder kategori di akun bersama tidak ditolak.

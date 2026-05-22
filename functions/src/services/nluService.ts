@@ -72,7 +72,11 @@ const QUERY_KEYWORDS = [
     'rincian',
     'kategori',
     'breakdown',
-    'boros'
+    'boros',
+    'history',
+    'riwayat',
+    'daftar',
+    'list',
 ];
 
 const ADVICE_KEYWORDS = [
@@ -102,10 +106,10 @@ const ADVICE_KEYWORDS = [
     'tanpa suffering'
 ];
 
-const TRANSACTION_QUERY_PATTERN = /transaksi|transaski|transsaksi|tranaksi|trans\b/i;
+const TRANSACTION_QUERY_PATTERN = /trans(?:aksi)?s?|transs|transaski|transsaksi|tranaksi|transactions?|txs?/i;
 const DETAIL_QUERY_PATTERN = /detail|rincian|apa\s+aja|apa\s+saja|list|tampilkan|lihat|show|tunjukkan/i;
 const RANKING_QUERY_PATTERN = /\b(top|last|latest|terakhir|tertinggi|terbesar|terbanyak|highest|biggest|largest)\b/i;
-const LIMIT_QUERY_PATTERN = /\b(top|last|latest)\s+\d+\b|(?:^|\s)\d+\s+(?:transaksi|transaski|transsaksi|tranaksi|trans|item|data|pengeluaran)\b/i;
+const LIMIT_QUERY_PATTERN = /\b(top|last|latest)\s+\d+\b|(?:^|\s)\d+\s+(?:trans(?:aksi)?s?|transs|transaski|transsaksi|tranaksi|transactions?|txs?|item|data|pengeluaran)\b/i;
 
 function containsQueryKeywords(message: string): boolean {
     const lower = message.toLowerCase();
@@ -332,7 +336,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
 
         // Pattern for "terakhir" (recent by date) - only if not already matched
         if (!limit) {
-            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:transaksi|transaski|transsaksi|tranaksi|trans|item|data|pengeluaran|pemasukan)?\s*terakhir|last\s+(\d+)/i);
+            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:trans(?:aksi)?s?|transs|transaski|transsaksi|tranaksi|transactions?|txs?|item|data|pengeluaran|pemasukan)?\s*terakhir|last\s+(\d+)|(?:^|\s)(\d+)\s+(?:last|latest)/i);
             if (recentMatch) {
                 const numStr = recentMatch.slice(1).find(v => v !== undefined);
                 if (numStr) {
@@ -393,7 +397,7 @@ function detectSimpleIntent(message: string): ParsedIntent | null {
         }
 
         if (!limit) {
-            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:pemasukan|pengeluaran|income|expense|expenses)?\s*terakhir|last\s+(\d+)/i);
+            const recentMatch = lower.match(/(?:^|\s)(\d+)\s+(?:pemasukan|pengeluaran|income|expense|expenses)?\s*terakhir|last\s+(\d+)|(?:^|\s)(\d+)\s+(?:last|latest)/i);
             if (recentMatch) {
                 const numStr = recentMatch.slice(1).find(v => v !== undefined);
                 if (numStr) {
@@ -799,6 +803,7 @@ Contoh:
 "5 transaksi terakhir" → intent: query_details, limit: 5, confidence: high
 "top 10 pengeluaran bulan ini" → intent: query_details, limit: 10, sort_by: "amount", time_range: "this_month", confidence: high
 "top 10 transaski bulan ini" → intent: query_details, limit: 10, sort_by: "amount", time_range: "this_month", confidence: high
+"show 10 last transs" → intent: query_details, limit: 10, sort_by: "date", confidence: high
 "gimana keuanganku bulan ini?" → intent: financial_advice, time_range: this_month, confidence: high
 "analisa pengeluaran aku" → intent: financial_advice, time_range: this_month, confidence: high
 "tips hemat bulan depan?" → intent: savings_strategy, time_range: this_month, confidence: high
