@@ -27,22 +27,32 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const cacheNames = await caches.keys();
-    await Promise.all(
-      cacheNames
-        .filter((cacheName) => cacheName.startsWith('dompetcerdas-') && ![
-          STATIC_CACHE,
-          RUNTIME_CACHE,
-          APP_SHELL_CACHE,
-        ].includes(cacheName))
-        .map((cacheName) => caches.delete(cacheName))
+    const staleCaches = cacheNames.filter((cacheName) =>
+      cacheName.startsWith('dompetcerdas-') && ![
+        STATIC_CACHE,
+        RUNTIME_CACHE,
+        APP_SHELL_CACHE,
+      ].includes(cacheName)
     );
 
+    await Promise.all(staleCaches.map((cacheName) => caches.delete(cacheName)));
     await self.clients.claim();
+
+    // On update (stale caches existed): force-navigate all open tabs so they
+    // reload under the new SW with fresh HTML. This handles the blank-page
+    // case where JS never loaded (stale HTML referencing deleted chunks).
+    if (staleCaches.length > 0) {
+      const windowClients = await self.clients.matchAll({ type: 'window' });
+      await Promise.all(
+        windowClients.map((client) => client.navigate(client.url).catch(() => {}))
+      );
+    }
   })());
 });
 

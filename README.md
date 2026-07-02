@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.11
+# DompetCerdas - Smart Expense Tracker v2.8.12
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -53,11 +53,16 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.11`
+- **Version**: `v2.8.12`
 - **Build Date**: `Jul 02, 2026`
-- **Status**: PWA optimization: instant app shell, bundle splitting, icon fix, sync indicator double-render fix, dan ErrorBoundary untuk chunk load failure.
+- **Status**: PWA hotfix — SW auto-activate (`skipWaiting`) dan force-reload tabs saat update untuk mencegah blank screen setelah deploy.
 
 ## Changelog
+
+### v2.8.12 - Jul 02, 2026
+- Fix: SW `skipWaiting()` di install event agar SW versi baru langsung aktif tanpa menunggu user close all tabs.
+- Fix: SW `client.navigate()` di activate event — force-reload semua tab terbuka saat update (stale caches cleared), menangani blank-page case di mana JS tidak sempat load karena HTML cache mereferensi chunk yang sudah dihapus.
+- Fix: `controllerchange` listener di `pwa.ts` dengan refresh guard — reload otomatis saat SW baru mengambil kontrol, mencegah double-reload.
 
 ### v2.8.11 - Jul 02, 2026
 - PWA: Service Worker navigation caching dengan StaleWhileRevalidate untuk app shell instant pada kunjungan berikutnya.

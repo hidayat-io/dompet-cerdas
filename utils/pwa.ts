@@ -20,6 +20,13 @@ const watchInstallingWorker = (worker: ServiceWorker | null) => {
 export const registerServiceWorker = async () => {
   if (!('serviceWorker' in navigator)) return;
 
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
   try {
     const registration = await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`, {
       scope: '/',
