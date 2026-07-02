@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
     if (id.includes('firebase/app') || id.includes('@firebase/app')) return 'firebase-core';
     if (id.includes('firebase')) return 'firebase';
     if (id.includes('@mui/material') || id.includes('@emotion/')) return 'mui-core';
+    if (id.includes('@dnd-kit')) return 'dnd-kit';
     if (id.includes('recharts')) return 'charts';
     if (id.includes('react-markdown')) return 'markdown';
     if (id.includes('react/') || id.includes('/react-dom/')) return 'react-core';

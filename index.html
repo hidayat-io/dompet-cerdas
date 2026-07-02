@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>DompetCerdas</title>
 
   <!-- Favicon & App Icons -->
@@ -14,21 +14,28 @@
 
   <!-- PWA Meta Tags -->
   <meta name="theme-color" content="#4F46E5">
+  <meta name="color-scheme" content="light dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DompetCerdas">
   <meta name="description" content="Aplikasi pencatatan keuangan pribadi yang cerdas dengan analisis AI">
 
-  <!-- Cache Control - Prevent browser caching -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap" rel="stylesheet">
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div id="initial-loader" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;color:#6b7280;font-family:system-ui,sans-serif">
+      <svg width="40" height="40" viewBox="0 0 40 40" style="animation:spin 0.8s linear infinite">
+        <circle cx="20" cy="20" r="16" fill="none" stroke="#e5e7eb" stroke-width="4"/>
+        <circle cx="20" cy="20" r="16" fill="none" stroke="#4F46E5" stroke-width="4" stroke-dasharray="80" stroke-dashoffset="60" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-color-scheme:dark){#initial-loader{background:#0f172a;color:#94a3b8}}</style>
+  </div>
   <script type="module" src="/index.tsx"></script>
 </body>
 

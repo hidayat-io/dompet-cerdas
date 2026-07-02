@@ -34,13 +34,15 @@ const AuthLogin: React.FC = () => {
 
     // Check for redirect result on page load (for mobile redirect flow)
     useEffect(() => {
+        let active = true;
         const checkRedirectResult = async () => {
             try {
                 const result = await getRedirectResult(auth as Auth);
-                if (result) {
+                if (result && active) {
                     console.log('Redirect sign-in successful:', result.user.email);
                 }
             } catch (err: any) {
+                if (!active) return;
                 console.error('Redirect result error:', err);
                 const errorCode = err.code;
                 if (errorCode === 'auth/unauthorized-domain') {
@@ -49,11 +51,12 @@ const AuthLogin: React.FC = () => {
                     setError(`Gagal login: ${err.message}`);
                 }
             } finally {
-                setIsCheckingRedirect(false);
+                if (active) setIsCheckingRedirect(false);
             }
         };
 
         checkRedirectResult();
+        return () => { active = false; };
     }, []);
 
     const handleLogin = async () => {

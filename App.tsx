@@ -7,13 +7,11 @@ import { auth, db } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
 import { Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, SharedAccountMember, Transaction } from './types';
-import TransactionForm from './components/TransactionForm';
-import OnboardingModal from './components/OnboardingModal';
-import AuthLogin from './components/AuthLogin';
+import type { NotificationType } from './components/NotificationModal';
 
 import IconDisplay from './components/IconDisplay';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useTheme } from './contexts/ThemeContext';
-import NotificationModal, { NotificationType } from './components/NotificationModal';
 import { activateServiceWorkerUpdate, PWA_UPDATE_EVENT } from './utils/pwa';
 
 // MUI Components
@@ -110,6 +108,18 @@ const DebtManager = lazy(() => import('./components/DebtManager'));
 const Settings = lazy(() => import('./components/Settings'));
 const AiAdvisor = lazy(() => import('./components/AiAdvisor'));
 const LinkTelegram = lazy(() => import('./components/LinkTelegram'));
+const AuthLogin = lazy(() => import('./components/AuthLogin'));
+const TransactionForm = lazy(() => import('./components/TransactionForm'));
+const OnboardingModal = lazy(() => import('./components/OnboardingModal'));
+const NotificationModal = lazy(() => import('./components/NotificationModal'));
+
+// Prefetch high-probability next routes (called on idle after dashboard mount).
+// import() hits the same module cache React.lazy uses, so a later render is instant.
+const prefetchLazyRoutes = () => {
+  void import('./components/TransactionList');
+  void import('./components/BudgetManager');
+  void import('./components/Settings');
+};
 
 const getNormalizedDebtStatus = (amount: number, paidAmount: number, status?: DebtStatus): DebtStatus => {
   if (status === 'PAID' || paidAmount >= amount) return 'PAID';
@@ -234,6 +244,7 @@ function App() {
   const pendingSyncKeysRef = useRef(new Set<string>());
   const isFlushingAttachmentQueueRef = useRef(false);
   const isBackfillingPlanCreatorsRef = useRef(false);
+  const backfilledPlanIdsRef = useRef<Set<string>>(new Set());
 
   // Data States (Synced with Firestore)
   const [categories, setCategories] = useState<Category[]>([]);
@@ -505,7 +516,9 @@ function App() {
     }
 
     const legacyPlans = plans.filter((plan) => (
-      !plan.createdByUserId || plan.items.some((item) => !item.createdByUserId)
+      !backfilledPlanIdsRef.current.has(plan.id) && (
+        !plan.createdByUserId || plan.items.some((item) => !item.createdByUserId)
+      )
     ));
 
     if (legacyPlans.length === 0) {
@@ -514,6 +527,7 @@ function App() {
 
     let cancelled = false;
     isBackfillingPlanCreatorsRef.current = true;
+    legacyPlans.forEach((plan) => backfilledPlanIdsRef.current.add(plan.id));
 
     const backfillPlanCreators = async () => {
       try {
@@ -585,6 +599,20 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user || currentView !== 'DASHBOARD') return;
+    const idleWindow = window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      const handle = idleWindow.requestIdleCallback(prefetchLazyRoutes, { timeout: 4000 });
+      return () => idleWindow.cancelIdleCallback?.(handle);
+    }
+    const timer = window.setTimeout(prefetchLazyRoutes, 2000);
+    return () => window.clearTimeout(timer);
+  }, [user, currentView]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -854,9 +882,11 @@ function App() {
 
       const userRef = getUserDocRef(db, user.uid);
       const accountsRef = getAccountsCollectionRef(db, user.uid);
-      const userSnap = await getDoc(userRef);
+      const [userSnap, accountsSnap] = await Promise.all([
+        getDoc(userRef),
+        getDocs(accountsRef),
+      ]);
       const userMeta = (userSnap.data() || {}) as UserMeta;
-      const accountsSnap = await getDocs(accountsRef);
       const existingAccounts = accountsSnap.docs.map((accountDoc) => ({
         id: accountDoc.id,
         ...(accountDoc.data() as Omit<FinancialAccount, 'id'>)
@@ -1040,6 +1070,7 @@ function App() {
 
     const unsubAccounts = onSnapshot(accountsRef, { includeMetadataChanges: true }, (snapshot) => {
       updatePendingSyncKey('accounts', snapshot.metadata.hasPendingWrites);
+      if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
       const data = snapshot.docs
         .map((accountDoc) => ({ id: accountDoc.id, ...accountDoc.data() } as FinancialAccount))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -1136,6 +1167,7 @@ function App() {
         (snapshot) => {
           if (!isCurrentListener()) return;
           updatePendingSyncKey('shared-account-members', snapshot.metadata.hasPendingWrites);
+          if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const members = snapshot.docs
             .map((memberDoc) => ({
               id: memberDoc.id,
@@ -1233,6 +1265,7 @@ function App() {
         (snapshot) => {
           if (!isCurrentListener()) return;
           updatePendingSyncKey('categories', snapshot.metadata.hasPendingWrites);
+          if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const data = snapshot.docs.map((categoryDoc) => ({ id: categoryDoc.id, ...categoryDoc.data() } as Category))
             .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
           setCategories(data);
@@ -1250,6 +1283,7 @@ function App() {
         (snapshot) => {
           if (!isCurrentListener()) return;
           updatePendingSyncKey('transactions', snapshot.metadata.hasPendingWrites);
+          if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
           setTransactions(data);
         },
@@ -1266,6 +1300,7 @@ function App() {
         (snapshot) => {
           if (!isCurrentListener()) return;
           updatePendingSyncKey('plans', snapshot.metadata.hasPendingWrites);
+          if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const data = snapshot.docs.map((planDoc) => normalizePlan(planDoc.id, planDoc.data() as Partial<Plan>));
           setPlans(data);
         },
@@ -1282,6 +1317,7 @@ function App() {
         (snapshot) => {
           if (!isCurrentListener()) return;
           updatePendingSyncKey('budgets', snapshot.metadata.hasPendingWrites);
+          if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const data = snapshot.docs.map((budgetDoc) => ({ id: budgetDoc.id, ...(budgetDoc.data() as Partial<Budget>) } as Budget));
           setBudgets(data);
         },
@@ -1298,6 +1334,7 @@ function App() {
         (snapshot) => {
           if (!isCurrentListener()) return;
           updatePendingSyncKey('debts', snapshot.metadata.hasPendingWrites);
+          if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const data = snapshot.docs.map((debtDoc) => normalizeDebtRecord(debtDoc.id, debtDoc.data() as Partial<DebtRecord>));
           setDebts(data);
         },
@@ -2324,9 +2361,11 @@ function App() {
   // Handle link-telegram route
   if (isLinkTelegramRoute) {
     return (
-      <Suspense fallback={<ViewLoadingFallback />}>
-        <LinkTelegram />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <LinkTelegram />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
@@ -2339,7 +2378,13 @@ function App() {
   }
 
   if (!user) {
-    return <AuthLogin />;
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <AuthLogin />
+        </Suspense>
+      </ErrorBoundary>
+    );
   }
 
   if (accountLoading) {
@@ -2699,8 +2744,9 @@ function App() {
         {/* Content Area */}
         <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 2, md: 4 }, pb: { xs: '120px', md: 4 } }}>
           <Container maxWidth="lg" disableGutters>
-            <Suspense fallback={<ViewLoadingFallback />}>
-              {currentView === 'DASHBOARD' && (
+            <ErrorBoundary key={currentView}>
+              <Suspense fallback={<ViewLoadingFallback />}>
+                {currentView === 'DASHBOARD' && (
                 <Dashboard
                   transactions={transactions}
                   categories={categories}
@@ -2810,18 +2856,23 @@ function App() {
                 />
               )}
             </Suspense>
+            </ErrorBoundary>
           </Container>
         </Box>
 
-        <OnboardingModal
-          isOpen={showOnboarding}
-          accountName={activeAccount?.name || 'Akun Keuangan'}
-          telegramLinked={telegramLinked}
-          onClose={closeOnboarding}
-          onGoToTransactions={() => navigateFromOnboarding('TRANSACTIONS')}
-          onGoToBudgets={() => navigateFromOnboarding('BUDGETS')}
-          onGoToSettings={() => navigateFromOnboarding('SETTINGS')}
-        />
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <OnboardingModal
+              isOpen={showOnboarding}
+              accountName={activeAccount?.name || 'Akun Keuangan'}
+              telegramLinked={telegramLinked}
+              onClose={closeOnboarding}
+              onGoToTransactions={() => navigateFromOnboarding('TRANSACTIONS')}
+              onGoToBudgets={() => navigateFromOnboarding('BUDGETS')}
+              onGoToSettings={() => navigateFromOnboarding('SETTINGS')}
+            />
+          </Suspense>
+        </ErrorBoundary>
 
         {/* Mobile Bottom Navigation */}
         <Paper
@@ -2926,25 +2977,39 @@ function App() {
 
         {/* Transaction Modal */}
         {showAddModal && (
-          <TransactionForm
-            categories={categories}
-            currentUserId={user.uid}
-            onClose={() => setShowAddModal(false)}
-            onAdd={addTransaction}
-            onAddCategory={addCategory}
-            onShowNotification={showNotification}
-          />
+          <ErrorBoundary
+            fallback={null}
+            onError={() => {
+              setShowAddModal(false);
+              showNotification('error', 'Gagal memuat form', 'Form transaksi gagal dimuat. Periksa koneksi internet lalu coba lagi.');
+            }}
+          >
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <TransactionForm
+                categories={categories}
+                currentUserId={user.uid}
+                onClose={() => setShowAddModal(false)}
+                onAdd={addTransaction}
+                onAddCategory={addCategory}
+                onShowNotification={showNotification}
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
 
         {/* Notification Modal */}
-        <NotificationModal
-          isOpen={notification.isOpen}
-          type={notification.type}
-          title={notification.title}
-          message={notification.message}
-          onClose={closeNotification}
-          autoClose={notification.autoClose}
-        />
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <NotificationModal
+              isOpen={notification.isOpen}
+              type={notification.type}
+              title={notification.title}
+              message={notification.message}
+              onClose={closeNotification}
+              autoClose={notification.autoClose}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </Box>
     </Box>
   );

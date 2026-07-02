@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { registerServiceWorker } from './utils/pwa';
 
@@ -14,9 +15,17 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ThemeProvider>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </ThemeProvider>
   </React.StrictMode>
 );
 
-void registerServiceWorker();
+if (document.readyState === 'complete') {
+  void registerServiceWorker();
+} else {
+  window.addEventListener('load', () => {
+    void registerServiceWorker();
+  }, { once: true });
+}

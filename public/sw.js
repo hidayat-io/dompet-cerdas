@@ -13,6 +13,8 @@ const PRECACHE_URLS = [
   '/apple-touch-icon.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon-192.webp',
+  '/icon-512.webp',
 ];
 
 const CACHEABLE_DESTINATIONS = new Set(['script', 'style', 'font', 'image']);
@@ -50,7 +52,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-const isCacheableResponse = (response) => response && (response.ok || response.type === 'opaque');
+const isCacheableResponse = (response) => response && response.ok;
 
 const staleWhileRevalidate = async (request, cacheName) => {
   const cache = await caches.open(cacheName);
@@ -77,19 +79,35 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      try {
-        const response = await fetch(request);
-        const cache = await caches.open(APP_SHELL_CACHE);
-        cache.put('/index.html', response.clone());
-        return response;
-      } catch (error) {
-        const cache = await caches.open(APP_SHELL_CACHE);
-        const cachedAppShell = await cache.match('/index.html');
-        if (cachedAppShell) return cachedAppShell;
+      const cache = await caches.open(APP_SHELL_CACHE);
+      // SPA: all navigations share the same app shell HTML. Normalize cache key
+      // to '/index.html' so /link-telegram, /, etc. reuse one entry.
+      const cachedShell = await cache.match('/index.html');
+
+      // Background revalidate — does NOT block the returned response.
+      const revalidate = fetch(request)
+        .then((response) => {
+          if (isCacheableResponse(response)) {
+            cache.put('/index.html', response.clone());
+          }
+          return response;
+        })
+        .catch(() => null);
+
+      if (!cachedShell) {
+        const fresh = await revalidate;
+        if (fresh) return fresh;
 
         const staticCache = await caches.open(STATIC_CACHE);
-        return staticCache.match('/offline.html');
+        const precachedShell = await staticCache.match('/index.html');
+        if (precachedShell) return precachedShell;
+
+        const offline = await staticCache.match('/offline.html');
+        return offline || Response.error();
       }
+
+      event.waitUntil(revalidate);
+      return cachedShell;
     })());
     return;
   }

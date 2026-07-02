@@ -49,6 +49,7 @@ try {
             localCache: persistentLocalCache({
                 tabManager: persistentMultipleTabManager(),
             }),
+            experimentalAutoDetectLongPolling: true,
         });
     } catch (firestoreInitError) {
         console.warn("Firestore persistence fallback:", firestoreInitError);

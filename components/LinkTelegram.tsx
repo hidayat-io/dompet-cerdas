@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../firebase';
 import { callCloudFunction } from '../services/firebaseRuntime';
@@ -17,6 +17,7 @@ const LinkTelegram: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
     const [linkedAccountName, setLinkedAccountName] = useState<string | null>(null);
+    const linkCalledRef = useRef(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -27,7 +28,8 @@ const LinkTelegram: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (authChecked) {
+        if (authChecked && !linkCalledRef.current) {
+            linkCalledRef.current = true;
             linkTelegramAccount();
         }
     }, [authChecked]);

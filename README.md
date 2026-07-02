@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.10
+# DompetCerdas - Smart Expense Tracker v2.8.11
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -53,11 +53,29 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.10`
-- **Build Date**: `May 22, 2026`
-- **Status**: Bugfix: perbaikan deteksi query bot Telegram agar tidak terdeteksi sebagai transaksi baru yang tersimpan otomatis.
+- **Version**: `v2.8.11`
+- **Build Date**: `Jul 02, 2026`
+- **Status**: PWA optimization: instant app shell, bundle splitting, icon fix, sync indicator double-render fix, dan ErrorBoundary untuk chunk load failure.
 
 ## Changelog
+
+### v2.8.11 - Jul 02, 2026
+- PWA: Service Worker navigation caching dengan StaleWhileRevalidate untuk app shell instant pada kunjungan berikutnya.
+- PWA: Hilangkan anti-cache meta tags, defer SW registration ke `window load`, preconnect Google Fonts.
+- PWA: Lazy-load AuthLogin, TransactionForm, OnboardingModal, NotificationModal — entry chunk turun 31% (104KB → 72KB).
+- PWA: Fix bug JPEG-as-PNG pada semua icon, tambah alternatif WebP (icon-512: 297KB → 4.8KB).
+- PWA: Bootstrap paralel (`Promise.all`) untuk `getDoc(userRef)` + `getDocs(accountsRef)`.
+- PWA: Idle prefetch route lazy (TransactionList, BudgetManager, Settings) via `requestIdleCallback`.
+- PWA: Inline SVG loading screen di `#root` sebelum React mount, dark mode aware.
+- PWA: `viewport-fit=cover`, `color-scheme` meta, `@dnd-kit` manual chunk, `experimentalAutoDetectLongPolling`.
+- Fix: ErrorBoundary global dengan deteksi `ChunkLoadError` (termasuk Safari/iOS) dan fallback UI MUI; `key` prop reset pada navigasi.
+- Fix: SW fallback chain diperbaiki — app-shell cache → network → static cache → `offline.html`.
+- Fix: Manifest icon `purpose` dari `"any maskable"` ke `"any"` untuk rendering tanpa safe zone padding.
+- Fix: Hapus opaque response caching untuk mencegah 7MB padding dari Chrome anti-XS-leak.
+- Fix: LinkTelegram double-call di React StrictMode dicegah dengan `useRef` guard.
+- Fix: AuthLogin unmount safety — `active` flag mencegah state update setelah unmount.
+- Fix: Backfill loop prevention — `Set` tracking untuk plan ID yang sudah di-backfill.
+- Fix: Sync indicator double-render — `docChanges({ includeMetadataChanges: false })` guard pada 7 collection listener mencegah re-render saat hanya metadata berubah.
 
 ### v2.8.10 - May 22, 2026
 - Fix: perbaikan regex pencarian & intent pada bot Telegram untuk mengenali format query seperti `show 10 last transs`, `10 last txs`, dsb., serta mencegah false positive parsing transaksi / auto-save.
