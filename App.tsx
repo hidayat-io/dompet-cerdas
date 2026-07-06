@@ -2678,19 +2678,26 @@ function App() {
               >
                 <IconDisplay name="Settings" size={18} />
               </IconButton>
-              <Chip
-                icon={<IconDisplay name="CalendarDays" size={14} />}
-                label="Rencana"
+              <IconButton
                 size="small"
-                variant={currentView === 'PLANS' ? 'filled' : 'outlined'}
                 onClick={() => setCurrentView('PLANS')}
                 sx={{
-                  bgcolor: currentView === 'PLANS' ? theme.colors.accent : theme.colors.bgHover,
-                  color: currentView === 'PLANS' ? '#fff' : theme.colors.textSecondary,
-                  borderColor: currentView === 'PLANS' ? theme.colors.accent : theme.colors.border,
-                  '& .MuiChip-icon': { color: 'inherit' },
+                  bgcolor: currentView === 'PLANS' ? theme.colors.accentLight : 'transparent',
+                  color: currentView === 'PLANS' ? theme.colors.accent : theme.colors.textMuted,
                 }}
-              />
+              >
+                <IconDisplay name="CalendarDays" size={18} />
+              </IconButton>
+              <IconButton
+                size="small"
+                onClick={() => setCurrentView('ROUTINE_EXPENSES')}
+                sx={{
+                  bgcolor: currentView === 'ROUTINE_EXPENSES' ? theme.colors.accentLight : 'transparent',
+                  color: currentView === 'ROUTINE_EXPENSES' ? theme.colors.accent : theme.colors.textMuted,
+                }}
+              >
+                <IconDisplay name="RefreshCw" size={18} />
+              </IconButton>
               <Avatar
                 src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`}
                 alt={user.displayName || 'User'}
