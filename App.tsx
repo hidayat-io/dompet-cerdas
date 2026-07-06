@@ -32,6 +32,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import Menu from '@mui/material/Menu';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import Fab from '@mui/material/Fab';
@@ -231,6 +232,7 @@ function App() {
   const isLinkTelegramRoute = window.location.pathname === '/link-telegram';
 
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
+  const [moreMenuAnchorEl, setMoreMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
@@ -2409,15 +2411,16 @@ function App() {
     { view: 'CATEGORIES', label: 'Kategori', icon: 'Briefcase' },
   ];
 
-  const BOTTOM_NAV_ITEMS: Array<{ view: View; label: string; icon: string }> = [
+  const BOTTOM_NAV_ITEMS: Array<{ view: View | 'MORE'; label: string; icon: string }> = [
     { view: 'DASHBOARD', label: 'Beranda', icon: 'Home' },
     { view: 'TRANSACTIONS', label: 'Riwayat', icon: 'BookOpen' },
     { view: 'BUDGETS', label: 'Anggaran', icon: 'PiggyBank' },
-    { view: 'CATEGORIES', label: 'Kategori', icon: 'Briefcase' },
     { view: 'DEBTS', label: 'Hutang', icon: 'Handshake' },
+    { view: 'MORE', label: 'Lainnya', icon: 'MoreHorizontal' },
   ];
 
   const bottomNavIndex = BOTTOM_NAV_ITEMS.findIndex((item) => item.view === currentView);
+  const activeBottomNavIndex = bottomNavIndex !== -1 ? bottomNavIndex : 4; // Highlight 'MORE' if view is hidden
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}>
@@ -2660,16 +2663,6 @@ function App() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <IconButton
                 size="small"
-                onClick={() => setCurrentView('AI_ADVISOR')}
-                sx={{
-                  bgcolor: currentView === 'AI_ADVISOR' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
-                  color: currentView === 'AI_ADVISOR' ? '#8B5CF6' : theme.colors.textMuted,
-                }}
-              >
-                <IconDisplay name="Zap" size={18} />
-              </IconButton>
-              <IconButton
-                size="small"
                 onClick={() => setCurrentView('SETTINGS')}
                 sx={{
                   bgcolor: currentView === 'SETTINGS' ? theme.colors.accentLight : 'transparent',
@@ -2677,26 +2670,6 @@ function App() {
                 }}
               >
                 <IconDisplay name="Settings" size={18} />
-              </IconButton>
-              <IconButton
-                size="small"
-                onClick={() => setCurrentView('PLANS')}
-                sx={{
-                  bgcolor: currentView === 'PLANS' ? theme.colors.accentLight : 'transparent',
-                  color: currentView === 'PLANS' ? theme.colors.accent : theme.colors.textMuted,
-                }}
-              >
-                <IconDisplay name="CalendarDays" size={18} />
-              </IconButton>
-              <IconButton
-                size="small"
-                onClick={() => setCurrentView('ROUTINE_EXPENSES')}
-                sx={{
-                  bgcolor: currentView === 'ROUTINE_EXPENSES' ? theme.colors.accentLight : 'transparent',
-                  color: currentView === 'ROUTINE_EXPENSES' ? theme.colors.accent : theme.colors.textMuted,
-                }}
-              >
-                <IconDisplay name="RefreshCw" size={18} />
               </IconButton>
               <Avatar
                 src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`}
@@ -2907,13 +2880,15 @@ function App() {
           }}
         >
           <BottomNavigation
-            value={bottomNavIndex >= 0 ? bottomNavIndex : false}
-            onChange={(_, newValue) => {
-              if (newValue >= 0 && newValue < BOTTOM_NAV_ITEMS.length) {
-                setCurrentView(BOTTOM_NAV_ITEMS[newValue].view);
+            showLabels
+            value={activeBottomNavIndex}
+            onChange={(event, newValue) => {
+              if (newValue === 4) {
+                setMoreMenuAnchorEl(event.currentTarget as HTMLElement);
+              } else if (newValue >= 0 && newValue < BOTTOM_NAV_ITEMS.length) {
+                setCurrentView(BOTTOM_NAV_ITEMS[newValue].view as View);
               }
             }}
-            showLabels
             sx={{
               bgcolor: theme.colors.bgCard,
               height: 64,
@@ -3029,6 +3004,55 @@ function App() {
             />
           </Suspense>
         </ErrorBoundary>
+        {/* More Menu (Mobile) */}
+        <Menu
+          anchorEl={moreMenuAnchorEl}
+          open={Boolean(moreMenuAnchorEl)}
+          onClose={() => setMoreMenuAnchorEl(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          PaperProps={{
+            elevation: 8,
+            sx: {
+              bgcolor: theme.colors.bgCard,
+              color: theme.colors.textPrimary,
+              borderRadius: 3,
+              minWidth: 200,
+              mt: -1,
+              '& .MuiMenuItem-root': { py: 1.5 },
+            }
+          }}
+        >
+          <MenuItem 
+            onClick={() => { setCurrentView('CATEGORIES'); setMoreMenuAnchorEl(null); }}
+            selected={currentView === 'CATEGORIES'}
+          >
+            <ListItemIcon><IconDisplay name="Briefcase" size={20} /></ListItemIcon>
+            Kategori
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setCurrentView('PLANS'); setMoreMenuAnchorEl(null); }}
+            selected={currentView === 'PLANS'}
+          >
+            <ListItemIcon><IconDisplay name="CalendarDays" size={20} /></ListItemIcon>
+            Rencana
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setCurrentView('ROUTINE_EXPENSES'); setMoreMenuAnchorEl(null); }}
+            selected={currentView === 'ROUTINE_EXPENSES'}
+          >
+            <ListItemIcon><IconDisplay name="RefreshCw" size={20} /></ListItemIcon>
+            Pengeluaran Rutin
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setCurrentView('AI_ADVISOR'); setMoreMenuAnchorEl(null); }}
+            selected={currentView === 'AI_ADVISOR'}
+          >
+            <ListItemIcon sx={{ color: theme.colors.accent }}><IconDisplay name="Zap" size={20} /></ListItemIcon>
+            Analisis AI
+          </MenuItem>
+        </Menu>
+
       </Box>
     </Box>
   );
