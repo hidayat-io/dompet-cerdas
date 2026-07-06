@@ -1,7 +1,7 @@
 import { Category, IconName } from './types';
 
 // App Version
-export const APP_VERSION = '2.8.13';
+export const APP_VERSION = '2.8.14';
 export const APP_BUILD_DATE = 'Jul 06, 2026';
 
 

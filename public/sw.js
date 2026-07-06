@@ -89,35 +89,29 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      const cache = await caches.open(APP_SHELL_CACHE);
-      // SPA: all navigations share the same app shell HTML. Normalize cache key
-      // to '/index.html' so /link-telegram, /, etc. reuse one entry.
-      const cachedShell = await cache.match('/index.html');
-
-      // Background revalidate — does NOT block the returned response.
-      const revalidate = fetch(request)
-        .then((response) => {
-          if (isCacheableResponse(response)) {
-            cache.put('/index.html', response.clone());
-          }
-          return response;
-        })
-        .catch(() => null);
-
-      if (!cachedShell) {
-        const fresh = await revalidate;
-        if (fresh) return fresh;
-
-        const staticCache = await caches.open(STATIC_CACHE);
-        const precachedShell = await staticCache.match('/index.html');
-        if (precachedShell) return precachedShell;
-
-        const offline = await staticCache.match('/offline.html');
-        return offline || Response.error();
+      try {
+        // NETWORK FIRST strategy for index.html to avoid chunk load errors (blank screen)
+        const networkResponse = await fetch(request);
+        if (networkResponse && networkResponse.ok) {
+          const cache = await caches.open(APP_SHELL_CACHE);
+          cache.put('/index.html', networkResponse.clone());
+          return networkResponse;
+        }
+      } catch (error) {
+        // Network failed, fallback to cache below
       }
 
-      event.waitUntil(revalidate);
-      return cachedShell;
+      // FALLBACK TO CACHE
+      const cache = await caches.open(APP_SHELL_CACHE);
+      const cachedShell = await cache.match('/index.html');
+      if (cachedShell) return cachedShell;
+
+      const staticCache = await caches.open(STATIC_CACHE);
+      const precachedShell = await staticCache.match('/index.html');
+      if (precachedShell) return precachedShell;
+
+      const offline = await staticCache.match('/offline.html');
+      return offline || Response.error();
     })());
     return;
   }
