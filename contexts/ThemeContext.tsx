@@ -161,7 +161,7 @@ function buildMuiTheme(t: Theme) {
             divider: t.colors.border,
         },
         typography: {
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'Space Grotesk', 'Space Grotesk Fallback Helvetica', 'Space Grotesk Fallback Arial', sans-serif",
         },
         shape: {
             borderRadius: 12,

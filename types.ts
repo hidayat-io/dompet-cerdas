@@ -144,6 +144,30 @@ export interface DebtRecord {
 export type SimulationItem = PlanItem;
 export type Simulation = Plan;
 
+export interface RoutineExpense {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string;
+  createdAt: string;
+  createdByUserId?: string;
+  createdByName?: string;
+  reminderEnabled?: boolean;
+  reminderType?: 'AWAL_BULAN' | 'AKHIR_BULAN' | 'CUSTOM';
+  reminderDate?: number; // 1-31
+  reminderTime?: string; // e.g. "08:00"
+}
+
+export interface RoutineExpenseRecord {
+  id: string;
+  expenseId: string;
+  month: string; // YYYY-MM
+  transactionId?: string;
+  paidAt: string;
+  createdByUserId?: string;
+}
+
+
 // Icon names available for selection (150+ icons from Lucide React)
 export type IconName =
   // Finance & Money

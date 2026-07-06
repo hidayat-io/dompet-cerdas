@@ -6,9 +6,9 @@ import {
   DocumentReference,
   Firestore,
 } from 'firebase/firestore';
-import { DebtRecord, FinancialAccount, SharedAccount, SharedAccountMember } from '../types';
+import { DebtRecord, FinancialAccount, SharedAccount, SharedAccountMember, RoutineExpense, RoutineExpenseRecord } from '../types';
 
-export type AccountScopedCollectionName = 'categories' | 'transactions' | 'plans' | 'budgets' | 'simulations' | 'debts';
+export type AccountScopedCollectionName = 'categories' | 'transactions' | 'plans' | 'budgets' | 'simulations' | 'debts' | 'routine_expenses' | 'routine_expense_records';
 
 export const DEFAULT_ACCOUNT_NAME = 'Akun Utama';
 type UserMeta = {
@@ -63,6 +63,12 @@ export const getLegacySimulationsCollectionRef = (db: Firestore, userId: string,
 
 export const getDebtsCollectionRef = (db: Firestore, userId: string, accountId: string) =>
   getAccountScopedCollectionRef<DebtRecord>(db, userId, accountId, 'debts');
+
+export const getRoutineExpensesCollectionRef = (db: Firestore, userId: string, accountId: string) =>
+  getAccountScopedCollectionRef<RoutineExpense>(db, userId, accountId, 'routine_expenses');
+
+export const getRoutineExpenseRecordsCollectionRef = (db: Firestore, userId: string, accountId: string) =>
+  getAccountScopedCollectionRef<RoutineExpenseRecord>(db, userId, accountId, 'routine_expense_records');
 
 export const getScopedCollectionRefForAccount = <T>(
   db: Firestore,

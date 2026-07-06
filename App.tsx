@@ -82,7 +82,7 @@ import { getNormalizedBudget, getPreviousMonthKey } from './utils/budget';
 
 // ... (skip content)
 
-type View = 'DASHBOARD' | 'TRANSACTIONS' | 'CATEGORIES' | 'PLANS' | 'BUDGETS' | 'DEBTS' | 'AI_ADVISOR' | 'SETTINGS';
+type View = 'DASHBOARD' | 'TRANSACTIONS' | 'CATEGORIES' | 'PLANS' | 'BUDGETS' | 'DEBTS' | 'ROUTINE_EXPENSES' | 'AI_ADVISOR' | 'SETTINGS';
 
 type UserMeta = {
   activeAccountId?: string;
@@ -105,6 +105,7 @@ const TransactionList = lazy(() => import('./components/TransactionList'));
 const CategoryManager = lazy(() => import('./components/CategoryManager'));
 const PlanManager = lazy(() => import('./components/PlanManager'));
 const DebtManager = lazy(() => import('./components/DebtManager'));
+const RoutineExpenseManager = lazy(() => import('./components/RoutineExpenseManager'));
 const Settings = lazy(() => import('./components/Settings'));
 const AiAdvisor = lazy(() => import('./components/AiAdvisor'));
 const LinkTelegram = lazy(() => import('./components/LinkTelegram'));
@@ -2404,6 +2405,7 @@ function App() {
     { view: 'PLANS', label: 'Rencana', icon: 'CalendarDays' },
     { view: 'BUDGETS', label: 'Anggaran', icon: 'PiggyBank' },
     { view: 'DEBTS', label: 'Hutang Piutang', icon: 'Handshake' },
+    { view: 'ROUTINE_EXPENSES', label: 'Pengeluaran Rutin', icon: 'RefreshCw' },
     { view: 'CATEGORIES', label: 'Kategori', icon: 'Briefcase' },
   ];
 
@@ -2812,6 +2814,16 @@ function App() {
                   onDeleteDebt={deleteDebt}
                   onRecordPayment={recordDebtPayment}
                   onMarkAsPaid={markDebtAsPaid}
+                />
+              )}
+              {currentView === 'ROUTINE_EXPENSES' && activeAccount && (
+                <RoutineExpenseManager
+                  activeAccount={activeAccount}
+                  currentUserId={user.uid}
+                  categories={categories}
+                  onAddTransaction={addTransaction}
+                  onAddCategory={addCategory}
+                  onShowNotification={showNotification}
                 />
               )}
               {currentView === 'CATEGORIES' && (

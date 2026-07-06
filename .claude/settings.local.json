@@ -12,7 +12,21 @@
       "Bash(ls /Users/mthidayat/Dev-Labs/dompet_cerdas/*.md)",
       "Bash(npm run:*)",
       "Bash(firebase deploy:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0 Safari/537.36\" https://budggt.com/ -o /private/tmp/claude-501/-Users-mthidayat-Dev-Labs-dompet-cerdas/0dfa41d1-1a3a-4c16-ba5d-c3586129a87d/scratchpad/budggt.html -L)",
+      "Bash(curl -sv -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0 Safari/537.36\" https://budggt.com/ -o /dev/null)",
+      "Bash(curl -s --compressed -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0 Safari/537.36\" https://budggt.com/ -o /private/tmp/claude-501/-Users-mthidayat-Dev-Labs-dompet-cerdas/0dfa41d1-1a3a-4c16-ba5d-c3586129a87d/scratchpad/budggt.html)",
+      "Bash(curl -s --compressed -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0 Safari/537.36\" https://budggt.com/assets/index-CRn9cfEr.css -o /private/tmp/claude-501/-Users-mthidayat-Dev-Labs-dompet-cerdas/0dfa41d1-1a3a-4c16-ba5d-c3586129a87d/scratchpad/budggt.css)",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0 Safari/537.36' 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap' -o /private/tmp/claude-501/-Users-mthidayat-Dev-Labs-dompet-cerdas/0dfa41d1-1a3a-4c16-ba5d-c3586129a87d/scratchpad/space-grotesk.css)",
+      "Bash(awk '/\\\\/\\\\* latin \\\\*\\\\//{getline; while \\($0 !~ /^}/\\) {print; getline}}' /private/tmp/claude-501/-Users-mthidayat-Dev-Labs-dompet-cerdas/0dfa41d1-1a3a-4c16-ba5d-c3586129a87d/scratchpad/space-grotesk.css)",
+      "Bash(curl -s https://fonts.gstatic.com/s/spacegrotesk/v22/V8mDoQDjQSkFtoMM3T6r8E7mPbF4C_k3HqU.woff2 -o /private/tmp/claude-501/-Users-mthidayat-Dev-Labs-dompet-cerdas/0dfa41d1-1a3a-4c16-ba5d-c3586129a87d/scratchpad/test-latin.woff2)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import fontTools; print\\(fontTools.__file__\\)\")",
+      "Bash(pip3 show *)",
+      "Bash(python3 *)",
+      "Bash(mkdir -p /Users/mthidayat/Dev-Labs/dompet_cerdas/public/fonts)",
+      "Bash(cp /private/tmp/claude-501/-Users-mthidayat-Dev-Labs-dompet-cerdas/0dfa41d1-1a3a-4c16-ba5d-c3586129a87d/scratchpad/test-latin.woff2 /Users/mthidayat/Dev-Labs/dompet_cerdas/public/fonts/space-grotesk-variable.woff2)",
+      "Skill(run)"
     ]
   }
 }

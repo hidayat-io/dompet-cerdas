@@ -946,6 +946,8 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.13** | Jul 06, 2026 | Added time selection option for Telegram routine expense reminders and updated cron to run hourly |
+| **v2.8.12** | Jul 06, 2026 | Added Routine Expense management with monthly checklist, integrated with transaction system and Telegram reminders |
 | **v2.8.10** | May 22, 2026 | Fix Telegram bot query detection (e.g. show 10 last transs) and prevent auto-save false positives |
 | **v2.8.9** | May 14, 2026 | Fix Firestore rules for shared account category reordering |
 | **v2.8.8** | May 14, 2026 | Refactored drag and drop using @dnd-kit for smooth PWA touch support |
@@ -981,6 +983,6 @@ firebase functions:log
 
 ---
 
-**Last Updated**: May 1, 2026
+**Last Updated**: Jul 06, 2026
 **Status**: ✅ Internal Testing Ready
 **Support**: Check documentation or Firebase console logs

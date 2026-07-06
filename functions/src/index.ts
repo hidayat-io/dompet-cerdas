@@ -17,6 +17,7 @@ import {
     deletePrivateAccountScopedData,
     removeSharedAccountAccess,
 } from './services/sharedAccountService';
+import { processRoutineExpenseReminders } from './services/reminderService';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -575,4 +576,19 @@ export const joinSharedAccountByCode = functions
             name: sharedData.name || 'Keuangan Bersama',
             role,
         };
+    });
+
+/**
+ * Scheduled function to check and send routine expense reminders
+ * Runs every hour at minute 0 (Asia/Jakarta time)
+ */
+export const dailyRoutineExpenseReminder = functions
+    .region('asia-southeast1')
+    .pubsub.schedule('0 * * * *')
+    .timeZone('Asia/Jakarta')
+    .onRun(async (context) => {
+        console.log('Running hourly routine expense reminder check...');
+        await processRoutineExpenseReminders();
+        console.log('Finished daily routine expense reminder check.');
+        return null;
     });

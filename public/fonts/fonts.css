@@ -1,0 +1,26 @@
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-variable.woff2') format('woff2');
+}
+
+/* Metric-matched fallbacks so local system fonts occupy the same box size as
+   Space Grotesk, avoiding layout shift while the webfont loads. */
+@font-face {
+  font-family: 'Space Grotesk Fallback Arial';
+  src: local('Arial');
+  size-adjust: 109.69%;
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Space Grotesk Fallback Helvetica';
+  src: local('Helvetica');
+  size-adjust: 109.69%;
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0%;
+}
