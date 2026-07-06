@@ -59,12 +59,7 @@ export const activateServiceWorkerUpdate = async () => {
     return;
   }
 
-  await registration?.update();
-
-  if (registration?.waiting) {
-    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-    return;
-  }
-
+  // If there's no waiting worker but the user clicked update, 
+  // it might have already been activated by another tab or skipWaiting.
   window.location.reload();
 };

@@ -848,13 +848,14 @@ function App() {
     isApplyingUpdateRef.current = true;
 
     try {
-      await activateServiceWorkerUpdate();
-
+      // Set a failsafe timeout to force reload if the SW update hangs
       window.setTimeout(() => {
         if (isApplyingUpdateRef.current) {
           window.location.reload();
         }
       }, 1800);
+
+      await activateServiceWorkerUpdate();
     } catch (error) {
       console.error('Failed to apply service worker update:', error);
       setIsApplyingUpdate(false);
