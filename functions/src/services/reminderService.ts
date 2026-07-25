@@ -1,5 +1,7 @@
 import { getDb } from '../index';
 import { initBot } from '../bot';
+import { getJakartaDateString } from '../utils/date';
+import { getUserAccounts, getTransactionsCollection } from './accountService';
 
 const formatRp = (value: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
@@ -110,5 +112,95 @@ export async function processRoutineExpenseReminders() {
         }
     } catch (error) {
         console.error('Error processing routine expense reminders:', error);
+    }
+}
+
+export async function processDailyNoTransactionReminders() {
+    const db = getDb();
+    const bot = initBot();
+
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jakarta',
+        hour: '2-digit',
+        hour12: false
+    });
+    const hour = parseInt(formatter.format(now), 10);
+    const currentHourStr = `${String(hour).padStart(2, '0')}:00`;
+    const todayStr = getJakartaDateString();
+
+    console.log(`[DAILY REMINDER] Checking users for daily transaction input reminders at ${currentHourStr} (WIB) for date ${todayStr}`);
+
+    try {
+        const tgLinksSnapshot = await db.collectionGroup('telegram_link').get();
+
+        console.log(`[DAILY REMINDER] Found ${tgLinksSnapshot.docs.length} total Telegram links.`);
+
+        for (const doc of tgLinksSnapshot.docs) {
+            const tgLink = doc.data();
+            
+            if (!tgLink.active) continue;
+            if (!tgLink.reminderEnabled) continue;
+            if (tgLink.reminderTime !== currentHourStr) continue;
+
+            const userId = doc.ref.path.split('/')[1];
+            if (!userId || !tgLink.telegramId) continue;
+
+            console.log(`[DAILY REMINDER] User ${userId} has reminder configured for ${tgLink.reminderTime}. Checking transaction status...`);
+
+            const accounts = await getUserAccounts(userId);
+            let hasTransaction = false;
+
+            const checkPromises = accounts.map(async (acc) => {
+                const context = {
+                    userId,
+                    accountId: acc.id,
+                    sharedAccountId: acc.sharedAccountId,
+                    usesLegacyPaths: false
+                };
+                const txCol = getTransactionsCollection(context);
+                
+                const snap = await txCol
+                    .where('createdByUserId', '==', userId)
+                    .where('date', '==', todayStr)
+                    .limit(1)
+                    .get();
+                
+                if (!snap.empty) {
+                    hasTransaction = true;
+                }
+            });
+
+            const legacyContext = { userId, usesLegacyPaths: true };
+            checkPromises.push((async () => {
+                const snap = await getTransactionsCollection(legacyContext)
+                    .where('createdByUserId', '==', userId)
+                    .where('date', '==', todayStr)
+                    .limit(1)
+                    .get();
+                if (!snap.empty) {
+                    hasTransaction = true;
+                }
+            })());
+
+            await Promise.all(checkPromises);
+
+            if (!hasTransaction) {
+                const message = `⚠️ *Pengingat Dompet Cerdas*\n\n` +
+                                `Hari ini belum ada transaksi yang Anda input, apakah Anda melewatkan sesuatu?\n\n` +
+                                `Silakan ketik atau kirim foto struk transaksi Anda langsung di sini untuk mencatat! 📝`;
+
+                try {
+                    await bot.sendMessage(tgLink.telegramId, message, { parse_mode: 'Markdown' });
+                    console.log(`[DAILY REMINDER] Sent transaction reminder to user ${userId} (TG: ${tgLink.telegramId})`);
+                } catch (err) {
+                    console.error(`[DAILY REMINDER] Failed to send reminder to telegram ID ${tgLink.telegramId}:`, err);
+                }
+            } else {
+                console.log(`[DAILY REMINDER] User ${userId} has already recorded a transaction today. Skipping reminder.`);
+            }
+        }
+    } catch (error) {
+        console.error('[DAILY REMINDER] Error processing daily no-transaction reminders:', error);
     }
 }

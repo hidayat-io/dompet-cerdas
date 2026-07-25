@@ -494,7 +494,20 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                   size="small"
                   value={startDate}
                   onChange={(e) => handleStartDateChange(e.target.value)}
-                  slotProps={{ inputLabel: { shrink: true } }}
+                  slotProps={{
+                    input: {
+                      onClick: (e: any) => {
+                        if (typeof e.target.showPicker === 'function') {
+                          try {
+                            e.target.showPicker();
+                          } catch (err) {
+                            console.error('[DATEPICKER] Failed to open picker:', err);
+                          }
+                        }
+                      }
+                    },
+                    inputLabel: { shrink: true }
+                  }}
                   sx={{ flex: 1 }}
                 />
                 <TextField
@@ -503,7 +516,20 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                   size="small"
                   value={endDate}
                   onChange={(e) => handleEndDateChange(e.target.value)}
-                  slotProps={{ inputLabel: { shrink: true } }}
+                  slotProps={{
+                    input: {
+                      onClick: (e: any) => {
+                        if (typeof e.target.showPicker === 'function') {
+                          try {
+                            e.target.showPicker();
+                          } catch (err) {
+                            console.error('[DATEPICKER] Failed to open picker:', err);
+                          }
+                        }
+                      }
+                    },
+                    inputLabel: { shrink: true }
+                  }}
                   sx={{ flex: 1 }}
                 />
                 <Button

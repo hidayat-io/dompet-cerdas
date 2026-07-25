@@ -434,14 +434,27 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
         </Box>
 
         {/* Date */}
-          <TextField
+        <TextField
           fullWidth
           label="Tanggal"
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           disabled={isSaving || isReadOnly}
-          InputLabelProps={{ shrink: true }}
+          slotProps={{
+            input: {
+              onClick: (e: any) => {
+                if (!isReadOnly && typeof e.target.showPicker === 'function') {
+                  try {
+                    e.target.showPicker();
+                  } catch (err) {
+                    console.error('[DATEPICKER] Failed to open picker:', err);
+                  }
+                }
+              }
+            },
+            inputLabel: { shrink: true }
+          }}
           sx={{ mb: 2 }}
         />
 

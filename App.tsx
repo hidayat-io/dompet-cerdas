@@ -95,6 +95,8 @@ type UserMeta = {
 
 type TelegramLinkMeta = {
   defaultAccountId?: string;
+  reminderEnabled?: boolean;
+  reminderTime?: string;
 };
 
 const MIGRATION_BATCH_SIZE = 400;
@@ -260,6 +262,8 @@ function App() {
   const [accountLoading, setAccountLoading] = useState(true);
   const [telegramDefaultAccountId, setTelegramDefaultAccountId] = useState<string | null>(null);
   const [telegramLinked, setTelegramLinked] = useState(false);
+  const [telegramReminderEnabled, setTelegramReminderEnabled] = useState<boolean>(false);
+  const [telegramReminderTime, setTelegramReminderTime] = useState<string>('20:00');
   const [sharedAccountMembers, setSharedAccountMembers] = useState<SharedAccountMember[]>([]);
   const [activeSharedInviteCode, setActiveSharedInviteCode] = useState<string | null>(null);
   const activeAccountRef = useRef<FinancialAccount | null>(null);
@@ -1094,6 +1098,8 @@ function App() {
       updatePendingSyncKey('telegram-link', false);
       setTelegramDefaultAccountId(null);
       setTelegramLinked(false);
+      setTelegramReminderEnabled(false);
+      setTelegramReminderTime('20:00');
       return;
     }
 
@@ -1103,6 +1109,8 @@ function App() {
       setTelegramLinked(snapshot.exists());
       const data = snapshot.data() as TelegramLinkMeta | undefined;
       setTelegramDefaultAccountId(data?.defaultAccountId || null);
+      setTelegramReminderEnabled(data?.reminderEnabled ?? false);
+      setTelegramReminderTime(data?.reminderTime || '20:00');
     });
 
     return () => {
@@ -1491,6 +1499,18 @@ function App() {
     if (selectedAccount) {
       showNotification('success', 'Akun Telegram Diperbarui', `Bot Telegram sekarang memakai akun "${selectedAccount.name}".`, true);
     }
+  };
+
+  const updateTelegramReminderSettings = async (enabled: boolean, time: string) => {
+    if (!user) return;
+
+    await setDoc(doc(db, 'users', user.uid, 'telegram_link', 'main'), {
+      reminderEnabled: enabled,
+      reminderTime: time,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    showNotification('success', 'Pengaturan Pengingat Diperbarui', 'Konfigurasi pengingat harian Telegram Anda berhasil disimpan.', true);
   };
 
   const deleteAccount = async (accountId: string) => {
@@ -2831,10 +2851,13 @@ function App() {
                   activeAccountName={activeAccount?.name || null}
                   telegramLinked={telegramLinked}
                   telegramDefaultAccountId={telegramDefaultAccountId}
+                  telegramReminderEnabled={telegramReminderEnabled}
+                  telegramReminderTime={telegramReminderTime}
                   activeSharedInviteCode={activeSharedInviteCode}
                   sharedAccountMembers={sharedAccountMembers}
                   onOpenOnboarding={openOnboarding}
                   onUpdateTelegramAccount={updateTelegramDefaultAccount}
+                  onUpdateTelegramReminderSettings={updateTelegramReminderSettings}
                   onCreateAccount={createPrivateAccount}
                   onCreateSharedAccount={createSharedAccount}
                   onShareAccount={shareAccount}

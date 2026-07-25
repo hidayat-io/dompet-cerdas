@@ -34,10 +34,13 @@ interface SettingsProps {
     activeAccountName: string | null;
     telegramLinked: boolean;
     telegramDefaultAccountId: string | null;
+    telegramReminderEnabled: boolean;
+    telegramReminderTime: string;
     activeSharedInviteCode: string | null;
     sharedAccountMembers: SharedAccountMember[];
     onOpenOnboarding: () => void;
     onUpdateTelegramAccount: (accountId: string) => Promise<void>;
+    onUpdateTelegramReminderSettings: (enabled: boolean, time: string) => Promise<void>;
     onCreateAccount: (name: string) => Promise<void>;
     onCreateSharedAccount: (name: string) => Promise<void>;
     onShareAccount: (accountId: string) => Promise<void>;
@@ -57,10 +60,13 @@ const Settings: React.FC<SettingsProps> = ({
     activeAccountName,
     telegramLinked,
     telegramDefaultAccountId,
+    telegramReminderEnabled,
+    telegramReminderTime,
     activeSharedInviteCode,
     sharedAccountMembers,
     onOpenOnboarding,
     onUpdateTelegramAccount,
+    onUpdateTelegramReminderSettings,
     onCreateAccount,
     onCreateSharedAccount,
     onShareAccount,
@@ -563,6 +569,53 @@ const Settings: React.FC<SettingsProps> = ({
                 </Typography>
             </Paper>
 
+            {/* Telegram Daily Reminder Settings */}
+            {telegramLinked && (
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3 }}>
+                        <Box>
+                            <Typography variant="h6" fontWeight={700}>Pengingat Transaksi Harian</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                Kirim pesan via Telegram jika Anda belum mencatat transaksi apa pun pada hari tersebut.
+                            </Typography>
+                        </Box>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={telegramReminderEnabled}
+                                    onChange={(e) => onUpdateTelegramReminderSettings(e.target.checked, telegramReminderTime)}
+                                />
+                            }
+                            label={telegramReminderEnabled ? "Pengingat Aktif" : "Pengingat Dinonaktifkan"}
+                        />
+
+                        {telegramReminderEnabled && (
+                            <FormControl fullWidth size="small">
+                                <InputLabel id="telegram-reminder-time-label">Waktu Pengingat (WIB)</InputLabel>
+                                <Select
+                                    labelId="telegram-reminder-time-label"
+                                    label="Waktu Pengingat (WIB)"
+                                    value={telegramReminderTime}
+                                    onChange={(e) => onUpdateTelegramReminderSettings(telegramReminderEnabled, e.target.value)}
+                                >
+                                    {Array.from({ length: 24 }).map((_, idx) => {
+                                        const hourStr = `${String(idx).padStart(2, '0')}:00`;
+                                        return (
+                                            <MenuItem key={hourStr} value={hourStr}>
+                                                {hourStr} WIB
+                                            </MenuItem>
+                                        );
+                                    })}
+                                </Select>
+                            </FormControl>
+                        )}
+                    </Box>
+                </Paper>
+            )}
+
             {/* Quick Guide */}
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
@@ -651,7 +704,20 @@ const Settings: React.FC<SettingsProps> = ({
                                     fullWidth
                                     value={customStartDate}
                                     onChange={(e) => setCustomStartDate(e.target.value)}
-                                    slotProps={{ inputLabel: { shrink: true } }}
+                                    slotProps={{
+                                        input: {
+                                            onClick: (e: any) => {
+                                                if (typeof e.target.showPicker === 'function') {
+                                                    try {
+                                                        e.target.showPicker();
+                                                    } catch (err) {
+                                                        console.error('[DATEPICKER] Failed to open picker:', err);
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        inputLabel: { shrink: true }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 6 }}>
@@ -662,7 +728,20 @@ const Settings: React.FC<SettingsProps> = ({
                                     fullWidth
                                     value={customEndDate}
                                     onChange={(e) => setCustomEndDate(e.target.value)}
-                                    slotProps={{ inputLabel: { shrink: true } }}
+                                    slotProps={{
+                                        input: {
+                                            onClick: (e: any) => {
+                                                if (typeof e.target.showPicker === 'function') {
+                                                    try {
+                                                        e.target.showPicker();
+                                                    } catch (err) {
+                                                        console.error('[DATEPICKER] Failed to open picker:', err);
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        inputLabel: { shrink: true }
+                                    }}
                                 />
                             </Grid>
                         </Grid>

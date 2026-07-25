@@ -53,11 +53,16 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.12`
-- **Build Date**: `Jul 02, 2026`
-- **Status**: PWA hotfix — SW auto-activate (`skipWaiting`) dan force-reload tabs saat update untuk mencegah blank screen setelah deploy.
+- **Version**: `v2.8.17`
+- **Build Date**: `Jul 25, 2026`
+- **Status**: Added configurable Telegram daily transaction reminders (on/off + custom hour) and enhanced desktop datepicker behavior.
 
 ## Changelog
+
+### v2.8.17 - Jul 25, 2026
+- Feat: Added configurable Telegram daily transaction input reminders under Settings (Switch toggle + hour selection).
+- Feat: Added `.showPicker()` triggers globally on all date input fields, allowing desktop users to click anywhere on the field to open the calendar dropdown.
+- Refactor: Optimized Firestore daily reminder query to filter active links in memory, avoiding collectionGroup composite index requirements.
 
 ### v2.8.12 - Jul 02, 2026
 - Fix: SW `skipWaiting()` di install event agar SW versi baru langsung aktif tanpa menunggu user close all tabs.

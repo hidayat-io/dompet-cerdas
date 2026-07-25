@@ -31,6 +31,8 @@ export interface TelegramLink {
     linkedAt: admin.firestore.Timestamp;
     active: boolean;
     lastInteraction: admin.firestore.Timestamp;
+    reminderEnabled?: boolean;
+    reminderTime?: string;
 }
 
 export interface TelegramLinkContext {

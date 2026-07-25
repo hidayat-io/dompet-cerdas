@@ -429,7 +429,20 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                                     fullWidth
                                     value={draft.transactionDate}
                                     onChange={(e) => setDraft((c) => ({ ...c, transactionDate: e.target.value }))}
-                                    slotProps={{ inputLabel: { shrink: true } }}
+                                    slotProps={{
+                                        input: {
+                                            onClick: (e: any) => {
+                                                if (typeof e.target.showPicker === 'function') {
+                                                    try {
+                                                        e.target.showPicker();
+                                                    } catch (err) {
+                                                        console.error('[DATEPICKER] Failed to open picker:', err);
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        inputLabel: { shrink: true }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -440,7 +453,20 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                                     fullWidth
                                     value={draft.dueDate}
                                     onChange={(e) => setDraft((c) => ({ ...c, dueDate: e.target.value }))}
-                                    slotProps={{ inputLabel: { shrink: true } }}
+                                    slotProps={{
+                                        input: {
+                                            onClick: (e: any) => {
+                                                if (typeof e.target.showPicker === 'function') {
+                                                    try {
+                                                        e.target.showPicker();
+                                                    } catch (err) {
+                                                        console.error('[DATEPICKER] Failed to open picker:', err);
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        inputLabel: { shrink: true }
+                                    }}
                                 />
                             </Grid>
                         </Grid>
@@ -492,7 +518,20 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                         fullWidth
                         value={paymentDraft?.date || ''}
                         onChange={(e) => setPaymentDraft((c) => c ? ({ ...c, date: e.target.value }) : c)}
-                        slotProps={{ inputLabel: { shrink: true } }}
+                        slotProps={{
+                            input: {
+                                onClick: (e: any) => {
+                                    if (typeof e.target.showPicker === 'function') {
+                                        try {
+                                            e.target.showPicker();
+                                        } catch (err) {
+                                            console.error('[DATEPICKER] Failed to open picker:', err);
+                                        }
+                                    }
+                                }
+                            },
+                            inputLabel: { shrink: true }
+                        }}
                         sx={{ mb: 2 }}
                     />
 

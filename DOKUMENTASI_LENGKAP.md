@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.10
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.17
 
 **Status**: ✅ Fully Documented
-**Last Updated**: May 22, 2026
-**Version**: 2.8.10
+**Last Updated**: Jul 25, 2026
+**Version**: 2.8.17
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -946,6 +946,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v2.8.17** | Jul 25, 2026 | Added configurable Telegram daily transaction reminders (on/off + custom hour) and enhanced desktop datepicker behavior |
 | **v2.8.13** | Jul 06, 2026 | Added time selection option for Telegram routine expense reminders and updated cron to run hourly |
 | **v2.8.12** | Jul 06, 2026 | Added Routine Expense management with monthly checklist, integrated with transaction system and Telegram reminders |
 | **v2.8.10** | May 22, 2026 | Fix Telegram bot query detection (e.g. show 10 last transs) and prevent auto-save false positives |

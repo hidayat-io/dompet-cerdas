@@ -619,7 +619,20 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                         size="small"
                         value={applyDate}
                         onChange={(e) => setApplyDate(e.target.value)}
-                        slotProps={{ inputLabel: { shrink: true } }}
+                        slotProps={{
+                            input: {
+                                onClick: (e: any) => {
+                                    if (typeof e.target.showPicker === 'function') {
+                                        try {
+                                            e.target.showPicker();
+                                        } catch (err) {
+                                            console.error('[DATEPICKER] Failed to open picker:', err);
+                                        }
+                                    }
+                                }
+                            },
+                            inputLabel: { shrink: true }
+                        }}
                     />
                 </FullScreenDialog>
 
@@ -664,7 +677,20 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                 fullWidth
                                 value={editItemPlannedDate}
                                 onChange={(e) => setEditItemPlannedDate(e.target.value)}
-                                slotProps={{ inputLabel: { shrink: true } }}
+                                slotProps={{
+                                    input: {
+                                        onClick: (e: any) => {
+                                            if (typeof e.target.showPicker === 'function') {
+                                                try {
+                                                    e.target.showPicker();
+                                                } catch (err) {
+                                                    console.error('[DATEPICKER] Failed to open picker:', err);
+                                                }
+                                            }
+                                        }
+                                    },
+                                    inputLabel: { shrink: true }
+                                }}
                             />
                             <FormControl size="small" fullWidth>
                                 <InputLabel>Status</InputLabel>
@@ -730,7 +756,20 @@ const PlanManager: React.FC<PlanManagerProps> = ({
                                 fullWidth
                                 value={newItemPlannedDate}
                                 onChange={(e) => setNewItemPlannedDate(e.target.value)}
-                                slotProps={{ inputLabel: { shrink: true } }}
+                                slotProps={{
+                                    input: {
+                                        onClick: (e: any) => {
+                                            if (typeof e.target.showPicker === 'function') {
+                                                try {
+                                                    e.target.showPicker();
+                                                } catch (err) {
+                                                    console.error('[DATEPICKER] Failed to open picker:', err);
+                                                }
+                                            }
+                                        }
+                                    },
+                                    inputLabel: { shrink: true }
+                                }}
                                 inputProps={{ 'data-testid': 'plans-item-date' }}
                             />
                     </Box>

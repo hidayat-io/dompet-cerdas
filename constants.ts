@@ -1,8 +1,8 @@
 import { Category, IconName } from './types';
 
 // App Version
-export const APP_VERSION = '2.8.16';
-export const APP_BUILD_DATE = 'Jul 06, 2026';
+export const APP_VERSION = '2.8.17';
+export const APP_BUILD_DATE = 'Jul 25, 2026';
 
 
 export const INITIAL_CATEGORIES: Category[] = [

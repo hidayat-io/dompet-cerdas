@@ -17,7 +17,7 @@ import {
     deletePrivateAccountScopedData,
     removeSharedAccountAccess,
 } from './services/sharedAccountService';
-import { processRoutineExpenseReminders } from './services/reminderService';
+import { processRoutineExpenseReminders, processDailyNoTransactionReminders } from './services/reminderService';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -589,6 +589,10 @@ export const dailyRoutineExpenseReminder = functions
     .onRun(async (context) => {
         console.log('Running hourly routine expense reminder check...');
         await processRoutineExpenseReminders();
+        
+        console.log('Running hourly daily transaction input reminder check...');
+        await processDailyNoTransactionReminders();
+        
         console.log('Finished daily routine expense reminder check.');
         return null;
     });
