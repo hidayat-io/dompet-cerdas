@@ -1,16 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
 import { callCloudFunction } from "./firebaseRuntime";
-import { Category, Transaction } from "../types";
-
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-
-const createAiClient = () => {
-  if (!apiKey) {
-    return null;
-  }
-
-  return new GoogleGenAI({ apiKey });
-};
+import { Category, ReceiptScanResult, Transaction } from "../types";
 
 export type FinancialAnalysisMode = "HEALTH" | "SPENDING" | "SAVINGS";
 
@@ -71,43 +60,31 @@ export const getFinancialAdvice = async (
 };
 
 export const validateCategoryWithAI = async (
-  newName: string,
-  existingCategories: Category[]
+  _newName: string,
+  _existingCategories: Category[]
 ): Promise<string[]> => {
-  const ai = createAiClient();
-  if (!ai) return [];
+  return [];
+};
 
-  if (existingCategories.length === 0) return [];
-
-  const categoryNames = existingCategories.map((category) => category.name).join(", ");
-
-  const prompt = `
-    Bertindaklah sebagai sistem validasi data yang cerdas.
-    Tugas Anda adalah mengecek apakah nama kategori baru yang diinput user memiliki kemiripan makna (sinonim) atau kemiripan penulisan (typo) dengan daftar kategori yang sudah ada.
-
-    Kategori Baru: "${newName}"
-    Daftar Kategori Existing: [${categoryNames}]
-
-    Instruksi:
-    1. Bandingkan "Kategori Baru" dengan setiap item di "Daftar Kategori Existing".
-    2. Cari yang artinya SAMA PERSIS, MIRIP (sinonim), atau TYPO.
-    3. Jika ditemukan kemiripan yang signifikan, sebutkan nama kategori existing tersebut.
-    4. Jangan sebutkan jika maknanya berbeda jauh.
-    5. Outputkan HANYA JSON Array string berisi nama kategori existing yang konflik.
-    6. Jika tidak ada yang mirip, outputkan [].
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: prompt,
-    });
-
-    const text = response.text || "[]";
-    const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    return JSON.parse(cleanJson);
-  } catch (error) {
-    console.error("Gemini Validation Error:", error);
-    return [];
+export const scanReceiptImage = async (compressedFile: File): Promise<ReceiptScanResult> => {
+  const validScanTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!validScanTypes.includes(compressedFile.type)) {
+    throw new Error("Hanya file foto (JPG, PNG, WEBP) yang didukung untuk scan struk.");
   }
+
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(new Error("Gagal membaca file."));
+    reader.readAsDataURL(compressedFile);
+  });
+
+  return callCloudFunction<{ imageBase64: string; mimeType: string }, ReceiptScanResult>(
+    "scanReceipt",
+    { imageBase64: base64, mimeType: "image/jpeg" }
+  );
 };

@@ -30,6 +30,8 @@ deploy/
 # Temporary files
 *.tmp
 *.temp
+scratch/
+.omo/
 
 # Firebase
 functions/lib/

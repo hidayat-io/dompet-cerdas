@@ -22,6 +22,9 @@ import FullScreenDialog from './FullScreenDialog';
 import { processFileForUpload } from '../utils/fileCompression';
 import Toast from './Toast';
 import { NotificationType } from './NotificationModal';
+import Tooltip from '@mui/material/Tooltip';
+import { scanReceiptImage } from '../services/geminiService';
+import { ReceiptScanResult } from '../types';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -104,6 +107,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [conflictBaseline, setConflictBaseline] = useState<Transaction | undefined>(initialData);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState('');
+  const [scanError, setScanError] = useState('');
+  const scanRequestedRef = useRef(false);
   const canEditTransaction = !initialData || !currentUserId || !initialData.createdByUserId || initialData.createdByUserId === currentUserId || activeAccountRole === 'OWNER';
   const isReadOnly = !!initialData && !canEditTransaction;
 
@@ -122,6 +129,42 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     if (transaction?.attachment?.name) return transaction.attachment.name;
     if (transaction?.attachmentName) return transaction.attachmentName;
     return 'Tanpa lampiran';
+  };
+
+  const matchCategoryFromSuggestion = (suggestion: string): string => {
+    const normalized = suggestion.toLowerCase().trim();
+    const exactMatch = categories.find(c => c.name.toLowerCase() === normalized);
+    if (exactMatch) return exactMatch.id;
+    const containsMatch = categories.find(c =>
+      c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())
+    );
+    if (containsMatch) return containsMatch.id;
+    const aliasMap: Record<string, string[]> = {
+      'makanan': ['makan', 'food', 'kuliner', 'resto', 'cafe'],
+      'transport': ['transportasi', 'bensin', 'bbm', 'parkir', 'gojek', 'grab'],
+      'belanja': ['shopping', 'market', 'minimarket'],
+      'belanja harian': ['daily', 'sembako'],
+      'tagihan': ['bill', 'pln', 'pdam', 'pulsa', 'internet'],
+      'kesehatan': ['health', 'obat', 'dokter', 'rs'],
+      'hiburan': ['entertain', 'movie', 'bioskop', 'game'],
+      'gaji': ['salary', 'income', 'upah'],
+    };
+    for (const [key, aliases] of Object.entries(aliasMap)) {
+      if (aliases.some(a => normalized.includes(a))) {
+        const aliasMatch = categories.find(c => c.name.toLowerCase().includes(key));
+        if (aliasMatch) return aliasMatch.id;
+      }
+    }
+    const belanja = categories.find(c => c.type === 'EXPENSE' && c.name.toLowerCase() === 'belanja');
+    if (belanja) return belanja.id;
+    const fallback = categories.find(c => c.type === 'EXPENSE');
+    return fallback?.id || '';
+  };
+
+  const validateScanDate = (dateStr: string): string => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   };
 
   const applyTransactionToForm = (transaction: Transaction) => {
@@ -145,6 +188,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
     setIsAttachmentDeleted(false);
     setCompressionMessage('');
     setError('');
+    setScanError('');
+    setScanMessage('');
+    setIsScanning(false);
+    scanRequestedRef.current = false;
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -199,8 +246,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    setError(''); setCompressionMessage('');
+    if (!file) {
+      // User cancelled file dialog — reset scan flag so next regular upload doesn't trigger scan
+      scanRequestedRef.current = false;
+      return;
+    }
+
+    // Capture and reset scan request flag IMMEDIATELY (no setTimeout)
+    const wasScanRequested = scanRequestedRef.current;
+    scanRequestedRef.current = false;
+
+    setError(''); setCompressionMessage(''); setScanError(''); setScanMessage('');
+
     const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!validImageTypes.includes(file.type) && file.type !== 'application/pdf') {
       setError('Hanya file foto (JPG, PNG, GIF, WEBP) atau PDF yang diizinkan.'); return;
@@ -214,14 +271,76 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
       if (result.type === 'image') setAttachmentPreview(URL.createObjectURL(result.file));
       else setAttachmentPreview(null);
       if (result.message) setCompressionMessage(result.message);
+
+      // AI Scan: only if triggered by scan button AND file is scan-eligible image
+      const validScanTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (wasScanRequested && validScanTypes.includes(file.type)) {
+        if (!navigator.onLine) {
+          setScanError('Fitur scan struk membutuhkan koneksi internet. Lampiran tetap tersimpan.');
+          return;
+        }
+        setIsScanning(true);
+        setScanMessage('Menganalisis struk...');
+        try {
+          const scanResult = await scanReceiptImage(result.file);
+          if (scanResult.is_receipt === false) {
+            setScanError('Foto ini sepertinya bukan struk belanja. Mohon upload foto struk yang valid.');
+            return;
+          }
+          if (!scanResult.totalAmount || scanResult.totalAmount <= 0) {
+            setScanError('Nominal total tidak terbaca. Pastikan angka "Total" terlihat jelas di foto.');
+            return;
+          }
+          setDisplayAmount(formatAmountInput(scanResult.totalAmount));
+          if (scanResult.date) setDate(validateScanDate(scanResult.date));
+          // Human-friendly description composition
+          let humanDescription = '';
+          if (scanResult.notes && scanResult.notes.trim()) {
+            humanDescription = scanResult.notes.trim();
+          } else if (scanResult.merchant && scanResult.items?.length) {
+            humanDescription = `Belanja di ${scanResult.merchant}: ${scanResult.items.slice(0, 3).join(', ')}`;
+          } else if (scanResult.merchant) {
+            humanDescription = `Belanja di ${scanResult.merchant}`;
+          } else if (scanResult.items?.length) {
+            humanDescription = `Belanja: ${scanResult.items.slice(0, 3).join(', ')}`;
+          } else {
+            humanDescription = 'Belanja Struk';
+          }
+          setDescription(humanDescription);
+          if (scanResult.categorySuggestion) {
+            const matchedCategoryId = matchCategoryFromSuggestion(scanResult.categorySuggestion);
+            if (matchedCategoryId) setCategoryId(matchedCategoryId);
+          }
+          setScanMessage('Struk berhasil dibaca! Silakan periksa dan sesuaikan.');
+          setCompressionMessage(`AI: ${scanResult.merchant || 'Struk'} — Rp ${formatAmountInput(scanResult.totalAmount)} (confidence: ${scanResult.confidence})`);
+        } catch (scanErr) {
+          const msg = scanErr instanceof Error ? scanErr.message : 'Gagal menganalisis struk. Silakan coba lagi.';
+          setScanError(msg);
+        } finally {
+          setIsScanning(false);
+        }
+      } else if (wasScanRequested) {
+        setScanError('Scan struk hanya mendukung foto JPG, PNG, atau WEBP. Lampiran tetap tersimpan.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memproses file.');
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
+  const handleScanButtonClick = () => {
+    if (!navigator.onLine) {
+      setScanError('Fitur scan struk membutuhkan koneksi internet.');
+      return;
+    }
+    scanRequestedRef.current = true;
+    fileInputRef.current?.click();
+  };
+
   const removeAttachment = () => {
     setAttachment(null); setAttachmentPreview(null); setAttachmentType(null); setCompressionMessage('');
+    setScanMessage('');
+    setScanError('');
     if (existingAttachment) setIsAttachmentDeleted(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -501,31 +620,93 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
               </Typography>
             </Paper>
           ) : (
-            <Paper sx={{ p: 1.5, bgcolor: 'action.hover' }}>
+            <Paper sx={{ p: 1.5, bgcolor: 'action.hover', position: 'relative', overflow: 'hidden' }}>
+              {isScanning && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    bgcolor: 'rgba(0, 0, 0, 0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1
+                  }}
+                />
+              )}
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, overflow: 'hidden' }}>
                   {showImagePreview ? (
-                    <Box component="img" src={attachmentPreview || existingAttachment?.url} alt="Preview" sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1.5 }} />
+                    <Box sx={{ position: 'relative' }}>
+                      <Box component="img" src={attachmentPreview || existingAttachment?.url} alt="Preview" sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1.5, opacity: isScanning ? 0.6 : 1 }} />
+                      {isScanning && (
+                        <CircularProgress size={20} sx={{ position: 'absolute', top: 14, left: 14 }} />
+                      )}
+                    </Box>
                   ) : (
                     <Box sx={{ width: 48, height: 48, borderRadius: 1.5, bgcolor: theme.colors.expenseBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <IconDisplay name="FileText" size={24} sx={{ color: theme.colors.expense }} />
+                      {isScanning ? <CircularProgress size={20} /> : <IconDisplay name="FileText" size={24} sx={{ color: theme.colors.expense }} />}
                     </Box>
                   )}
                   <Box sx={{ overflow: 'hidden' }}>
-                    <Typography variant="body2" fontWeight={600} noWrap>{attachment?.name || existingAttachment?.name}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" fontWeight={600} noWrap>{attachment?.name || existingAttachment?.name}</Typography>
+                      {isScanning ? (
+                        <Chip
+                          icon={<CircularProgress size={10} sx={{ color: 'inherit !important' }} />}
+                          label="Menganalisis AI..."
+                          size="small"
+                          color="primary"
+                          sx={{ height: 20, fontSize: 10, fontWeight: 700 }}
+                        />
+                      ) : scanMessage && !scanError ? (
+                        <Chip
+                          label="AI"
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          sx={{ height: 20, fontSize: 10 }}
+                        />
+                      ) : null}
+                    </Box>
                     <Typography variant="caption" color="text.disabled">
                       {attachment ? `${(attachment.size / 1024).toFixed(1)} KB` : 'Terlampir'} • {attachmentType === 'image' || existingAttachment?.type === 'image' ? 'Foto' : 'PDF'}
                     </Typography>
                   </Box>
                 </Box>
-                <IconButton size="small" onClick={removeAttachment} disabled={isSaving || isReadOnly}>
+                <IconButton size="small" onClick={removeAttachment} disabled={isSaving || isScanning || isReadOnly}>
                   <IconDisplay name="X" size={18} />
                 </IconButton>
               </Box>
             </Paper>
           )}
-          {compressionMessage && (
+          {!hasAttachment && (
+            <Tooltip title={!navigator.onLine ? 'Fitur ini membutuhkan koneksi internet' : 'Foto struk akan dianalisis AI untuk mengisi form otomatis'} arrow>
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                onClick={handleScanButtonClick}
+                disabled={isSaving || isScanning || isReadOnly || !navigator.onLine}
+                startIcon={isScanning ? <CircularProgress size={14} /> : <IconDisplay name="Sparkles" size={16} />}
+                sx={{ mt: 1, borderStyle: 'dashed', py: 0.75 }}
+              >
+                {isScanning ? 'Menganalisis struk...' : 'Scan Struk (AI)'}
+              </Button>
+            </Tooltip>
+          )}
+          {compressionMessage && !isScanning && !scanMessage && (
             <Alert severity="success" sx={{ mt: 1, py: 0.5, fontSize: 12 }}>{compressionMessage}</Alert>
+          )}
+          {scanError && (
+            <Alert severity="warning" sx={{ mt: 1, py: 0.5, fontSize: 12 }} onClose={() => setScanError('')}>
+              {scanError}
+            </Alert>
+          )}
+          {scanMessage && !scanError && !isScanning && (
+            <Alert severity="info" sx={{ mt: 1, py: 0.5, fontSize: 12 }} onClose={() => setScanMessage('')}>
+              {scanMessage}
+            </Alert>
           )}
         </Box>
 

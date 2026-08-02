@@ -52,6 +52,18 @@ export interface Attachment {
   size: number;
 }
 
+// Receipt scan result from AI (mirrors backend ReceiptData, minus receiptType & currency)
+export interface ReceiptScanResult {
+  merchant: string;
+  totalAmount: number;
+  date: string; // YYYY-MM-DD
+  items?: string[];
+  categorySuggestion: string;
+  confidence: 'high' | 'medium' | 'low';
+  is_receipt?: boolean;
+  notes?: string;
+}
+
 export interface Transaction {
   id: string;
   amount: number;
