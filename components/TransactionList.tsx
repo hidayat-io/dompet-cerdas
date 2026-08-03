@@ -335,31 +335,78 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       )}
 
       <Box sx={{ pb: { xs: 10, md: 0 } }}>
-        {/* Summary Strip - Compact */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 3 }}>
+        {/* Summary Strip - Compact & Responsive */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: { xs: 0.5, sm: 1.5 },
+            mb: 2,
+            p: { xs: 1.25, sm: 2 },
+            bgcolor: 'action.hover',
+            borderRadius: 3,
+          }}
+        >
           <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" display="block" noWrap>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: { xs: 10, sm: 12 } }} noWrap>
               Masuk
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.income, whiteSpace: 'nowrap' }} component="span">
+            <Typography
+              fontWeight={700}
+              sx={{
+                color: theme.colors.income,
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+              }}
+            >
               {totalIncome > 0 ? formatRp(totalIncome).replace(/\u00A0/g, ' ') : 'Rp 0'}
             </Typography>
           </Box>
-          <Box sx={{ width: 1, bgcolor: 'divider', flexShrink: 0 }} />
+          <Box sx={{ width: 1, height: 24, bgcolor: 'divider', flexShrink: 0 }} />
           <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" display="block" noWrap>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: { xs: 10, sm: 12 } }} noWrap>
               Keluar
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense, whiteSpace: 'nowrap' }} component="span">
+            <Typography
+              fontWeight={700}
+              sx={{
+                color: theme.colors.expense,
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+              }}
+            >
               {totalExpense > 0 ? formatRp(totalExpense).replace(/\u00A0/g, ' ') : 'Rp 0'}
             </Typography>
           </Box>
-          <Box sx={{ width: 1, bgcolor: 'divider', flexShrink: 0 }} />
+          <Box sx={{ width: 1, height: 24, bgcolor: 'divider', flexShrink: 0 }} />
           <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" display="block" noWrap>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: { xs: 10, sm: 12 } }} noWrap>
               Selisih
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense, whiteSpace: 'nowrap' }} component="span">
+            <Typography
+              fontWeight={700}
+              sx={{
+                color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense,
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+              }}
+            >
               {totalBalance > 0 ? '+' : totalBalance < 0 ? '−' : ''}{totalBalance !== 0 ? formatRp(Math.abs(totalBalance)).replace(/\u00A0/g, ' ') : 'Rp 0'}
             </Typography>
           </Box>
