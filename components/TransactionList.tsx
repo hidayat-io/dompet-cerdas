@@ -335,83 +335,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       )}
 
       <Box sx={{ pb: { xs: 10, md: 0 } }}>
-        {/* Summary Strip - Compact & Responsive */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: { xs: 0.5, sm: 1.5 },
-            mb: 2,
-            p: { xs: 1.25, sm: 2 },
-            bgcolor: 'action.hover',
-            borderRadius: 3,
-          }}
-        >
-          <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: { xs: 10, sm: 12 } }} noWrap>
-              Masuk
-            </Typography>
-            <Typography
-              fontWeight={700}
-              sx={{
-                color: theme.colors.income,
-                fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: 'block',
-              }}
-            >
-              {totalIncome > 0 ? formatRp(totalIncome).replace(/\u00A0/g, ' ') : 'Rp 0'}
-            </Typography>
-          </Box>
-          <Box sx={{ width: 1, height: 24, bgcolor: 'divider', flexShrink: 0 }} />
-          <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: { xs: 10, sm: 12 } }} noWrap>
-              Keluar
-            </Typography>
-            <Typography
-              fontWeight={700}
-              sx={{
-                color: theme.colors.expense,
-                fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: 'block',
-              }}
-            >
-              {totalExpense > 0 ? formatRp(totalExpense).replace(/\u00A0/g, ' ') : 'Rp 0'}
-            </Typography>
-          </Box>
-          <Box sx={{ width: 1, height: 24, bgcolor: 'divider', flexShrink: 0 }} />
-          <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: { xs: 10, sm: 12 } }} noWrap>
-              Selisih
-            </Typography>
-            <Typography
-              fontWeight={700}
-              sx={{
-                color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense,
-                fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: 'block',
-              }}
-            >
-              {totalBalance > 0 ? '+' : totalBalance < 0 ? '−' : ''}{totalBalance !== 0 ? formatRp(Math.abs(totalBalance)).replace(/\u00A0/g, ' ') : 'Rp 0'}
-            </Typography>
-          </Box>
-        </Box>
-
         {/* Header + Filter Toggle */}
         <PageHeader
           title="Riwayat Transaksi"
@@ -717,10 +640,21 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           </Box>
         )}
 
-        {/* Transaction Count */}
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          {filteredTransactions.length} transaksi ditemukan
-        </Typography>
+        {/* Transaction Count & Compact Summary */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            {filteredTransactions.length} transaksi ditemukan
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontSize: 12 }}>
+            <Typography variant="caption" sx={{ color: theme.colors.income, fontWeight: 700 }}>
+              +{formatRp(totalIncome).replace(/\u00A0/g, ' ')}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>•</Typography>
+            <Typography variant="caption" sx={{ color: theme.colors.expense, fontWeight: 700 }}>
+              -{formatRp(totalExpense).replace(/\u00A0/g, ' ')}
+            </Typography>
+          </Box>
+        </Box>
 
         {/* Empty State */}
         {filteredTransactions.length === 0 && (
