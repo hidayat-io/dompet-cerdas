@@ -118,12 +118,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatAmountInput = (amount: number) => {
-      const ns = amount.toString().split(',');
-      const sisa = ns[0].length % 3;
-      let rupiah = ns[0].substr(0, sisa);
-      const ribuan = ns[0].substr(sisa).match(/\d{3}/gi);
-      if (ribuan) rupiah += (sisa ? '.' : '') + ribuan.join('.');
-      return rupiah;
+    if (isNaN(amount) || amount === 0) return '';
+    return Math.abs(Math.round(amount)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
   const getAttachmentLabel = (transaction?: Transaction | null) => {
@@ -232,12 +228,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const hasRemoteConflict = !!(initialData && latestData && latestData.id === initialData.id && getTransactionSnapshot(conflictBaseline) !== getTransactionSnapshot(latestData));
 
   const formatRupiah = (value: string) => {
-    const ns = value.replace(/[^,\d]/g, '').split(',');
-    const sisa = ns[0].length % 3;
-    let rupiah = ns[0].substr(0, sisa);
-    const ribuan = ns[0].substr(sisa).match(/\d{3}/gi);
-    if (ribuan) rupiah += (sisa ? '.' : '') + ribuan.join('.');
-    return ns[1] !== undefined ? rupiah + ',' + ns[1] : rupiah;
+    const clean = value.replace(/\D/g, '');
+    if (!clean) return '';
+    return parseInt(clean, 10).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -634,39 +627,29 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           </Box>
         </Box>
 
-        {/* Advanced Toggle */}
-        <Button
-          size="small"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          sx={{ mb: 2, color: theme.colors.accent, fontWeight: 600 }}
-        >
-          {showAdvanced ? 'Sembunyikan detail' : 'Tambah detail (catatan, lampiran)'}
-        </Button>
+        {/* Description / Catatan (Selalu Tampil) */}
+        <TextField
+          fullWidth
+          label="Catatan / Keterangan"
+          multiline
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          disabled={isSaving || isReadOnly}
+          placeholder="Contoh: Makan siang, Gaji bulanan"
+          sx={{ mb: 2 }}
+          slotProps={{
+            inputLabel: { shrink: true },
+            input: { notched: true },
+          }}
+        />
 
-        {showAdvanced && (
-          <>
-            {/* Description */}
-            <TextField
-              fullWidth
-              label="Catatan"
-              multiline
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={isSaving || isReadOnly}
-              placeholder="Contoh: Makan siang, Gaji bulanan"
-              sx={{ mb: 2 }}
-              slotProps={{
-                inputLabel: { shrink: true },
-                input: { notched: true },
-              }}
-            />
-
-            {/* Attachment */}
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                Lampiran
-              </Typography>
+        {/* Attachment (Selalu Tampil) */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+            Lampiran Foto / PDF (opsional)
+          </Typography>
+          <input type="file" ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileSelect} disabled={isSaving || isReadOnly} style={{ display: 'none' }} />
           <input type="file" ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileSelect} disabled={isSaving || isReadOnly} style={{ display: 'none' }} />
           {!hasAttachment ? (
             <Paper
@@ -776,9 +759,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
               {scanMessage}
             </Alert>
           )}
-            </Box>
-          </>
-        )}
+        </Box>
 
         {initialData?.source && (
           <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
