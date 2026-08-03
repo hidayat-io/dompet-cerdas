@@ -1,8 +1,9 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Transaction, Category } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import TransactionForm from './TransactionForm';
+import TransactionActionSheet from './TransactionActionSheet';
 import { NotificationType } from './NotificationModal';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -146,27 +147,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
 
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
-  // Long Press Logic with Animation
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [longPressedId, setLongPressedId] = useState<string | null>(null);
-
-  const handleTouchStart = (transaction: Transaction) => {
-    setLongPressedId(transaction.id);
-    longPressTimerRef.current = setTimeout(() => {
-      setEditingTransaction(transaction);
-      setLongPressedId(null);
-      if (navigator && navigator.vibrate) navigator.vibrate(50);
-    }, 600);
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    setLongPressedId(null);
-  };
-
   // Filter state
   const [filterMode, setFilterMode] = useState<FilterMode>('month');
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
@@ -186,6 +166,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
+
+  const [actionSheetTransaction, setActionSheetTransaction] = useState<Transaction | null>(null);
 
   const yearOptions = useMemo(() => generateYearOptions(), []);
 
@@ -353,25 +335,35 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       )}
 
       <Box sx={{ pb: { xs: 10, md: 0 } }}>
-        {/* Summary Cards */}
-        <Grid container spacing={1.5} sx={{ mb: 2 }}>
-          {[
-            { label: 'Pemasukan', value: totalIncome, color: theme.colors.income },
-            { label: 'Pengeluaran', value: totalExpense, color: theme.colors.expense },
-            { label: 'Saldo', value: totalBalance, color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense, prefix: totalBalance > 0 ? '+' : '' },
-          ].map((item) => (
-            <Grid size={{ xs: 4 }} key={item.label}>
-              <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, borderRadius: 2 }}>
-                <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                  {item.label}
-                </Typography>
-                <Typography variant="body2" fontWeight={700} sx={{ color: item.color, fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>
-                  {item.prefix}{formatRp(item.value)}
-                </Typography>
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
+        {/* Summary Strip - Compact */}
+        <Box sx={{ display: 'flex', gap: 1.5, mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 3 }}>
+          <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary" display="block">
+              Masuk
+            </Typography>
+            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.income }}>
+              {formatRp(totalIncome)}
+            </Typography>
+          </Box>
+          <Box sx={{ width: 1, bgcolor: 'divider' }} />
+          <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary" display="block">
+              Keluar
+            </Typography>
+            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense }}>
+              {formatRp(totalExpense)}
+            </Typography>
+          </Box>
+          <Box sx={{ width: 1, bgcolor: 'divider' }} />
+          <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary" display="block">
+              Selisih
+            </Typography>
+            <Typography variant="body2" fontWeight={700} sx={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense }}>
+              {totalBalance >= 0 ? '+' : ''}{formatRp(totalBalance)}
+            </Typography>
+          </Box>
+        </Box>
 
         {/* Header + Filter Toggle */}
         <PageHeader
@@ -698,9 +690,9 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           </Card>
         )}
 
-        {/* Transactions grouped by date */}
+        {/* Transactions grouped by date - Compact mobile list */}
         {filteredTransactions.length > 0 && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
               {Object.entries(groupedTransactions).map(([date, txs]) => {
                 const transactionsForDate = txs as Transaction[];
                 const { dayDate, dayName, monthYear } = getDateParts(date);
@@ -708,76 +700,45 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                 const isToday = date === todayKey;
 
                 return (
-                  <Card
-                    key={date}
-                    variant="outlined"
-                    sx={{
-                      overflow: 'hidden',
-                      borderRadius: 4,
-                      borderColor: isToday ? 'primary.main' : 'divider',
-                      boxShadow: isToday ? `0 0 0 1px ${theme.colors.accent}22` : 'none',
-                    }}
-                  >
+                  <Box key={date} sx={{ mb: 2 }}>
+                    {/* Compact sticky date header */}
                     <Box
                       sx={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: 2,
-                        px: { xs: 2.5, md: 3 },
-                        py: 2,
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        background: isToday
-                          ? `linear-gradient(135deg, ${theme.colors.accentLight} 0%, ${theme.colors.bgCard} 100%)`
-                          : 'linear-gradient(180deg, rgba(148,163,184,0.06) 0%, rgba(148,163,184,0.02) 100%)',
+                        px: 2,
+                        py: 1.5,
+                        mb: 0.5,
+                        bgcolor: isToday ? theme.colors.accentLight : 'transparent',
+                        borderRadius: 2,
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1,
+                        backdropFilter: 'blur(8px)',
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box
-                          sx={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: 3,
-                            bgcolor: isToday ? 'primary.main' : 'background.paper',
-                            color: isToday ? '#fff' : 'text.primary',
-                            border: '1px solid',
-                            borderColor: isToday ? 'primary.main' : 'divider',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: isToday ? `0 12px 24px ${theme.colors.accent}25` : 'none',
-                          }}
-                        >
-                          <Typography sx={{ fontSize: 30, fontWeight: 300, lineHeight: 1, letterSpacing: '-1px', color: 'inherit' }}>
-                            {dayDate}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="h6" fontWeight={700} color="text.primary" lineHeight={1.2}>
-                            {dayName}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                            {monthYear}
-                          </Typography>
-                        </Box>
+                      <Box>
+                        <Typography variant="body2" fontWeight={700} color={isToday ? theme.colors.accent : 'text.primary'}>
+                          {dayName}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {dayDate} {monthYear}
+                        </Typography>
                       </Box>
-                      <Chip
-                        label={`${dailyTotal > 0 ? '+' : ''}${formatRp(dailyTotal)}`}
-                        size="small"
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
                         sx={{
-                          bgcolor: dailyTotal >= 0 ? theme.colors.incomeBg : theme.colors.expenseBg,
                           color: dailyTotal >= 0 ? theme.colors.income : theme.colors.expense,
-                          fontWeight: 700,
-                          height: 28,
-                          borderRadius: 2,
                         }}
-                      />
+                      >
+                        {dailyTotal > 0 ? '+' : ''}{formatRp(dailyTotal)}
+                      </Typography>
                     </Box>
 
-                    <List disablePadding sx={{ bgcolor: 'background.paper' }}>
-                    {transactionsForDate.map((t, idx, arr) => {
+                    <List disablePadding sx={{ bgcolor: 'background.paper', borderRadius: 3, overflow: 'hidden' }}>
+                    {transactionsForDate.map((t, idx) => {
                       const cat = categories.find(c => c.id === t.categoryId);
                       const isIncome = cat?.type === 'INCOME';
                       const attachmentData = t.attachmentUrl
@@ -789,66 +750,61 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
 
                       return (
                         <React.Fragment key={t.id}>
-                          <ListItemButton 
-                            sx={{ 
-                              py: 2,
-                              px: { xs: 2.5, md: 3 },
-                              transition: 'all 0.2s',
-                              transform: longPressedId === t.id ? 'scale(0.98)' : 'none',
-                              opacity: longPressedId === t.id ? 0.7 : 1,
-                              bgcolor: longPressedId === t.id ? theme.colors.accentLight : 'transparent',
-                              '&:hover': {
-                                bgcolor: 'action.hover',
-                              },
+                          <ListItemButton
+                            onClick={() => setActionSheetTransaction(t)}
+                            sx={{
+                              py: 1.5,
+                              px: 2,
+                              transition: 'all 0.15s',
+                              '&:hover': { bgcolor: 'action.hover' },
+                              '&:active': { bgcolor: 'action.selected' },
                             }}
-                            onTouchStart={() => handleTouchStart(t)}
-                            onTouchEnd={handleTouchEnd}
-                            onTouchMove={handleTouchEnd}
-                            onMouseDown={() => handleTouchStart(t)}
-                            onMouseUp={handleTouchEnd}
-                            onMouseLeave={handleTouchEnd}
                           >
                             <ListItemAvatar>
-                              <Avatar sx={{ bgcolor: cat?.color || theme.colors.bgHover, width: 44, height: 44 }}>
-                                <IconDisplay name={cat?.icon || 'HelpCircle'} size={22} sx={{ color: '#fff' }} />
+                              <Avatar sx={{ bgcolor: cat?.color || theme.colors.bgHover, width: 40, height: 40 }}>
+                                <IconDisplay name={cat?.icon || 'HelpCircle'} size={20} sx={{ color: '#fff' }} />
                               </Avatar>
                             </ListItemAvatar>
-                            <ListItemText 
-                              primary={<Typography variant="subtitle1" fontWeight={700} noWrap>{cat?.name || 'Kategori Dihapus'}</Typography>}
+                            <ListItemText
+                              primary={
+                                <Typography variant="body2" fontWeight={700} noWrap sx={{ mb: 0.25 }}>
+                                  {t.description || cat?.name || 'Tanpa deskripsi'}
+                                </Typography>
+                              }
                               secondary={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                  <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 200 }}>
-                                    {t.description || 'Tidak ada catatan'}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                                  <Typography variant="caption" color="text.secondary" noWrap>
+                                    {cat?.name || 'Kategori Dihapus'}
                                   </Typography>
                                   {attachmentData && (
                                     <Chip
                                       size="small"
-                                      icon={<IconDisplay name={attachmentData.type === 'image' ? 'Image' : 'FileText'} size={12} />}
+                                      icon={<IconDisplay name={attachmentData.type === 'image' ? 'Image' : 'FileText'} size={10} />}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setViewingAttachment(attachmentData);
                                       }}
                                       sx={{
-                                        height: 20,
-                                        fontSize: 10,
+                                        height: 18,
+                                        fontSize: 9,
                                         cursor: 'pointer',
-                                        color: attachmentData.type === 'image' ? theme.colors.income : theme.colors.accent,
-                                        bgcolor: attachmentData.type === 'image' ? theme.colors.incomeBg : theme.colors.accentLight,
-                                        '& .MuiChip-label': { px: 1 },
+                                        color: theme.colors.info,
+                                        bgcolor: theme.colors.infoBg,
+                                        '& .MuiChip-label': { px: 0.75 },
                                       }}
                                     />
                                   )}
                                   {pendingAttachmentUpload && (
                                     <Chip
                                       size="small"
-                                      icon={<IconDisplay name={pendingAttachmentUpload.status === 'failed' ? 'AlertCircle' : 'Loader'} size={12} />}
-                                      label={pendingAttachmentUpload.status === 'failed' ? 'Upload gagal' : 'Menunggu upload'}
+                                      icon={<IconDisplay name={pendingAttachmentUpload.status === 'failed' ? 'AlertCircle' : 'Loader'} size={10} />}
+                                      label={pendingAttachmentUpload.status === 'failed' ? 'Gagal' : 'Sync...'}
                                       sx={{
-                                        height: 20,
-                                        fontSize: 10,
-                                        color: pendingAttachmentUpload.status === 'failed' ? theme.colors.error : theme.colors.accent,
-                                        bgcolor: pendingAttachmentUpload.status === 'failed' ? theme.colors.errorLight : theme.colors.accentLight,
-                                        '& .MuiChip-label': { px: 1 },
+                                        height: 18,
+                                        fontSize: 9,
+                                        color: pendingAttachmentUpload.status === 'failed' ? theme.colors.error : theme.colors.warning,
+                                        bgcolor: pendingAttachmentUpload.status === 'failed' ? theme.colors.errorLight : theme.colors.warningBg,
+                                        '& .MuiChip-label': { px: 0.75 },
                                       }}
                                     />
                                   )}
@@ -857,19 +813,19 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                               sx={{ m: 0, pr: 2 }}
                             />
                             <Typography
-                              variant="subtitle1"
+                              variant="body2"
                               fontWeight={700}
                               sx={{ color: isIncome ? theme.colors.income : theme.colors.textPrimary, flexShrink: 0, whiteSpace: 'nowrap' }}
                             >
                               {isIncome ? '+' : '-'}{formatRp(t.amount)}
                             </Typography>
                           </ListItemButton>
-                          {idx < arr.length - 1 && <Divider component="li" variant="inset" sx={{ ml: { xs: 9, md: 10 } }} />}
+                          {idx < transactionsForDate.length - 1 && <Divider component="li" variant="inset" sx={{ ml: 8 }} />}
                         </React.Fragment>
                       );
                     })}
                     </List>
-                  </Card>
+                  </Box>
                 );
               })}
           </Box>
@@ -891,6 +847,51 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           onShowNotification={onShowNotification}
         />
       )}
+
+      {/* Action Sheet */}
+      <TransactionActionSheet
+        open={!!actionSheetTransaction}
+        transaction={actionSheetTransaction ? {
+          id: actionSheetTransaction.id,
+          description: actionSheetTransaction.description,
+          amount: actionSheetTransaction.amount,
+          date: actionSheetTransaction.date,
+          categoryName: categories.find(c => c.id === actionSheetTransaction.categoryId)?.name,
+          hasAttachment: !!(actionSheetTransaction.attachment || actionSheetTransaction.attachmentUrl),
+          canEdit: !currentUserId || !actionSheetTransaction.createdByUserId || actionSheetTransaction.createdByUserId === currentUserId || activeAccountRole === 'OWNER',
+        } : null}
+        onClose={() => setActionSheetTransaction(null)}
+        onAction={(action) => {
+          if (!actionSheetTransaction) return;
+
+          switch (action) {
+            case 'view':
+              if (actionSheetTransaction.attachmentUrl) {
+                setViewingAttachment({
+                  url: actionSheetTransaction.attachmentUrl,
+                  name: actionSheetTransaction.attachmentName || 'Lampiran',
+                  type: actionSheetTransaction.attachmentType || 'image',
+                });
+              } else if (actionSheetTransaction.attachment) {
+                setViewingAttachment({
+                  url: actionSheetTransaction.attachment.url,
+                  name: actionSheetTransaction.attachment.name,
+                  type: actionSheetTransaction.attachment.type,
+                });
+              }
+              break;
+            case 'edit':
+              setEditingTransaction(actionSheetTransaction);
+              break;
+            case 'duplicate':
+              onShowNotification?.('info', 'Fitur Duplikat', 'Fitur duplikat transaksi akan segera hadir.', true);
+              break;
+            case 'delete':
+              onDelete(actionSheetTransaction.id);
+              break;
+          }
+        }}
+      />
     </>
   );
 };

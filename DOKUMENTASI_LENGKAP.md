@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v2.8.17
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v3.0.0
 
 **Status**: ✅ Fully Documented
-**Last Updated**: Jul 25, 2026
-**Version**: 2.8.17
+**Last Updated**: Aug 3, 2026
+**Version**: 3.0.0
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 

@@ -262,7 +262,6 @@ const iconMap: Record<string, string> = {
   MoreHorizontal: 'more_horiz',
   MoreVertical: 'more_vert',
   AlertCircle: 'error',
-  AlertTriangle: 'warning',
   Info: 'info',
   HelpCircle: 'help',
   CheckCircle: 'check_circle',
@@ -275,6 +274,11 @@ const iconMap: Record<string, string> = {
   Database: 'storage',
   Loader: 'hourglass_empty',
   Inbox: 'inbox',
+  Copy: 'content_copy',
+  ChevronRight: 'chevron_right',
+  Clock: 'schedule',
+  WifiOff: 'wifi_off',
+  AlertTriangle: 'warning',
 };
 
 interface IconDisplayProps {

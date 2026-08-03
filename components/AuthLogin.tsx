@@ -9,7 +9,6 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconDisplay from './IconDisplay';
 
-// Detect mobile devices
 const isMobile = (): boolean => {
     if (typeof window === 'undefined') return false;
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -24,6 +23,12 @@ const GoogleLogo: React.FC = () => (
     </svg>
 );
 
+const features = [
+    { icon: 'Zap', title: 'Catat Cepat', desc: '3 detik untuk input transaksi' },
+    { icon: 'PieChart', title: 'Anggaran Terpantau', desc: 'Alert otomatis saat hampir habis' },
+    { icon: 'Send', title: 'Telegram Bot', desc: 'Catat lewat chat & voice note' },
+];
+
 const AuthLogin: React.FC = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +37,6 @@ const AuthLogin: React.FC = () => {
     const testEmail = import.meta.env.VITE_E2E_TEST_EMAIL || 'e2e.test@dompet.local';
     const testPassword = import.meta.env.VITE_E2E_TEST_PASSWORD || 'E2eTest123!';
 
-    // Check for redirect result on page load (for mobile redirect flow)
     useEffect(() => {
         let active = true;
         const checkRedirectResult = async () => {
@@ -63,7 +67,6 @@ const AuthLogin: React.FC = () => {
         setIsLoading(true);
         setError('');
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (!(auth as any).app) {
             setError("Firebase belum terinisialisasi. Silakan refresh halaman.");
             setIsLoading(false);
@@ -130,62 +133,106 @@ const AuthLogin: React.FC = () => {
     if (isCheckingRedirect) {
         return (
             <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
-                <Paper elevation={3} sx={{ borderRadius: 4, p: 4, maxWidth: 448, width: '100%', textAlign: 'center' }}>
+                <Box sx={{ textAlign: 'center' }}>
                     <CircularProgress sx={{ mb: 2 }} />
                     <Typography color="text.secondary">Memeriksa status login...</Typography>
-                </Paper>
+                </Box>
             </Box>
         );
     }
 
     return (
-        <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
-            <Paper elevation={3} sx={{ borderRadius: 4, p: 4, maxWidth: 448, width: '100%', textAlign: 'center' }}>
-                {/* App Icon */}
+        <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3, bgcolor: 'background.default' }}>
+            {/* Logo & Tagline */}
+            <Box sx={{ textAlign: 'center', mb: 4, maxWidth: 360 }}>
                 <Box
                     sx={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 3,
+                        width: 72,
+                        height: 72,
+                        borderRadius: 4,
                         bgcolor: 'primary.main',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         mx: 'auto',
                         mb: 3,
-                        boxShadow: '0 8px 24px rgba(79,70,229,0.3)',
+                        boxShadow: '0 8px 32px rgba(79,70,229,0.25)',
                     }}
                 >
-                    <IconDisplay name="Wallet" size={32} sx={{ color: '#fff' }} />
+                    <IconDisplay name="Wallet" size={36} sx={{ color: '#fff' }} />
                 </Box>
-
                 <Typography variant="h4" fontWeight={700} gutterBottom>
                     DompetCerdas
                 </Typography>
-                <Typography color="text.secondary" sx={{ mb: 3 }}>
-                    Kelola keuanganmu dengan lebih pintar, aman, dan terintegrasi di cloud.
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+                    Kelola keuangan dengan lebih pintar dan terintegrasi
                 </Typography>
+            </Box>
 
+            {/* Feature Highlights */}
+            <Box sx={{ width: '100%', maxWidth: 360, mb: 4 }}>
+                {features.map((feature) => (
+                    <Box
+                        key={feature.title}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            p: 2,
+                            mb: 1.5,
+                            borderRadius: 3,
+                            bgcolor: 'background.paper',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 2,
+                                bgcolor: 'primary.light',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                            }}
+                        >
+                            <IconDisplay name={feature.icon} size={22} sx={{ color: 'primary.main' }} />
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" fontWeight={700}>
+                                {feature.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                {feature.desc}
+                            </Typography>
+                        </Box>
+                    </Box>
+                ))}
+            </Box>
+
+            {/* Login Card */}
+            <Paper elevation={0} sx={{ width: '100%', maxWidth: 360, p: 3, borderRadius: 4 }}>
                 {error && (
-                    <Alert severity="error" sx={{ mb: 3, textAlign: 'left' }}>
+                    <Alert severity="error" sx={{ mb: 3 }}>
                         {error}
                     </Alert>
                 )}
 
                 <Button
                     fullWidth
-                    variant="outlined"
+                    variant="contained"
                     onClick={handleLogin}
                     disabled={isLoading}
-                    startIcon={isLoading ? <CircularProgress size={18} /> : <GoogleLogo />}
+                    startIcon={isLoading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : <GoogleLogo />}
                     sx={{
-                        py: 1.25,
-                        borderRadius: 2,
+                        py: 1.5,
+                        borderRadius: 3,
                         fontWeight: 600,
-                        borderColor: 'divider',
-                        color: 'text.primary',
-                        bgcolor: 'background.paper',
-                        '&:hover': { bgcolor: 'action.hover', borderColor: 'divider' },
+                        fontSize: 15,
+                        bgcolor: '#4285F4',
+                        '&:hover': { bgcolor: '#3367D6' },
                     }}
                 >
                     Masuk dengan Google
@@ -194,13 +241,13 @@ const AuthLogin: React.FC = () => {
                 {isE2EMode && (
                     <Button
                         fullWidth
-                        variant="contained"
+                        variant="outlined"
                         onClick={handleTestLogin}
                         disabled={isLoading}
                         sx={{
                             mt: 1.5,
                             py: 1.25,
-                            borderRadius: 2,
+                            borderRadius: 3,
                             fontWeight: 600,
                         }}
                         data-testid="auth-e2e-login"
@@ -209,8 +256,8 @@ const AuthLogin: React.FC = () => {
                     </Button>
                 )}
 
-                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 3 }}>
-                    Dengan masuk, kamu menyetujui bahwa data akan tersimpan di cloud Firebase.
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 3, textAlign: 'center' }}>
+                    Dengan masuk, kamu menyetujui bahwa data akan tersimpan aman di cloud Firebase
                 </Typography>
             </Paper>
         </Box>

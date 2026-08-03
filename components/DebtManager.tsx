@@ -879,52 +879,126 @@ const DebtManager: React.FC<DebtManagerProps> = ({
                         <Paper
                             key={debt.id}
                             variant="outlined"
-                            component="button"
-                            onClick={() => setActiveDebtId(debt.id)}
                             sx={{
-                                px: 2, py: 2, borderRadius: 3.5, cursor: 'pointer', textAlign: 'left', width: '100%',
-                                bgcolor: 'background.paper', transition: 'box-shadow 0.15s',
-                                '&:hover': { boxShadow: 3 },
+                                px: 2.5, py: 2.5, borderRadius: 3, textAlign: 'left',
+                                bgcolor: isOverdue(debt) ? theme.colors.expenseBg : 'background.paper',
+                                borderColor: isOverdue(debt) ? theme.colors.expense : 'divider',
+                                borderWidth: isOverdue(debt) ? 2 : 1,
                             }}
                         >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Box sx={{
-                                    width: 48, height: 48, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 14, fontWeight: 700,
-                                    bgcolor: debt.kind === 'RECEIVABLE' ? theme.colors.incomeBg : theme.colors.expenseBg,
-                                    color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense,
-                                }}>
-                                    {getInitials(debt.personName)}
-                                </Box>
-
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 0.5 }}>
-                                        <Box sx={{ minWidth: 0 }}>
-                                            <Typography variant="body1" fontWeight={600} noWrap>{debt.personName}</Typography>
-                                            <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, flex: 1, minWidth: 0 }}>
+                                        <Box sx={{
+                                            width: 44, height: 44, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 13, fontWeight: 700,
+                                            bgcolor: debt.kind === 'RECEIVABLE' ? theme.colors.incomeBg : theme.colors.expenseBg,
+                                            color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense,
+                                        }}>
+                                            {getInitials(debt.personName)}
+                                        </Box>
+                                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                                            <Typography variant="body1" fontWeight={700} sx={{ mb: 0.25 }}>{debt.personName}</Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                                 {getSupportingText(debt)}
                                             </Typography>
                                         </Box>
-                                        <Typography variant="body1" fontWeight={700} sx={{ color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense, flexShrink: 0 }}>
-                                            {formatRp(debt.remainingAmount)}
-                                        </Typography>
                                     </Box>
+                                    <Typography variant="h6" fontWeight={700} sx={{ color: debt.kind === 'RECEIVABLE' ? theme.colors.income : theme.colors.expense, flexShrink: 0, ml: 2 }}>
+                                        {formatRp(debt.remainingAmount)}
+                                    </Typography>
+                                </Box>
 
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                    <Chip
+                                        size="small"
+                                        label={getStatusLabel(debt.status)}
+                                        sx={{ ...getStatusChipSx(debt), height: 24, fontSize: 11, fontWeight: 700 }}
+                                    />
+                                    {debt.dueDate && (
                                         <Chip
                                             size="small"
-                                            label={getStatusLabel(debt.status)}
-                                            sx={{ ...getStatusChipSx(debt), height: 22, fontSize: 11, fontWeight: 700 }}
+                                            icon={isOverdue(debt) ? <IconDisplay name="AlertTriangle" size={12} /> : <IconDisplay name="Clock" size={12} />}
+                                            label={isOverdue(debt) ? 'Lewat jatuh tempo' : `Tempo ${formatShortDate(debt.dueDate)}`}
+                                            sx={{
+                                                height: 24,
+                                                fontSize: 11,
+                                                fontWeight: 600,
+                                                bgcolor: isOverdue(debt) ? theme.colors.expense : 'action.hover',
+                                                color: isOverdue(debt) ? '#fff' : 'text.secondary',
+                                            }}
                                         />
-                                        {debt.dueDate && (
-                                            <Chip
-                                                size="small"
-                                                label={isOverdue(debt) ? 'Lewat jatuh tempo' : `Jatuh tempo ${formatShortDate(debt.dueDate)}`}
-                                                sx={{ height: 22, fontSize: 11, fontWeight: 600 }}
-                                            />
-                                        )}
-                                    </Box>
+                                    )}
                                 </Box>
+
+                                {debt.status !== 'PAID' && (
+                                    <Box sx={{ display: 'flex', gap: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPaymentDraft({
+                                                    debtId: debt.id,
+                                                    amount: debt.remainingAmount > 0
+                                                        ? new Intl.NumberFormat('id-ID').format(debt.remainingAmount)
+                                                        : '',
+                                                    date: getToday(),
+                                                    note: '',
+                                                });
+                                            }}
+                                            sx={{
+                                                flex: 1,
+                                                borderRadius: 2,
+                                                textTransform: 'none',
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            Catat Pembayaran
+                                        </Button>
+                                        <IconButton
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPayoffTarget(debt);
+                                            }}
+                                            sx={{
+                                                width: 40,
+                                                height: 40,
+                                                borderRadius: 2,
+                                                bgcolor: 'action.hover',
+                                            }}
+                                        >
+                                            <IconDisplay name="Check" size={18} />
+                                        </IconButton>
+                                        <IconButton
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveDebtId(debt.id);
+                                            }}
+                                            sx={{
+                                                width: 40,
+                                                height: 40,
+                                                borderRadius: 2,
+                                                bgcolor: 'action.hover',
+                                            }}
+                                        >
+                                            <IconDisplay name="ChevronRight" size={18} />
+                                        </IconButton>
+                                    </Box>
+                                )}
+                                {debt.status === 'PAID' && (
+                                    <Box sx={{ pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={() => setActiveDebtId(debt.id)}
+                                            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+                                        >
+                                            Lihat riwayat pembayaran
+                                        </Button>
+                                    </Box>
+                                )}
                             </Box>
                         </Paper>
                     ))}

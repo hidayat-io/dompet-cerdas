@@ -2,9 +2,28 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v2.8.12
+# DompetCerdas - Smart Expense Tracker v3.0.0
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
+
+## 🎉 What's New in v3.0.0 — Mobile-First Redesign
+
+Redesign menyeluruh UI/UX dengan fokus pada kecepatan input dan mobile experience:
+
+- **Quick Add**: FAB tengah di bottom nav untuk catat transaksi dalam 3 tap dari halaman mana saja
+- **Action Dashboard**: Dashboard menampilkan "Perlu Perhatian" (anggaran hampir habis, hutang jatuh tempo, rencana hari ini) di atas fold
+- **Quick Actions**: 4 tombol shortcut (Pengeluaran, Pemasukan, Scan Struk, Riwayat) langsung dari dashboard
+- **Transaction Action Sheet**: Tap item transaksi → pilih Lihat lampiran / Edit / Duplikat / Hapus (tidak perlu menebak long-press)
+- **Compact List**: Riwayat transaksi dengan sticky date header dan item 56px yang lebih padat
+- **Progressive Disclosure**: Form transaksi hanya tampilkan essentials, detail (lampiran, catatan panjang) collapsed default
+- **Visual Budget Threshold**: Progress anggaran berubah warna saat >80% (amber) dan over-budget (merah)
+- **Quick Debt Payment**: Tombol "Catat Pembayaran" langsung di list hutang piutang tanpa masuk detail
+- **Sync Status Chip**: Indikator sinkronisasi konsisten di seluruh aplikasi
+- **Semantic Design Tokens**: Semantic colors (warning, success, info) dan typography scale standar
+- **Bottom Sheet Navigation**: Menu "Lainnya" jadi bottom sheet full-height dengan deskripsi per menu
+
+Detail lengkap: [`IMPLEMENTASI_REDESIGN_v3.md`](./IMPLEMENTASI_REDESIGN_v3.md) dan [`docs/UI_UX_REDESIGN.md`](./docs/UI_UX_REDESIGN.md)
+
 
 ## Features
 
@@ -53,11 +72,25 @@ Personal finance management with AI-powered receipt scanning and Telegram bot in
 
 ## Current Release
 
-- **Version**: `v2.8.17`
-- **Build Date**: `Jul 25, 2026`
-- **Status**: Added configurable Telegram daily transaction reminders (on/off + custom hour) and enhanced desktop datepicker behavior.
+- **Version**: `v3.0.0`
+- **Build Date**: `Aug 3, 2026`
+- **Status**: Mobile-first UI/UX redesign — Quick Add FAB, action dashboard, transaction action sheet, progressive disclosure forms, visual budget thresholds.
 
 ## Changelog
+
+### v3.0.0 - Aug 3, 2026
+- **Feat (Quick Add)**: FAB tengah di bottom nav untuk catat transaksi dari halaman mana saja dengan 3 tap (nominal → kategori → simpan).
+- **Feat (Quick Actions di Dashboard)**: 4 tombol shortcut (Pengeluaran, Pemasukan, Scan Struk, Riwayat) di dashboard.
+- **Feat (Action Dashboard)**: Section "Perlu Perhatian" di dashboard untuk anggaran >90%, hutang lewat jatuh tempo, dan rencana hari ini.
+- **Feat (Transaction Action Sheet)**: Tap item riwayat menampilkan bottom sheet aksi (Lihat lampiran / Edit / Duplikat / Hapus) — menggantikan long-press yang tersembunyi.
+- **UI (Riwayat)**: List transaksi lebih padat dengan sticky date header dan item 56px; summary strip satu baris untuk Masuk/Keluar/Selisih.
+- **UI (Form Transaksi)**: Progressive disclosure — section tanggal, catatan, dan lampiran collapsed default; quick date chips (Hari ini/Kemarin/2 hari lalu); input nominal besar.
+- **UI (Anggaran)**: Progress bar berubah warna hijau → amber (>80%) → merah (over-budget); ikon aksi cepat per kartu; tombol "Salin bulan lalu" lebih menonjol.
+- **UI (Hutang Piutang)**: Tombol "Catat Pembayaran" langsung di list tanpa masuk detail; penekanan visual untuk lewat jatuh tempo.
+- **UI (Login)**: Feature highlights (Catat Cepat, Anggaran, Telegram) dan CTA Google yang lebih prominent.
+- **UI (Navigasi Mobile)**: Menu "Lainnya" jadi bottom sheet full-height dengan ikon + deskripsi; bottom nav label diperbesar dari 0.6rem ke 0.75rem untuk accessibility.
+- **Design System**: Tambah semantic color tokens (warning/success/info + variant bg) di ThemeContext; komponen baru `SyncStatusChip`, `QuickAddSheet`, `QuickAddSheetLoader`, `TransactionActionSheet`.
+- **Docs**: Dokumen audit & rencana redesign di `docs/UI_UX_REDESIGN.md`, ringkasan implementasi di `IMPLEMENTASI_REDESIGN_v3.md`.
 
 ### v2.8.17 - Jul 25, 2026
 - Feat: Added configurable Telegram daily transaction input reminders under Settings (Switch toggle + hour selection).

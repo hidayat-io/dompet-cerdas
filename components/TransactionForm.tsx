@@ -111,6 +111,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
   const [scanMessage, setScanMessage] = useState('');
   const [scanError, setScanError] = useState('');
   const scanRequestedRef = useRef(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const canEditTransaction = !initialData || !currentUserId || !initialData.createdByUserId || initialData.createdByUserId === currentUserId || activeAccountRole === 'OWNER';
   const isReadOnly = !!initialData && !canEditTransaction;
 
@@ -486,18 +487,52 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           </ToggleButton>
         </ToggleButtonGroup>
 
-        {/* Amount */}
-        <TextField
-          fullWidth
-          label="Jumlah (Rp)"
-          value={displayAmount}
-          onChange={handleAmountChange}
-          disabled={isSaving || isReadOnly}
-          inputProps={{ inputMode: 'numeric' }}
-          autoFocus={!initialData}
-          sx={{ mb: 2 }}
-          InputProps={{ startAdornment: <Typography sx={{ mr: 1, color: 'text.disabled', fontWeight: 700 }}>Rp</Typography> }}
-        />
+        {/* Amount - Large Display */}
+        <Box sx={{ mb: 3, textAlign: 'center' }}>
+          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+            Jumlah
+          </Typography>
+          <Box
+            component="div"
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'baseline',
+              gap: 0.5,
+              borderBottom: '2px solid',
+              borderColor: categoryId ? theme.colors.accent : 'divider',
+              pb: 1,
+              transition: 'border-color 0.2s',
+            }}
+          >
+            <Typography sx={{ fontSize: 24, fontWeight: 700, color: 'text.disabled' }}>Rp</Typography>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={displayAmount}
+              onChange={handleAmountChange}
+              disabled={isSaving || isReadOnly}
+              placeholder="0"
+              autoFocus={!initialData}
+              style={{
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                fontSize: 40,
+                fontWeight: 700,
+                textAlign: 'center',
+                fontVariantNumeric: 'tabular-nums',
+                color: 'inherit',
+                width: '100%',
+                maxWidth: 200,
+              }}
+            />
+          </Box>
+          {error && (
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+              {error}
+            </Typography>
+          )}
+        </Box>
 
         {/* Category */}
         <Box sx={{ mb: 2 }}>
@@ -552,53 +587,86 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
           )}
         </Box>
 
-        {/* Date */}
-        <TextField
-          fullWidth
-          label="Tanggal"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          disabled={isSaving || isReadOnly}
-          slotProps={{
-            input: {
-              onClick: (e: any) => {
-                if (!isReadOnly && typeof e.target.showPicker === 'function') {
-                  try {
-                    e.target.showPicker();
-                  } catch (err) {
-                    console.error('[DATEPICKER] Failed to open picker:', err);
-                  }
-                }
-              }
-            },
-            inputLabel: { shrink: true }
-          }}
-          sx={{ mb: 2 }}
-        />
-
-        {/* Description */}
-        <TextField
-          fullWidth
-          label="Catatan"
-          multiline
-          rows={2}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          disabled={isSaving || isReadOnly}
-          placeholder="Contoh: Makan siang, Gaji bulanan"
-          sx={{ mb: 2 }}
-          slotProps={{
-            inputLabel: { shrink: true },
-            input: { notched: true },
-          }}
-        />
-
-        {/* Attachment */}
-        <Box>
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-            Lampiran
+        {/* Quick Date Chips */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+            Tanggal
           </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Hari ini', offset: 0 },
+              { label: 'Kemarin', offset: 1 },
+              { label: '2 hari lalu', offset: 2 },
+            ].map((chip) => {
+              const d = new Date();
+              d.setDate(d.getDate() - chip.offset);
+              const dateStr = d.toISOString().split('T')[0];
+              const isActive = date === dateStr;
+              return (
+                <Chip
+                  key={chip.label}
+                  label={chip.label}
+                  onClick={() => setDate(dateStr)}
+                  disabled={isReadOnly}
+                  sx={{
+                    bgcolor: isActive ? theme.colors.accentLight : 'action.hover',
+                    color: isActive ? theme.colors.accent : 'text.primary',
+                    fontWeight: 600,
+                    height: 36,
+                  }}
+                />
+              );
+            })}
+            <Chip
+              icon={<IconDisplay name="Calendar" size={14} />}
+              label={date && !['Hari ini', 'Kemarin', '2 hari lalu'].includes(new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })) ? `Pilih: ${date}` : 'Pilih tanggal'}
+              variant="outlined"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'date';
+                input.value = date;
+                input.onchange = (e) => setDate((e.target as HTMLInputElement).value);
+                input.click();
+              }}
+              disabled={isReadOnly}
+              sx={{ height: 36 }}
+            />
+          </Box>
+        </Box>
+
+        {/* Advanced Toggle */}
+        <Button
+          size="small"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          sx={{ mb: 2, color: theme.colors.accent, fontWeight: 600 }}
+        >
+          {showAdvanced ? 'Sembunyikan detail' : 'Tambah detail (catatan, lampiran)'}
+        </Button>
+
+        {showAdvanced && (
+          <>
+            {/* Description */}
+            <TextField
+              fullWidth
+              label="Catatan"
+              multiline
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={isSaving || isReadOnly}
+              placeholder="Contoh: Makan siang, Gaji bulanan"
+              sx={{ mb: 2 }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                input: { notched: true },
+              }}
+            />
+
+            {/* Attachment */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Lampiran
+              </Typography>
           <input type="file" ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileSelect} disabled={isSaving || isReadOnly} style={{ display: 'none' }} />
           {!hasAttachment ? (
             <Paper
@@ -708,7 +776,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, initialDa
               {scanMessage}
             </Alert>
           )}
-        </Box>
+            </Box>
+          </>
+        )}
 
         {initialData?.source && (
           <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>

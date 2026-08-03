@@ -34,6 +34,14 @@ export interface ThemeColors {
     expense: string;
     expenseBg: string;
 
+    // Warning / Info / Success (semantic states)
+    warning: string;
+    warningBg: string;
+    success: string;
+    successBg: string;
+    info: string;
+    infoBg: string;
+
     // Error
     error: string;
     errorLight: string;
@@ -43,6 +51,8 @@ export interface ThemeColors {
     sidebarText: string;
     sidebarActive: string;
     sidebarActiveBg: string;
+
+    surfaceTonal: string;
 }
 
 export interface Theme {
@@ -83,6 +93,13 @@ export const themes: Record<ThemeName, Theme> = {
             expense: '#dc2626',
             expenseBg: '#fee2e2',
 
+            warning: '#c27803',
+            warningBg: '#fdf3e3',
+            success: '#0e9f6e',
+            successBg: '#e7f6f0',
+            info: '#1c64f2',
+            infoBg: '#e8f0fe',
+
             error: '#dc2626',
             errorLight: '#fee2e2',
 
@@ -90,6 +107,8 @@ export const themes: Record<ThemeName, Theme> = {
             sidebarText: '#4b5563',
             sidebarActive: '#4f46e5',
             sidebarActiveBg: '#eef2ff',
+
+            surfaceTonal: '#f1f5f9',
         }
     },
     dark: {
@@ -121,6 +140,13 @@ export const themes: Record<ThemeName, Theme> = {
             expense: '#f87171',
             expenseBg: '#7f1d1d',
 
+            warning: '#fbbf24',
+            warningBg: '#451a03',
+            success: '#34d399',
+            successBg: '#064e3b',
+            info: '#60a5fa',
+            infoBg: '#1e3a8a',
+
             error: '#f87171',
             errorLight: '#7f1d1d',
 
@@ -128,6 +154,8 @@ export const themes: Record<ThemeName, Theme> = {
             sidebarText: '#cbd5e1',
             sidebarActive: '#818cf8',
             sidebarActiveBg: '#312e81',
+
+            surfaceTonal: '#334155',
         }
     }
 };
@@ -180,7 +208,14 @@ function buildMuiTheme(t: Theme) {
                     root: {
                         textTransform: 'none',
                         fontWeight: 600,
-                        borderRadius: 10,
+                        borderRadius: 12,
+                        minHeight: 44,
+                    },
+                    contained: {
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                        '&:hover': {
+                            boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+                        },
                     },
                 },
             },
@@ -230,13 +265,15 @@ function buildMuiTheme(t: Theme) {
                 styleOverrides: {
                     paper: {
                         backgroundImage: 'none',
+                        borderRadius: 20,
+                        margin: 16,
                     },
                 },
             },
             MuiDialogTitle: {
                 styleOverrides: {
                     root: {
-                        padding: '16px 24px',
+                        padding: '20px 24px 16px',
                     },
                 },
             },
@@ -250,7 +287,7 @@ function buildMuiTheme(t: Theme) {
             MuiDialogActions: {
                 styleOverrides: {
                     root: {
-                        padding: '16px 24px',
+                        padding: '16px 24px 20px',
                     },
                 },
             },
@@ -263,7 +300,7 @@ function buildMuiTheme(t: Theme) {
             MuiIconButton: {
                 styleOverrides: {
                     root: {
-                        borderRadius: 10,
+                        borderRadius: 12,
                     },
                 },
             },
@@ -285,6 +322,15 @@ function buildMuiTheme(t: Theme) {
                     },
                 },
             },
+            MuiSnackbar: {
+                styleOverrides: {
+                    root: {
+                        '& .MuiSnackbarContent-root': {
+                            borderRadius: 12,
+                        },
+                    },
+                },
+            },
             MuiTab: {
                 styleOverrides: {
                     root: {
@@ -296,7 +342,7 @@ function buildMuiTheme(t: Theme) {
             MuiTabs: {
                 styleOverrides: {
                     root: {
-                        minHeight: 40,
+                        minHeight: 44,
                     },
                 },
             },
@@ -305,7 +351,7 @@ function buildMuiTheme(t: Theme) {
                     root: {
                         textTransform: 'none',
                         fontWeight: 600,
-                        borderRadius: 10,
+                        borderRadius: 12,
                     },
                 },
             },

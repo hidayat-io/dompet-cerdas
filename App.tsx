@@ -99,6 +99,8 @@ type TelegramLinkMeta = {
   reminderTime?: string;
 };
 
+type QuickAddType = 'INCOME' | 'EXPENSE';
+
 const MIGRATION_BATCH_SIZE = 400;
 const DEFAULT_PLAN_ITEM_STATUS: PlanItemStatus = 'PLANNED';
 
@@ -116,6 +118,7 @@ const AuthLogin = lazy(() => import('./components/AuthLogin'));
 const TransactionForm = lazy(() => import('./components/TransactionForm'));
 const OnboardingModal = lazy(() => import('./components/OnboardingModal'));
 const NotificationModal = lazy(() => import('./components/NotificationModal'));
+const QuickAddSheetLoader = lazy(() => import('./components/QuickAddSheetLoader'));
 
 // Prefetch high-probability next routes (called on idle after dashboard mount).
 // import() hits the same module cache React.lazy uses, so a later render is instant.
@@ -236,6 +239,8 @@ function App() {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [moreMenuAnchorEl, setMoreMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddType, setQuickAddType] = useState<QuickAddType>('EXPENSE');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [showReconnectToast, setShowReconnectToast] = useState(false);
@@ -2432,16 +2437,16 @@ function App() {
     { view: 'CATEGORIES', label: 'Kategori', icon: 'Briefcase' },
   ];
 
-  const BOTTOM_NAV_ITEMS: Array<{ view: View | 'MORE'; label: string; icon: string }> = [
+  const BOTTOM_NAV_ITEMS: Array<{ view: View | 'MORE' | 'ADD'; label: string; icon: string }> = [
     { view: 'DASHBOARD', label: 'Beranda', icon: 'Home' },
     { view: 'TRANSACTIONS', label: 'Riwayat', icon: 'BookOpen' },
+    { view: 'ADD', label: 'Tambah', icon: 'Plus' },
     { view: 'BUDGETS', label: 'Anggaran', icon: 'PiggyBank' },
-    { view: 'DEBTS', label: 'Hutang', icon: 'Handshake' },
     { view: 'MORE', label: 'Lainnya', icon: 'MoreHorizontal' },
   ];
 
   const bottomNavIndex = BOTTOM_NAV_ITEMS.findIndex((item) => item.view === currentView);
-  const activeBottomNavIndex = bottomNavIndex !== -1 ? bottomNavIndex : 4; // Highlight 'MORE' if view is hidden
+  const activeBottomNavIndex = bottomNavIndex !== -1 ? bottomNavIndex : 4;
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}>
@@ -2661,7 +2666,7 @@ function App() {
       {/* Main Content Area */}
       <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
 
-        {/* Mobile Header */}
+        {/* Mobile Header - Compact single row */}
         <AppBar
           position="sticky"
           elevation={0}
@@ -2673,13 +2678,18 @@ function App() {
           }}
         >
           <Toolbar sx={{ justifyContent: 'space-between', px: 2, minHeight: '56px !important' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ p: 0.75, borderRadius: 1, bgcolor: theme.colors.accent, color: '#fff', display: 'flex' }}>
-                <IconDisplay name="Wallet" size={20} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: theme.colors.accent, color: '#fff', display: 'flex' }}>
+                <IconDisplay name="Wallet" size={18} />
               </Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: theme.colors.textPrimary }}>
-                DompetCerdas <Typography component="span" variant="caption" sx={{ opacity: 0.6 }}>v{APP_VERSION}</Typography>
-              </Typography>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: theme.colors.textPrimary, lineHeight: 1.2 }}>
+                  DompetCerdas
+                </Typography>
+                <Typography variant="caption" sx={{ color: theme.colors.textMuted, fontSize: 10 }}>
+                  {activeAccount?.name || 'Akun Keuangan'}
+                </Typography>
+              </Box>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <IconButton
@@ -2697,55 +2707,12 @@ function App() {
                 alt={user.displayName || 'User'}
                 sx={{ width: 32, height: 32, border: `1px solid ${theme.colors.border}`, ml: 0.5 }}
               />
-              <IconButton size="small" onClick={handleLogout} sx={{ color: theme.colors.expense, bgcolor: theme.colors.expenseBg }}>
-                <IconDisplay name="LogOut" size={16} />
-              </IconButton>
             </Box>
           </Toolbar>
         </AppBar>
 
-        {/* Mobile Account Selector */}
-        <Box
-          sx={{
-            display: { xs: 'flex', md: 'none' },
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1.5,
-            px: 2, py: 1,
-            bgcolor: theme.colors.bgCard,
-            borderBottom: `1px solid ${theme.colors.border}`,
-          }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="overline" sx={{ fontWeight: 600, letterSpacing: '0.16em', color: theme.colors.textMuted, fontSize: '0.6rem' }}>
-              Akun Aktif
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Select
-              value={activeAccountId || ''}
-              onChange={(e) => switchAccount(e.target.value as string)}
-              size="small"
-              sx={{
-                borderRadius: 2,
-                bgcolor: theme.colors.bgPrimary,
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.colors.border },
-                maxWidth: 180,
-                minWidth: 140,
-              }}
-            >
-              {accounts.map((account) => (
-                <MenuItem key={account.id} value={account.id}>
-                  {account.name}
-                </MenuItem>
-              ))}
-            </Select>
-            {themeToggleButton}
-          </Box>
-        </Box>
-
         {/* Content Area */}
-        <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 2, md: 4 }, pb: { xs: '120px', md: 4 } }}>
+        <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 2, md: 4 }, pb: { xs: '100px', md: 4 } }}>
           <Container maxWidth="lg" disableGutters>
             <ErrorBoundary key={currentView}>
               <Suspense fallback={<ViewLoadingFallback />}>
@@ -2754,14 +2721,22 @@ function App() {
                   transactions={transactions}
                   categories={categories}
                   budgets={normalizedBudgets}
+                  debts={debts}
+                  plans={plans}
+                  isOffline={isOffline}
+                  hasPendingWrites={hasPendingWrites}
+                  pendingAttachmentCount={Object.keys(pendingAttachmentUploads).length}
                   showGettingStarted={!hasStarterData}
                   isGettingStartedDismissed={isGettingStartedDismissed || hasSeenOnboarding}
                   activeAccountName={activeAccount?.name || 'Akun Keuangan'}
                   telegramLinked={telegramLinked}
                   onGoToTransactions={() => setCurrentView('TRANSACTIONS')}
                   onGoToBudgets={() => setCurrentView('BUDGETS')}
+                  onGoToDebts={() => setCurrentView('DEBTS')}
                   onGoToSettings={() => setCurrentView('SETTINGS')}
                   onOpenOnboarding={openOnboarding}
+                  onQuickAdd={(type) => { setQuickAddType(type); setShowQuickAdd(true); }}
+                  onScanReceipt={() => { setQuickAddType('EXPENSE'); setShowQuickAdd(true); }}
                 />
               )}
               {currentView === 'TRANSACTIONS' && (
@@ -2909,6 +2884,9 @@ function App() {
             onChange={(event, newValue) => {
               if (newValue === 4) {
                 setMoreMenuAnchorEl(event.currentTarget as HTMLElement);
+              } else if (newValue === 2) {
+                setQuickAddType('EXPENSE');
+                setShowQuickAdd(true);
               } else if (newValue >= 0 && newValue < BOTTOM_NAV_ITEMS.length) {
                 setCurrentView(BOTTOM_NAV_ITEMS[newValue].view as View);
               }
@@ -2925,56 +2903,59 @@ function App() {
                 },
               },
               '& .MuiBottomNavigationAction-label': {
-                fontSize: '0.6rem',
+                fontSize: '0.75rem',
                 fontWeight: 500,
                 mt: 0.25,
                 '&.Mui-selected': {
-                  fontSize: '0.6rem',
+                  fontSize: '0.75rem',
                   fontWeight: 600,
                 },
               },
             }}
           >
-            {BOTTOM_NAV_ITEMS.map((item, index) => (
-              <BottomNavigationAction
-                key={item.view}
-                value={index}
-                label={item.label}
-                icon={<IconDisplay name={item.icon} size={20} />}
-              />
-            ))}
+            {BOTTOM_NAV_ITEMS.map((item, index) => {
+              const isAddButton = item.view === 'ADD';
+              return (
+                <BottomNavigationAction
+                  key={item.view}
+                  value={index}
+                  label={item.label}
+                  icon={
+                    isAddButton ? (
+                      <Box
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: '50%',
+                          bgcolor: theme.colors.accent,
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                          mt: -3,
+                          transition: 'transform 0.15s',
+                          '&:active': { transform: 'scale(0.95)' },
+                        }}
+                      >
+                        <IconDisplay name={item.icon} size={24} />
+                      </Box>
+                    ) : (
+                      <IconDisplay name={item.icon} size={20} />
+                    )
+                  }
+                  sx={isAddButton ? { transform: 'translateY(-4px)' } : undefined}
+                />
+              );
+            })}
           </BottomNavigation>
         </Paper>
 
-        {/* Mobile FAB */}
-        {currentView === 'TRANSACTIONS' && (
-          <Fab
-            color="primary"
-            onClick={() => setShowAddModal(true)}
-            sx={{
-              display: { xs: 'flex', md: 'none' },
-              position: 'fixed',
-              bottom: 72,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 40,
-              width: 56,
-              height: 56,
-              border: `4px solid ${theme.colors.bgCard}`,
-              bgcolor: theme.colors.accent,
-              boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
-              '&:hover': { bgcolor: theme.colors.accentHover },
-            }}
-          >
-            <IconDisplay name="Plus" size={28} />
-          </Fab>
-        )}
-
         {/* Desktop FAB */}
-        {currentView === 'TRANSACTIONS' && (
+        {(currentView === 'TRANSACTIONS' || currentView === 'DASHBOARD') && (
           <Fab
             color="primary"
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setQuickAddType('EXPENSE'); setShowQuickAdd(true); }}
             sx={{
               display: { xs: 'none', md: 'flex' },
               position: 'fixed',
@@ -2991,6 +2972,33 @@ function App() {
           >
             <IconDisplay name="Plus" size={28} />
           </Fab>
+        )}
+
+        {/* Quick Add Sheet */}
+        {showQuickAdd && (
+          <ErrorBoundary
+            fallback={null}
+            onError={() => {
+              setShowQuickAdd(false);
+              showNotification('error', 'Gagal memuat form', 'Form transaksi gagal dimuat. Periksa koneksi internet lalu coba lagi.');
+            }}
+          >
+            <Suspense fallback={null}>
+              <QuickAddSheetLoader
+                quickAddType={quickAddType}
+                categories={categories}
+                transactions={transactions}
+                onClose={() => setShowQuickAdd(false)}
+                onOpenFullForm={() => {
+                  setShowQuickAdd(false);
+                  setShowAddModal(true);
+                }}
+                onAdd={addTransaction}
+                onAddCategory={addCategory}
+                onShowNotification={showNotification}
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
 
         {/* Transaction Modal */}
@@ -3028,54 +3036,117 @@ function App() {
             />
           </Suspense>
         </ErrorBoundary>
-        {/* More Menu (Mobile) */}
-        <Menu
-          anchorEl={moreMenuAnchorEl}
-          open={Boolean(moreMenuAnchorEl)}
-          onClose={() => setMoreMenuAnchorEl(null)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          PaperProps={{
-            elevation: 8,
-            sx: {
-              bgcolor: theme.colors.bgCard,
-              color: theme.colors.textPrimary,
-              borderRadius: 3,
-              minWidth: 200,
-              mt: -1,
-              '& .MuiMenuItem-root': { py: 1.5 },
-            }
-          }}
-        >
-          <MenuItem 
-            onClick={() => { setCurrentView('CATEGORIES'); setMoreMenuAnchorEl(null); }}
-            selected={currentView === 'CATEGORIES'}
+        {/* More Menu Bottom Sheet (Mobile) */}
+        {moreMenuAnchorEl && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1300,
+              bgcolor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'flex-end',
+              animation: 'fadeIn 0.2s ease-out',
+              '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } },
+            }}
+            onClick={() => setMoreMenuAnchorEl(null)}
           >
-            <ListItemIcon><IconDisplay name="Briefcase" size={20} /></ListItemIcon>
-            Kategori
-          </MenuItem>
-          <MenuItem 
-            onClick={() => { setCurrentView('PLANS'); setMoreMenuAnchorEl(null); }}
-            selected={currentView === 'PLANS'}
-          >
-            <ListItemIcon><IconDisplay name="CalendarDays" size={20} /></ListItemIcon>
-            Rencana
-          </MenuItem>
-          <MenuItem 
-            onClick={() => { setCurrentView('ROUTINE_EXPENSES'); setMoreMenuAnchorEl(null); }}
-            selected={currentView === 'ROUTINE_EXPENSES'}
-          >
-            <ListItemIcon><IconDisplay name="RefreshCw" size={20} /></ListItemIcon>
-            Pengeluaran Rutin
-          </MenuItem>
-          <MenuItem 
-            onClick={() => { setCurrentView('AI_ADVISOR'); setMoreMenuAnchorEl(null); }}
-            selected={currentView === 'AI_ADVISOR'}
-          >
-            <ListItemIcon sx={{ color: theme.colors.accent }}><IconDisplay name="Zap" size={20} /></ListItemIcon>
-            Analisis AI
-          </MenuItem>
-        </Menu>
+            <Box
+              sx={{
+                width: '100%',
+                bgcolor: 'background.paper',
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                maxHeight: '85vh',
+                overflow: 'auto',
+                animation: 'slideUp 0.25s ease-out',
+                '@keyframes slideUp': { from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } },
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Box sx={{ pt: 1.5, pb: 1, display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
+              </Box>
+
+              <Box sx={{ px: 3, pb: 2 }}>
+                <Typography variant="h6" fontWeight={700}>
+                  Menu Lainnya
+                </Typography>
+              </Box>
+
+              <List disablePadding sx={{ pb: 2 }}>
+                {[
+                  { view: 'CATEGORIES' as View, label: 'Kategori', icon: 'Briefcase', desc: 'Kelola kategori transaksi' },
+                  { view: 'PLANS' as View, label: 'Rencana', icon: 'CalendarDays', desc: 'Rencana pemasukan & pengeluaran' },
+                  { view: 'ROUTINE_EXPENSES' as View, label: 'Pengeluaran Rutin', icon: 'RefreshCw', desc: 'Atur pengeluaran berulang' },
+                  { view: 'AI_ADVISOR' as View, label: 'Analisis AI', icon: 'Zap', desc: 'Insight keuangan dengan AI' },
+                  { view: 'SETTINGS' as View, label: 'Pengaturan', icon: 'Settings', desc: 'Akun, tema, dan preferensi' },
+                ].map((item) => (
+                  <ListItemButton
+                    key={item.view}
+                    selected={currentView === item.view}
+                    onClick={() => {
+                      setCurrentView(item.view);
+                      setMoreMenuAnchorEl(null);
+                    }}
+                    sx={{
+                      px: 3,
+                      py: 2,
+                      '&.Mui-selected': { bgcolor: theme.colors.accentLight },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 44 }}>
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 2,
+                          bgcolor: currentView === item.view ? theme.colors.accent : 'action.hover',
+                          color: currentView === item.view ? '#fff' : 'text.secondary',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <IconDisplay name={item.icon} size={20} />
+                      </Box>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.label}
+                      secondary={item.desc}
+                      primaryTypographyProps={{ fontWeight: 600 }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                    <IconDisplay name="ChevronRight" size={18} sx={{ color: 'text.disabled' }} />
+                  </ListItemButton>
+                ))}
+              </List>
+
+              <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Box
+                  component="button"
+                  onClick={() => setMoreMenuAnchorEl(null)}
+                  sx={{
+                    width: '100%',
+                    py: 1.5,
+                    border: 'none',
+                    borderRadius: 3,
+                    bgcolor: 'action.hover',
+                    fontWeight: 700,
+                    fontSize: 15,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Tutup
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        )}
 
       </Box>
     </Box>
