@@ -336,31 +336,31 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
 
       <Box sx={{ pb: { xs: 10, md: 0 } }}>
         {/* Summary Strip - Compact */}
-        <Box sx={{ display: 'flex', gap: 1.5, mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 3 }}>
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary" display="block">
+        <Box sx={{ display: 'flex', gap: 2, mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 3 }}>
+          <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" display="block" noWrap>
               Masuk
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.income, fontVariantNumeric: 'tabular-nums' }}>
-              {totalIncome > 0 ? formatRp(totalIncome) : 'Rp 0'}
+            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.income, whiteSpace: 'nowrap' }} component="span">
+              {totalIncome > 0 ? formatRp(totalIncome).replace(/\u00A0/g, ' ') : 'Rp 0'}
             </Typography>
           </Box>
-          <Box sx={{ width: 1, bgcolor: 'divider' }} />
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary" display="block">
+          <Box sx={{ width: 1, bgcolor: 'divider', flexShrink: 0 }} />
+          <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" display="block" noWrap>
               Keluar
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense, fontVariantNumeric: 'tabular-nums' }}>
-              {totalExpense > 0 ? formatRp(totalExpense) : 'Rp 0'}
+            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense, whiteSpace: 'nowrap' }} component="span">
+              {totalExpense > 0 ? formatRp(totalExpense).replace(/\u00A0/g, ' ') : 'Rp 0'}
             </Typography>
           </Box>
-          <Box sx={{ width: 1, bgcolor: 'divider' }} />
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary" display="block">
+          <Box sx={{ width: 1, bgcolor: 'divider', flexShrink: 0 }} />
+          <Box sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" display="block" noWrap>
               Selisih
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense, fontVariantNumeric: 'tabular-nums' }}>
-              {totalBalance > 0 ? '+' : totalBalance < 0 ? '-' : ''}{totalBalance !== 0 ? formatRp(Math.abs(totalBalance)) : 'Rp 0'}
+            <Typography variant="body2" fontWeight={700} sx={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense, whiteSpace: 'nowrap' }} component="span">
+              {totalBalance > 0 ? '+' : totalBalance < 0 ? '−' : ''}{totalBalance !== 0 ? formatRp(Math.abs(totalBalance)).replace(/\u00A0/g, ' ') : 'Rp 0'}
             </Typography>
           </Box>
         </Box>
