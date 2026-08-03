@@ -341,8 +341,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             <Typography variant="caption" color="text.secondary" display="block">
               Masuk
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.income }}>
-              {formatRp(totalIncome)}
+            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.income, fontVariantNumeric: 'tabular-nums' }}>
+              {totalIncome > 0 ? formatRp(totalIncome) : 'Rp 0'}
             </Typography>
           </Box>
           <Box sx={{ width: 1, bgcolor: 'divider' }} />
@@ -350,8 +350,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             <Typography variant="caption" color="text.secondary" display="block">
               Keluar
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense }}>
-              {formatRp(totalExpense)}
+            <Typography variant="body2" fontWeight={700} sx={{ color: theme.colors.expense, fontVariantNumeric: 'tabular-nums' }}>
+              {totalExpense > 0 ? formatRp(totalExpense) : 'Rp 0'}
             </Typography>
           </Box>
           <Box sx={{ width: 1, bgcolor: 'divider' }} />
@@ -359,8 +359,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             <Typography variant="caption" color="text.secondary" display="block">
               Selisih
             </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense }}>
-              {totalBalance >= 0 ? '+' : ''}{formatRp(totalBalance)}
+            <Typography variant="body2" fontWeight={700} sx={{ color: totalBalance >= 0 ? theme.colors.income : theme.colors.expense, fontVariantNumeric: 'tabular-nums' }}>
+              {totalBalance > 0 ? '+' : totalBalance < 0 ? '-' : ''}{totalBalance !== 0 ? formatRp(Math.abs(totalBalance)) : 'Rp 0'}
             </Typography>
           </Box>
         </Box>
