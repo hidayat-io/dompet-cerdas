@@ -28,6 +28,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import FullScreenDialog from './FullScreenDialog';
 import PageHeader from './PageHeader';
+import { formatRp, formatRupiahInput } from '../utils/format';
 interface PlanManagerProps {
     plans: Plan[];
     categories: Category[];
@@ -56,22 +57,6 @@ const PLAN_STATUS_ORDER: Record<PlanItemStatus, number> = {
     PLANNED: 0,
     DONE: 1,
     CANCELLED: 2,
-};
-
-const formatRp = (val: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
-
-const formatRupiahInput = (value: string) => {
-    const numberString = value.replace(/[^,\d]/g, '').toString();
-    const split = numberString.split(',');
-    const sisa = split[0].length % 3;
-    let rupiah = split[0].substr(0, sisa);
-    const ribuan = split[0].substr(sisa).match(/\d{3}/gi);
-    if (ribuan) {
-        const separator = sisa ? '.' : '';
-        rupiah += separator + ribuan.join('.');
-    }
-    return split[1] !== undefined ? `${rupiah},${split[1]}` : rupiah;
 };
 
 const formatDateLabel = (value?: string) => {

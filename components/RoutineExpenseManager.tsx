@@ -31,6 +31,7 @@ import IconDisplay from './IconDisplay';
 import ConfirmDialog from './ConfirmDialog';
 import TransactionForm from './TransactionForm';
 import PageHeader from './PageHeader';
+import { formatRp, formatRupiahInput } from '../utils/format';
 import { NotificationType } from './NotificationModal';
 
 interface RoutineExpenseManagerProps {
@@ -44,14 +45,6 @@ interface RoutineExpenseManagerProps {
 
 const getMonthString = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-const formatRp = (value: number) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
-
-const formatRupiahInput = (value: string) => {
-  const digits = value.replace(/\D/g, '');
-  return digits ? new Intl.NumberFormat('id-ID').format(Number(digits)) : '';
-};
 
 const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
   activeAccount,

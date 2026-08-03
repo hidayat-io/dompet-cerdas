@@ -28,6 +28,7 @@ import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
 import FullScreenDialog from './FullScreenDialog';
 import PageHeader from './PageHeader';
+import { formatRp, formatRupiahInput } from '../utils/format';
 
 interface BudgetManagerProps {
     budgets: Budget[];
@@ -56,18 +57,6 @@ const emptyDraft: BudgetDraft = {
     name: '',
     limitAmount: '',
     categoryIds: [],
-};
-
-const formatRp = (value: number) => new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-}).format(value);
-
-const formatRupiahInput = (value: string) => {
-    const digits = value.replace(/\D/g, '');
-    if (!digits) return '';
-    return new Intl.NumberFormat('id-ID').format(Number(digits));
 };
 
 const shiftMonth = (monthKey: string, delta: number) => {

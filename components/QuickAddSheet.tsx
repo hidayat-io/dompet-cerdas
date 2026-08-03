@@ -13,11 +13,13 @@ interface QuickAddSheetProps {
     open: boolean;
     type: TransactionType;
     amount: string;
+    description: string;
     categoryId: string;
     categories: Array<{ id: string; name: string; icon: string; color: string; type: TransactionType }>;
     recentCategoryIds: string[];
     onTypeChange: (type: TransactionType) => void;
     onAmountChange: (amount: string) => void;
+    onDescriptionChange: (description: string) => void;
     onCategoryChange: (categoryId: string) => void;
     onSave: () => void;
     onAddDetail: () => void;
@@ -30,11 +32,13 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
     open,
     type,
     amount,
+    description,
     categoryId,
     categories,
     recentCategoryIds,
     onTypeChange,
     onAmountChange,
+    onDescriptionChange,
     onCategoryChange,
     onSave,
     onAddDetail,
@@ -170,7 +174,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                 </Box>
 
                 {/* Amount Input */}
-                <Box sx={{ mb: 3 }}>
+                <Box sx={{ mb: 2 }}>
                     <TextField
                         fullWidth
                         value={displayAmount}
@@ -195,12 +199,28 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                                 bgcolor: 'action.hover',
                                 borderRadius: 3,
                                 '&:before, &:after': { display: 'none' },
-                                py: 2,
+                                py: 1.5,
                             },
                         }}
                         error={!!error}
-                        helperText={error}
                         autoFocus
+                    />
+                </Box>
+
+                {/* Description Input (Wajib) */}
+                <Box sx={{ mb: 2.5 }}>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        label="Catatan / Keterangan *"
+                        value={description}
+                        onChange={(e) => onDescriptionChange(e.target.value)}
+                        placeholder="Contoh: Makan siang, Bensin, Parkir"
+                        error={!!error && !description.trim()}
+                        helperText={error}
+                        slotProps={{
+                            inputLabel: { shrink: true },
+                        }}
                     />
                 </Box>
 

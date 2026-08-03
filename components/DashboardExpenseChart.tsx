@@ -11,6 +11,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
 import IconDisplay from './IconDisplay';
+import { formatRp } from '../utils/format';
 import { useTheme } from '../contexts/ThemeContext';
 
 type ExpenseChartItem = {
@@ -24,9 +25,6 @@ interface DashboardExpenseChartProps {
   expenseByCategory: ExpenseChartItem[];
   totalExpense: number;
 }
-
-const formatRp = (value: number) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
 
 const DashboardExpenseChart: React.FC<DashboardExpenseChartProps> = ({ expenseByCategory, totalExpense }) => {
   const { theme } = useTheme();

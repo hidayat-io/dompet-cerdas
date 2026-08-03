@@ -18,6 +18,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import InputAdornment from '@mui/material/InputAdornment';
 import FullScreenDialog from './FullScreenDialog';
 import PageHeader from './PageHeader';
+import { formatRp, formatRupiahInput } from '../utils/format';
 
 interface DebtManagerProps {
     debts: DebtRecord[];
@@ -74,21 +75,10 @@ const parseLocalDate = (value?: string) => {
     return new Date(year, month - 1, day);
 };
 
-const formatRp = (value: number) => new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-}).format(value);
-
 const formatShortDate = (value?: string) => {
     const date = parseLocalDate(value);
     if (!date) return '-';
     return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
-};
-
-const formatRupiahInput = (value: string) => {
-    const digits = value.replace(/\D/g, '');
-    return digits ? new Intl.NumberFormat('id-ID').format(Number(digits)) : '';
 };
 
 const getInitials = (name: string) => {

@@ -31,6 +31,7 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
 }) => {
     const [type, setType] = useState<TransactionType>(quickAddType);
     const [amount, setAmount] = useState('');
+    const [description, setDescription] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
@@ -70,15 +71,18 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
             setError('Pilih kategori');
             return;
         }
+        if (!description.trim()) {
+            setError('Catatan / Keterangan transaksi wajib diisi');
+            return;
+        }
 
         setIsSaving(true);
         setError('');
 
         try {
             const today = new Date().toISOString().split('T')[0];
-            const category = categories.find(c => c.id === categoryId);
-            const description = category ? `${category.name}` : 'Transaksi';
-            await onAdd(parseInt(amount), categoryId, today, description);
+            const finalDesc = description.trim();
+            await onAdd(parseInt(amount), categoryId, today, finalDesc);
             onShowNotification?.('success', 'Tersimpan!', `Rp ${parseInt(amount).toLocaleString('id-ID')} berhasil dicatat.`, true);
             onClose();
         } catch (err) {
@@ -94,11 +98,13 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
             open
             type={type}
             amount={amount}
+            description={description}
             categoryId={categoryId}
             categories={categories}
             recentCategoryIds={recentCategoryIds}
             onTypeChange={setType}
             onAmountChange={setAmount}
+            onDescriptionChange={setDescription}
             onCategoryChange={setCategoryId}
             onSave={handleSave}
             onAddDetail={onOpenFullForm}

@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import TransactionForm from './TransactionForm';
 import TransactionActionSheet from './TransactionActionSheet';
 import { NotificationType } from './NotificationModal';
+import { formatRp } from '../utils/format';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -170,10 +171,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
   const [actionSheetTransaction, setActionSheetTransaction] = useState<Transaction | null>(null);
 
   const yearOptions = useMemo(() => generateYearOptions(), []);
-
-  const formatRp = (val: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
-  };
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -647,11 +644,11 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontSize: 12 }}>
             <Typography variant="caption" sx={{ color: theme.colors.income, fontWeight: 700 }}>
-              +{formatRp(totalIncome).replace(/\u00A0/g, ' ')}
+              +{formatRp(totalIncome)}
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.disabled' }}>•</Typography>
             <Typography variant="caption" sx={{ color: theme.colors.expense, fontWeight: 700 }}>
-              -{formatRp(totalExpense).replace(/\u00A0/g, ' ')}
+              -{formatRp(totalExpense)}
             </Typography>
           </Box>
         </Box>

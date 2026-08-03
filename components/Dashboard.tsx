@@ -12,6 +12,7 @@ import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
 import { getBudgetOverview, getBudgetSummaries, getMonthKey } from '../utils/budget';
 import SyncStatusChip from './SyncStatusChip';
+import { formatRp } from '../utils/format';
 
 const DashboardExpenseChart = lazy(() => import('./DashboardExpenseChart'));
 
@@ -36,9 +37,6 @@ interface DashboardProps {
     onQuickAdd: (type: 'INCOME' | 'EXPENSE') => void;
     onScanReceipt: () => void;
 }
-
-const formatRp = (val: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
 const formatShortDate = (dateStr?: string) => {
     if (!dateStr) return '-';
