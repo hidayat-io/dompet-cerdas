@@ -21,6 +21,7 @@ interface QuickAddSheetProps {
     onCategoryChange: (categoryId: string) => void;
     onSave: () => void;
     onAddDetail: () => void;
+    onClose: () => void;
     isSaving?: boolean;
     error?: string;
 }
@@ -37,6 +38,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
     onCategoryChange,
     onSave,
     onAddDetail,
+    onClose,
     isSaving = false,
     error,
 }) => {
@@ -72,41 +74,62 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
     if (!open) return null;
 
     return (
-        <Box
-            sx={{
-                position: 'fixed',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                zIndex: 1200,
-                bgcolor: 'background.paper',
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
-                maxHeight: '85vh',
-                display: 'flex',
-                flexDirection: 'column',
-                animation: 'slideUp 0.25s ease-out',
-                '@keyframes slideUp': {
-                    from: { transform: 'translateY(100%)' },
-                    to: { transform: 'translateY(0)' },
-                },
-            }}
-        >
-            {/* Handle */}
-            <Box sx={{ pt: 1.5, pb: 1, display: 'flex', justifyContent: 'center' }}>
-                <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
-            </Box>
+        <>
+            {/* Backdrop */}
+            <Box
+                sx={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    zIndex: 1200,
+                    animation: 'fadeIn 0.2s ease-out',
+                    '@keyframes fadeIn': {
+                        from: { opacity: 0 },
+                        to: { opacity: 1 },
+                    },
+                }}
+                onClick={onClose}
+            />
 
-            {/* Header */}
-            <Box sx={{ px: 3, pb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="h6" fontWeight={700}>
-                    Catat Transaksi
-                </Typography>
-                <IconButton size="small" onClick={onAddDetail} aria-label="Tutup">
-                    <IconDisplay name="X" size={18} />
-                </IconButton>
-            </Box>
+            {/* Sheet */}
+            <Box
+                sx={{
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 1201,
+                    bgcolor: 'background.paper',
+                    borderTopLeftRadius: 24,
+                    borderTopRightRadius: 24,
+                    boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+                    maxHeight: '85vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    animation: 'slideUp 0.25s ease-out',
+                    '@keyframes slideUp': {
+                        from: { transform: 'translateY(100%)' },
+                        to: { transform: 'translateY(0)' },
+                    },
+                }}
+            >
+                {/* Handle */}
+                <Box sx={{ pt: 1.5, pb: 1, display: 'flex', justifyContent: 'center' }}>
+                    <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
+                </Box>
+
+                {/* Header */}
+                <Box sx={{ px: 3, pb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="h6" fontWeight={700}>
+                        Catat Transaksi
+                    </Typography>
+                    <IconButton size="small" onClick={onClose} aria-label="Tutup">
+                        <IconDisplay name="X" size={18} />
+                    </IconButton>
+                </Box>
 
             {/* Content */}
             <Box sx={{ flex: 1, overflow: 'auto', px: 3, pb: 2 }}>
@@ -328,6 +351,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                 </Button>
             </Box>
         </Box>
+    </>
     );
 };
 

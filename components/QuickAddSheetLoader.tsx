@@ -102,6 +102,7 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
             onCategoryChange={setCategoryId}
             onSave={handleSave}
             onAddDetail={onOpenFullForm}
+            onClose={onClose}
             isSaving={isSaving}
             error={error}
         />

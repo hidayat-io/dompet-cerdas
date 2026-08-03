@@ -2678,15 +2678,15 @@ function App() {
           }}
         >
           <Toolbar sx={{ justifyContent: 'space-between', px: 2, minHeight: '56px !important' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: theme.colors.accent, color: '#fff', display: 'flex' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
+              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: theme.colors.accent, color: '#fff', display: 'flex', flexShrink: 0 }}>
                 <IconDisplay name="Wallet" size={18} />
               </Box>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: theme.colors.textPrimary, lineHeight: 1.2 }}>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="subtitle2" noWrap sx={{ fontWeight: 700, color: theme.colors.textPrimary, lineHeight: 1.2 }}>
                   DompetCerdas
                 </Typography>
-                <Typography variant="caption" sx={{ color: theme.colors.textMuted, fontSize: 10 }}>
+                <Typography variant="caption" noWrap sx={{ color: theme.colors.textMuted, fontSize: 10, display: 'block' }}>
                   {activeAccount?.name || 'Akun Keuangan'}
                 </Typography>
               </Box>
