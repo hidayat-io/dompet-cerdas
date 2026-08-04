@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# DompetCerdas - Smart Expense Tracker v3.0.0
+# DompetCerdas - Smart Expense Tracker v3.1.0
 
 Personal finance management with AI-powered receipt scanning and Telegram bot integration.
 
@@ -72,11 +72,19 @@ Detail lengkap: [`IMPLEMENTASI_REDESIGN_v3.md`](./IMPLEMENTASI_REDESIGN_v3.md) d
 
 ## Current Release
 
-- **Version**: `v3.0.0`
-- **Build Date**: `Aug 3, 2026`
-- **Status**: Mobile-first UI/UX redesign — Quick Add FAB, action dashboard, transaction action sheet, progressive disclosure forms, visual budget thresholds.
+- **Version**: `v3.1.0`
+- **Build Date**: `Aug 4, 2026`
+- **Status**: Unified transaction form, AI receipt scan, compact transaction filters, and production hosting verified.
 
 ## Changelog
+
+### v3.1.0 - Aug 4, 2026
+- **UI (Unified Transaction Form)**: Quick Add, edit transaksi, dan Pengeluaran Rutin sekarang memakai `QuickAddSheet` yang sama.
+- **Feat (AI Receipt Scan)**: Scan struk tersedia langsung di form dan mengisi nominal, tanggal, deskripsi, serta kategori hasil analisis.
+- **Feat (Edit Transactions)**: Form terpadu mempertahankan mode edit, read-only shared account, conflict resolution, attachment replacement, kategori baru, dan hapus transaksi.
+- **UI (Riwayat)**: Navigasi bulan memakai panah kiri/kanan; filter lanjutan dipindahkan ke modal dengan tombol X dan Tutup yang jelas.
+- **Fix (Form UX)**: Daftar kategori tidak lagi terpotong oleh scroll internal.
+- **Deploy**: Frontend production dideploy ke Firebase Hosting dan smoke check root + route SPA lulus.
 
 ### v3.0.0 - Aug 3, 2026
 - **Feat (Quick Add)**: FAB tengah di bottom nav untuk catat transaksi dari halaman mana saja dengan 3 tap (nominal → kategori → simpan).
@@ -105,7 +113,7 @@ Detail lengkap: [`IMPLEMENTASI_REDESIGN_v3.md`](./IMPLEMENTASI_REDESIGN_v3.md) d
 ### v2.8.11 - Jul 02, 2026
 - PWA: Service Worker navigation caching dengan StaleWhileRevalidate untuk app shell instant pada kunjungan berikutnya.
 - PWA: Hilangkan anti-cache meta tags, defer SW registration ke `window load`, preconnect Google Fonts.
-- PWA: Lazy-load AuthLogin, TransactionForm, OnboardingModal, NotificationModal — entry chunk turun 31% (104KB → 72KB).
+- PWA: Lazy-load AuthLogin, OnboardingModal, NotificationModal, dan QuickAddSheetLoader — entry chunk tetap terpisah dari form transaksi.
 - PWA: Fix bug JPEG-as-PNG pada semua icon, tambah alternatif WebP (icon-512: 297KB → 4.8KB).
 - PWA: Bootstrap paralel (`Promise.all`) untuk `getDoc(userRef)` + `getDocs(accountsRef)`.
 - PWA: Idle prefetch route lazy (TransactionList, BudgetManager, Settings) via `requestIdleCallback`.
@@ -192,12 +200,13 @@ Detail lengkap: [`IMPLEMENTASI_REDESIGN_v3.md`](./IMPLEMENTASI_REDESIGN_v3.md) d
 | Frontend | React 19, TypeScript, Vite |
 | UI Library | **Material UI (MUI)** v7 + Material Symbols web font |
 | Hosting | **Firebase Hosting** (CDN Global) |
-| Backend | Firebase Functions (Node.js 22) |
+| Web Backend | Go API via `VITE_API_BASE_URL` |
 | Database | Firestore |
+| Authentication | Firebase Auth |
 | Storage | Firebase Storage |
-| AI | Gemini 2.0 (Vision & NLU) |
+| AI | Gemini 2.5 Flash (Vision, NLU, advisor) |
 | Excel Export | ExcelJS |
-| Bot | node-telegram-bot-api |
+| Telegram Bot | Go backend integration |
 
 ## Quick Start
 
@@ -267,9 +276,8 @@ npm run deploy:hosting:safe
 
 ### Web App (.env.local)
 ```
-# Frontend AI analysis now uses Cloud Functions.
-# VITE_GEMINI_API_KEY is only needed for client-side category validation fallback.
-VITE_GEMINI_API_KEY=your_gemini_api_key
+# Go API base URL for web backend operations, including receipt scanning.
+VITE_API_BASE_URL=https://api.example.com/api/v1
 ```
 
 ### Functions (.env)

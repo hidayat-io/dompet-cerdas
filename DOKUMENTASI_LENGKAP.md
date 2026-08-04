@@ -1,8 +1,8 @@
-# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v3.0.0
+# 📚 DOKUMENTASI LENGKAP - Dompet Cerdas v3.1.0
 
 **Status**: ✅ Fully Documented
-**Last Updated**: Aug 3, 2026
-**Version**: 3.0.0
+**Last Updated**: Aug 4, 2026
+**Version**: 3.1.0
 **Latest Test URL**: https://expensetracker-test-1.web.app
 **Custom Domain**: https://dompas.indoomega.my.id
 
@@ -80,7 +80,8 @@ dompet_cerdas/
 │   ├── PageHeader.tsx              # Reusable page heading
 │   ├── FullScreenDialog.tsx        # Reusable full-screen dialog wrapper
 │   ├── TransactionList.tsx         # Transaction history with filters
-│   ├── TransactionForm.tsx         # Add/edit transaction modal
+│   ├── QuickAddSheet.tsx           # Unified add/edit transaction sheet
+│   ├── QuickAddSheetLoader.tsx     # Transaction form state and persistence
 │   ├── CategoryManager.tsx         # CRUD categories
 │   ├── CategoryFormModal.tsx       # Reusable category modal
 │   ├── PlanManager.tsx             # Rencana pemasukan/pengeluaran
@@ -165,10 +166,11 @@ dompet_cerdas/
 | **Database** | Firestore | 12.x | Real-time NoSQL DB |
 | **Storage** | Firebase Storage | 12.x | Receipt images |
 | **Hosting** | Firebase Hosting | - | CDN global |
-| **Functions** | Cloud Functions | Node 22 | Backend serverless |
-| **AI - Vision** | Gemini Vision | 2.0 Flash | Receipt OCR |
-| **AI - NLU** | Gemini NLU | 2.0 Flash | Intent parsing |
-| **AI - Advisor** | Gemini 2.0 Flash | 2.0 Flash | Financial insights |
+| **Web Backend** | Go API | Go 1.26 | Web transaction, sharing, advisor, and receipt-scan endpoints |
+| **Telegram Runtime** | Firebase Cloud Functions | Node 22 | Telegram webhook and bot flows |
+| **AI - Vision** | Gemini Vision | 2.5 Flash | Receipt OCR |
+| **AI - NLU** | Gemini NLU | 2.5 Flash | Intent parsing |
+| **AI - Advisor** | Gemini 2.5 Flash | 2.5 Flash | Financial insights |
 | **Bot SDK** | node-telegram-bot-api | Latest | Telegram integration |
 | **Excel** | ExcelJS | Latest | .xlsx export |
 | **Images** | Sharp | Latest | Image compression |
@@ -197,10 +199,10 @@ dompet_cerdas/
 
 ### 3️⃣ Transaksi (Transactions)
 - **CRUD**: Add, edit, delete transactions
-- **Full-Screen Form Flow**: Tambah dan edit transaksi memakai pola dialog full-screen yang seragam
+- **Unified Transaction Form**: Quick Add, edit transaksi, dan Pengeluaran Rutin memakai `QuickAddSheet` yang sama dengan mode add/edit, read-only, conflict resolution, dan scan struk AI
 - **Attachments**: JPG, PNG, GIF, WEBP, PDF support dengan preview
 - **Image Compression**: Auto-compress images sebelum upload
-- **Filters**: By month, by date range, by category
+- **Filters**: Navigasi bulan dengan panah kiri/kanan; filter lanjutan untuk pencarian, tipe, kategori, dan rentang tanggal dibuka lewat modal
 - **Grouping**: Riwayat dikelompokkan per hari dalam card terpisah dengan header tanggal yang lebih kuat
 - **Search**: Search by description
 - **Mobile UX**: Filter panel toggle pada mobile
@@ -946,6 +948,7 @@ firebase functions:log
 
 | Version | Date | Highlights |
 |---------|------|-----------|
+| **v3.1.0** | Aug 4, 2026 | Unified QuickAddSheet for add/edit/routine expenses, AI receipt scan in the active form, arrow month navigation, advanced-filter modal, and hosting verification |
 | **v2.8.17** | Jul 25, 2026 | Added configurable Telegram daily transaction reminders (on/off + custom hour) and enhanced desktop datepicker behavior |
 | **v2.8.13** | Jul 06, 2026 | Added time selection option for Telegram routine expense reminders and updated cron to run hourly |
 | **v2.8.12** | Jul 06, 2026 | Added Routine Expense management with monthly checklist, integrated with transaction system and Telegram reminders |
@@ -978,12 +981,14 @@ firebase functions:log
 
 **Project**: Dompet Cerdas Smart Expense Tracker  
 **Tech Stack**: React, TypeScript, Firebase, Gemini AI, Telegram Bot API  
-**Hosting**: Firebase Hosting + Cloud Functions  
-**Database**: Firebase Firestore  
-**AI**: Google Gemini 2.0 Flash
+**Hosting**: Firebase Hosting
+**Web Backend**: Go API
+**Telegram Runtime**: Firebase Cloud Functions
+**Database**: Firebase Firestore
+**AI**: Google Gemini 2.5 Flash
 
 ---
 
-**Last Updated**: Jul 06, 2026
-**Status**: ✅ Internal Testing Ready
+**Last Updated**: Aug 4, 2026
+**Status**: ✅ v3.1.0 deployed and hosting smoke check passed
 **Support**: Check documentation or Firebase console logs

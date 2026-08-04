@@ -19,8 +19,8 @@ import { parseTransactionMessageHybrid, ParsedTransactionDraft } from '../servic
 import { getTotalExpenses, getTotalIncome, getBalance, getCategoryBreakdown, getTransactionDetails, formatTimeRange } from '../services/queryService';
 import { analyzeFinancialHealth, generateSavingsStrategy, analyzeExpenseReduction } from '../services/advisorService';
 import * as responseFormatter from '../services/responseFormatter';
-import { formatAutoSavedTransaction, formatAutoSavedReceipt } from '../services/responseFormatter';
-import { getDb } from '../index';
+import { formatAutoSavedReceipt } from '../services/responseFormatter';
+import * as app from '../index';
 import { sanitizeFirestoreData } from '../utils/firestore';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -236,20 +236,6 @@ function isTextTransactionSessionExpired(sessionData: TextTransactionSessionData
     return sessionData.status !== 'pending' || (createdAtMs > 0 && Date.now() - createdAtMs > TEXT_TRANSACTION_SESSION_TTL_MS);
 }
 
-/**
- * Returns true when bot is confident enough to skip the confirmation step.
- * Criteria: single item, parse confidence high, category resolved without AI (high).
- */
-function shouldAutoSaveText(
-    items: TextTransactionSessionItem[],
-    parseConfidence: 'high' | 'medium' | 'low',
-    categoryConfidence: 'high' | 'medium' | 'low'
-): boolean {
-    return items.length === 1
-        && parseConfidence === 'high'
-        && categoryConfidence === 'high';
-}
-
 async function resolveCategoryChoice(
     description: string,
     categories: UserCategory[],
@@ -344,7 +330,7 @@ async function createTextTransactionDraftSession(params: {
         throw new Error('No valid transaction items to store in draft session');
     }
 
-    await getDb().collection('text_transaction_sessions').doc(sessionId).set(sanitizeFirestoreData({
+    await app.getDb().collection('text_transaction_sessions').doc(sessionId).set(sanitizeFirestoreData({
         userId: params.userId,
         telegramId: params.telegramId,
         accountId: params.accountId || null,
@@ -385,27 +371,6 @@ async function createAndSendTransactionDraftPreview(params: {
 
     if (validResolvedItems.length === 0) {
         throw new Error('Failed to build valid transaction draft items');
-    }
-
-    // ⚡ Auto-save path: skip confirmation when bot is fully confident
-    const catConfidence = resolvedWithConfidence[0]?._catConfidence ?? 'low';
-    const parseConfidence = params.parseConfidence ?? (params.usedAI ? 'medium' : 'high');
-    if (shouldAutoSaveText(validResolvedItems, parseConfidence, catConfidence)) {
-        const item = validResolvedItems[0];
-        await createManualTransactionsBatch(
-            params.userId,
-            [{ amount: item.amount, description: item.description, categoryName: item.categoryName, categoryIdOverride: item.categoryId }],
-            params.accountId
-        );
-        await getBot().sendMessage(
-            params.chatId,
-            responseFormatter.withAccountHeader(
-                formatAutoSavedTransaction(item.amount, item.description, item.categoryName),
-                params.accountName || undefined
-            ),
-            { parse_mode: 'Markdown' }
-        );
-        return;
     }
 
     // Normal confirmation path
@@ -927,7 +892,7 @@ async function handlePhotoMessage(
         // ✅ Optimization: Execute session write and message edit in parallel
         await Promise.all([
             // 1. Store in Firestore temporary session
-            getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
+            app.getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
                 userId,
                 telegramId: msg.from!.id,
                 receiptData,
@@ -1130,7 +1095,7 @@ async function handleDocumentMessage(
         // ✅ Optimization: Execute session write and message edit in parallel
         await Promise.all([
             // 1. Store in Firestore temporary session
-            getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
+            app.getDb().collection('receipt_sessions').doc(sessionId).set(sanitizeFirestoreData({
                 userId,
                 telegramId: msg.from!.id,
                 receiptData,
@@ -1650,7 +1615,7 @@ async function handleCallbackQuery(
         const sessionId = callbackData.replace('mtc_', '');
 
         try {
-            const sessionDoc = await getDb().collection('text_transaction_sessions').doc(sessionId).get();
+            const sessionDoc = await app.getDb().collection('text_transaction_sessions').doc(sessionId).get();
             if (!sessionDoc.exists) {
                 await getBot().answerCallbackQuery(query.id, {
                     text: 'Draft tidak ditemukan.',
@@ -1730,7 +1695,7 @@ async function handleCallbackQuery(
         const sessionId = callbackData.replace('mtx_', '');
 
         try {
-            const sessionDoc = await getDb().collection('text_transaction_sessions').doc(sessionId).get();
+            const sessionDoc = await app.getDb().collection('text_transaction_sessions').doc(sessionId).get();
             if (sessionDoc.exists) {
                 await sessionDoc.ref.update({
                     status: 'cancelled',
@@ -1775,7 +1740,7 @@ async function handleCallbackQuery(
         const itemIndex = parseInt(rawIndex, 10);
 
         try {
-            const sessionDoc = await getDb().collection('text_transaction_sessions').doc(sessionId).get();
+            const sessionDoc = await app.getDb().collection('text_transaction_sessions').doc(sessionId).get();
             if (!sessionDoc.exists) {
                 await getBot().answerCallbackQuery(query.id, {
                     text: 'Draft tidak ditemukan.',
@@ -1864,7 +1829,7 @@ async function handleCallbackQuery(
         const sessionId = callbackData.replace('c_', '');
 
         try {
-            const sessionDoc = await getDb().collection('receipt_sessions').doc(sessionId).get();
+            const sessionDoc = await app.getDb().collection('receipt_sessions').doc(sessionId).get();
 
             if (!sessionDoc.exists || sessionDoc.data()!.status !== 'pending') {
                 await getBot().answerCallbackQuery(query.id, {
@@ -1969,7 +1934,7 @@ async function handleCallbackQuery(
         const sessionId = callbackData.replace('x_', '');
 
         try {
-            const sessionDoc = await getDb().collection('receipt_sessions').doc(sessionId).get();
+            const sessionDoc = await app.getDb().collection('receipt_sessions').doc(sessionId).get();
 
             if (sessionDoc.exists) {
                 await sessionDoc.ref.update({ status: 'cancelled', cancelledAt: new Date() });

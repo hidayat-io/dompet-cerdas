@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Transaction, Category } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
-import TransactionForm from './TransactionForm';
+import QuickAddSheetLoader from './QuickAddSheetLoader';
 import TransactionActionSheet from './TransactionActionSheet';
 import { NotificationType } from './NotificationModal';
 import { formatRp } from '../utils/format';
@@ -18,8 +18,11 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import InputAdornment from '@mui/material/InputAdornment';
-import Grid from '@mui/material/Grid';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import Divider from '@mui/material/Divider';
 import Card from '@mui/material/Card';
 import List from '@mui/material/List';
@@ -121,20 +124,6 @@ const getMonthName = (month: number): string => {
   return months[month];
 };
 
-const getShortMonthName = (month: number): string => {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  return months[month];
-};
-
-const generateYearOptions = (): number[] => {
-  const currentYear = new Date().getFullYear();
-  const years = [];
-  for (let i = 0; i <= 5; i++) {
-    years.push(currentYear - i);
-  }
-  return years;
-};
-
 type FilterMode = 'month' | 'range';
 
 const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, currentUserId, activeAccountRole, pendingAttachmentUploads = {}, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
@@ -169,8 +158,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
   const [selectedType, setSelectedType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
 
   const [actionSheetTransaction, setActionSheetTransaction] = useState<Transaction | null>(null);
-
-  const yearOptions = useMemo(() => generateYearOptions(), []);
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -273,10 +260,16 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     return `${year}-${month}-${day}`;
   };
 
-  const handleMonthSelect = (monthIndex: number) => {
+  const handleMonthSelect = (monthIndex: number, year = selectedYear) => {
+    setSelectedYear(year);
     setSelectedMonthIndex(monthIndex);
-    setStartDate(formatDateLocal(new Date(selectedYear, monthIndex, 1)));
-    setEndDate(formatDateLocal(new Date(selectedYear, monthIndex + 1, 0)));
+    setStartDate(formatDateLocal(new Date(year, monthIndex, 1)));
+    setEndDate(formatDateLocal(new Date(year, monthIndex + 1, 0)));
+  };
+
+  const handleMonthStep = (step: -1 | 1) => {
+    const nextDate = new Date(selectedYear, selectedMonthIndex + step, 1);
+    handleMonthSelect(nextDate.getMonth(), nextDate.getFullYear());
   };
 
   const todayKey = formatDateLocal(new Date());
@@ -312,11 +305,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
     setEndDate(formatDateLocal(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
   };
 
-  const isCurrentMonth = () => {
-    const now = new Date();
-    return selectedYear === now.getFullYear() && selectedMonthIndex === now.getMonth();
-  };
-
   const hasActiveFilters = searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all';
 
   return (
@@ -332,264 +320,106 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       )}
 
       <Box sx={{ pb: { xs: 10, md: 0 } }}>
-        {/* Header + Filter Toggle */}
+        {/* Month navigation and advanced filters */}
         <PageHeader
           title="Riwayat Transaksi"
           description="Lihat, cari, dan saring transaksi dengan pola tampilan yang sama seperti menu lainnya."
           actions={
-            <Button
-              variant="outlined"
-              onClick={() => setShowFilters(!showFilters)}
-              startIcon={<IconDisplay name="Filter" size={16} />}
-              endIcon={<IconDisplay name={showFilters ? 'ArrowUp' : 'ArrowDown'} size={14} />}
-            >
-              {getFilterLabel()}
-            </Button>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                size="small"
+                aria-label="Bulan sebelumnya"
+                onClick={() => handleMonthStep(-1)}
+                disabled={filterMode !== 'month'}
+              >
+                <IconDisplay name="ArrowLeft" size={18} />
+              </IconButton>
+              <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130, textAlign: 'center' }}>
+                {filterMode === 'month' ? getFilterLabel() : 'Rentang tanggal'}
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label="Bulan berikutnya"
+                onClick={() => handleMonthStep(1)}
+                disabled={filterMode !== 'month'}
+              >
+                <IconDisplay name="ArrowRight" size={18} />
+              </IconButton>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setShowFilters(true)}
+                startIcon={<IconDisplay name="Filter" size={16} />}
+              >
+                Filter lanjutan
+              </Button>
+            </Box>
           }
         />
 
-        {/* Filter Panel */}
-        {showFilters && (
-          <Paper variant="outlined" sx={{ p: 2.5, mb: 2, borderRadius: 3 }}>
-            {/* Filter Mode Tabs */}
-            <Tabs 
-              value={filterMode} 
+        {/* Advanced filter modal */}
+        <Dialog open={showFilters} onClose={() => setShowFilters(false)} fullWidth maxWidth="sm">
+          <DialogTitle sx={{ pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            Filter Lanjutan
+            <IconButton onClick={() => setShowFilters(false)} aria-label="Tutup filter" size="small">
+              <IconDisplay name="X" size={20} />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            <Tabs
+              value={filterMode}
               onChange={(_, newValue) => setFilterMode(newValue)}
               variant="fullWidth"
               sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600 } }}
             >
-              <Tab 
-                value="month" 
-                label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><IconDisplay name="Calendar" size={16} /> Per Bulan</Box>} 
-              />
-              <Tab 
-                value="range" 
-                label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><IconDisplay name="CalendarDays" size={16} /> Rentang Tanggal</Box>} 
-              />
+              <Tab value="month" label="Per Bulan" />
+              <Tab value="range" label="Rentang Tanggal" />
             </Tabs>
-
-            {/* Month Selector */}
-            {filterMode === 'month' && (
-              <Box>
-                {/* Year selector */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflowX: 'auto', pb: 1, mb: 1.5 }}>
-                  <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flexShrink: 0 }}>
-                    Tahun:
-                  </Typography>
-                  {yearOptions.map((year) => (
-                    <Box
-                      key={year}
-                      component="button"
-                      onClick={() => handleYearChange(year)}
-                      sx={{
-                        px: 1.5,
-                        py: 0.75,
-                        border: 'none',
-                        borderRadius: 1.5,
-                        cursor: 'pointer',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        fontFamily: 'inherit',
-                        flexShrink: 0,
-                        bgcolor: selectedYear === year ? 'primary.main' : 'action.hover',
-                        color: selectedYear === year ? '#fff' : 'text.primary',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {year}
-                    </Box>
-                  ))}
-                </Box>
-
-                {/* Month grid */}
-                <Grid container spacing={1} sx={{ mb: 1 }}>
-                  {Array.from({ length: 12 }, (_, i) => i).map((monthIndex) => (
-                    <Grid size={{ xs: 3, md: 2 }} key={monthIndex}>
-                      <Box
-                        component="button"
-                        onClick={() => handleMonthSelect(monthIndex)}
-                        sx={{
-                          width: '100%',
-                          py: 1,
-                          border: '1px solid',
-                          borderRadius: 1.5,
-                          cursor: 'pointer',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          fontFamily: 'inherit',
-                          bgcolor: selectedMonthIndex === monthIndex ? 'primary.main' : 'action.hover',
-                          color: selectedMonthIndex === monthIndex ? '#fff' : 'text.primary',
-                          borderColor: selectedMonthIndex === monthIndex ? 'primary.main' : 'divider',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {getShortMonthName(monthIndex)}
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
-
-                {!isCurrentMonth() && (
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    startIcon={<IconDisplay name="RefreshCw" size={14} />}
-                    onClick={resetToCurrentMonth}
-                    sx={{ borderRadius: 2, mt: 1 }}
-                  >
-                    Kembali ke Bulan Ini
-                  </Button>
-                )}
-              </Box>
-            )}
-
-            {/* Date Range Selector */}
             {filterMode === 'range' && (
-              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { md: 'flex-end' } }}>
-                <TextField
-                  label="Dari Tanggal"
-                  type="date"
-                  size="small"
-                  value={startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                  slotProps={{
-                    input: {
-                      onClick: (e: any) => {
-                        if (typeof e.target.showPicker === 'function') {
-                          try {
-                            e.target.showPicker();
-                          } catch (err) {
-                            console.error('[DATEPICKER] Failed to open picker:', err);
-                          }
-                        }
-                      }
-                    },
-                    inputLabel: { shrink: true }
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  label="Sampai Tanggal"
-                  type="date"
-                  size="small"
-                  value={endDate}
-                  onChange={(e) => handleEndDateChange(e.target.value)}
-                  slotProps={{
-                    input: {
-                      onClick: (e: any) => {
-                        if (typeof e.target.showPicker === 'function') {
-                          try {
-                            e.target.showPicker();
-                          } catch (err) {
-                            console.error('[DATEPICKER] Failed to open picker:', err);
-                          }
-                        }
-                      }
-                    },
-                    inputLabel: { shrink: true }
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<IconDisplay name="RefreshCw" size={14} />}
-                  onClick={resetToCurrentMonth}
-                  sx={{ borderRadius: 2, flexShrink: 0, height: 40 }}
-                >
-                  Bulan Ini
-                </Button>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
+                <TextField label="Dari Tanggal" type="date" size="small" value={startDate} onChange={(e) => handleStartDateChange(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: 1 }} />
+                <TextField label="Sampai Tanggal" type="date" size="small" value={endDate} onChange={(e) => handleEndDateChange(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: 1 }} />
               </Box>
             )}
-
-            {/* Search & Filters */}
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, mt: 2 }}>
-              {/* Search */}
-              <TextField
-                size="small"
-                placeholder="Cari transaksi..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <IconDisplay name="Search" size={18} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchQuery ? (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setSearchQuery('')}>
-                          <IconDisplay name="X" size={14} />
-                        </IconButton>
-                      </InputAdornment>
-                    ) : null,
-                  }
-                }}
-                sx={{ flex: 1 }}
-              />
-
-              {/* Type Filter Tabs */}
-              <Tabs
-                value={selectedType}
-                onChange={(_, newValue) => setSelectedType(newValue)}
-                variant="scrollable"
-                scrollButtons="auto"
-                sx={{ 
-                  flexShrink: 0, 
-                  minHeight: 40,
-                  bgcolor: 'action.hover',
-                  borderRadius: 2,
-                  p: 0.5,
-                  '& .MuiTabs-indicator': { display: 'none' },
-                  '& .MuiTab-root': { 
-                    minHeight: 32, 
-                    py: 0.5, 
-                    px: 2, 
-                    borderRadius: 1.5,
-                    textTransform: 'none', 
-                    fontWeight: 600,
-                    fontSize: 13,
-                    minWidth: 'auto',
-                    color: 'text.secondary',
-                    '&.Mui-selected': {
-                      bgcolor: 'background.paper',
-                      boxShadow: 1,
-                    }
-                  },
-                  '& .MuiTab-root.Mui-selected[value="EXPENSE"]': { color: theme.colors.expense },
-                  '& .MuiTab-root.Mui-selected[value="INCOME"]': { color: theme.colors.income },
-                  '& .MuiTab-root.Mui-selected[value="all"]': { color: 'primary.main' },
-                }}
-              >
-                <Tab value="all" label="Semua" />
-                <Tab value="EXPENSE" label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><IconDisplay name="TrendingDown" size={14} /> Keluar</Box>} />
-                <Tab value="INCOME" label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><IconDisplay name="TrendingUp" size={14} /> Masuk</Box>} />
-              </Tabs>
-
-              {/* Category Filter */}
-              <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
-                <InputLabel>Kategori</InputLabel>
-                <Select
-                  label="Kategori"
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                >
-                  <MenuItem value="all">Semua Kategori</MenuItem>
-                  <MenuItem disabled sx={{ fontSize: 12, color: 'text.disabled', py: 0.25 }}>── Pengeluaran ──</MenuItem>
-                  {categories.filter(c => c.type === 'EXPENSE').map(cat => (
-                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-                  ))}
-                  <MenuItem disabled sx={{ fontSize: 12, color: 'text.disabled', py: 0.25 }}>── Pemasukan ──</MenuItem>
-                  {categories.filter(c => c.type === 'INCOME').map(cat => (
-                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            <TextField
+              fullWidth
+              size="small"
+              label="Cari transaksi"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              slotProps={{ input: { startAdornment: <InputAdornment position="start"><IconDisplay name="Search" size={18} /></InputAdornment> } }}
+              sx={{ mb: 2 }}
+            />
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 1 }}>Jenis transaksi</Typography>
+            <Tabs
+              value={selectedType}
+              onChange={(_, newValue) => setSelectedType(newValue)}
+              variant="fullWidth"
+              sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600 } }}
+            >
+              <Tab value="all" label="Semua" />
+              <Tab value="EXPENSE" label="Keluar" />
+              <Tab value="INCOME" label="Masuk" />
+            </Tabs>
+            <FormControl fullWidth size="small">
+              <InputLabel>Kategori</InputLabel>
+              <Select label="Kategori" value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}>
+                <MenuItem value="all">Semua Kategori</MenuItem>
+                <MenuItem disabled sx={{ fontSize: 12, color: 'text.disabled', py: 0.25 }}>── Pengeluaran ──</MenuItem>
+                {categories.filter(c => c.type === 'EXPENSE').map(cat => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
+                <MenuItem disabled sx={{ fontSize: 12, color: 'text.disabled', py: 0.25 }}>── Pemasukan ──</MenuItem>
+                {categories.filter(c => c.type === 'INCOME').map(cat => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'space-between' }}>
+            <Button onClick={() => setShowFilters(false)}>Tutup</Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button onClick={() => { setSearchQuery(''); setSelectedType('all'); setSelectedCategoryId('all'); }}>Reset filter</Button>
+              <Button variant="contained" onClick={() => setShowFilters(false)}>Terapkan</Button>
             </Box>
-          </Paper>
-        )}
+          </DialogActions>
+        </Dialog>
 
         {/* Active Filters */}
         {hasActiveFilters && (
@@ -812,8 +642,10 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
 
       {/* Edit Modal */}
       {editingTransaction && onUpdate && (
-        <TransactionForm
+        <QuickAddSheetLoader
+          quickAddType="EXPENSE"
           categories={categories}
+          transactions={transactions}
           initialData={editingTransaction}
           latestData={transactions.find((transaction) => transaction.id === editingTransaction.id) || editingTransaction}
           currentUserId={currentUserId}
@@ -823,6 +655,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           onAddCategory={onAddCategory}
           onClose={() => setEditingTransaction(null)}
           onShowNotification={onShowNotification}
+          onAdd={async () => {}}
         />
       )}
 

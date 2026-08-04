@@ -1,4 +1,4 @@
-# Ringkasan Implementasi Redesign UI/UX v3.0.0
+# Ringkasan Implementasi Redesign UI/UX v3.1.0
 
 **Tanggal Implementasi**: Agu 3, 2026
 **Status**: ✅ Selesai (Build Verified)
@@ -32,7 +32,7 @@ Redesign menyeluruh aplikasi Dompet Cerdas dari interface yang functional menjad
 |------|-----------------|
 | `components/Dashboard.tsx` | Layout action-oriented: Perlu Perhatian section, Quick Actions grid, compact hero card |
 | `components/TransactionList.tsx` | List kompak dengan sticky date header, tap-to-action sheet, compact summary strip |
-| `components/TransactionForm.tsx` | Progressive disclosure: collapse tanggal/catatan/lampiran, large amount input, quick date chips |
+| `components/QuickAddSheet.tsx` | Unified add/edit form: progressive disclosure, large amount input, AI receipt scan, attachments, conflict/read-only states |
 | `components/BudgetManager.tsx` | Visual progress dengan threshold 80%, compact action buttons, prominent copy previous month |
 | `components/DebtManager.tsx` | Quick payment action langsung dari list item, prominent overdue indicators |
 | `components/AuthLogin.tsx` | Feature highlights, cleaner layout, stronger value proposition |
@@ -175,6 +175,6 @@ surfaceTonal: '#f1f5f9' (light) / '#334155' (dark)
 ## Notes untuk Developer
 
 1. **SyncStatusChip** bisa dipakai di komponen manapun yang menampilkan status sync (Riwayat, Form, Settings)
-2. **QuickAddSheet** saat ini hanya support input dasar (nominal, kategori default). Detail lengkap (lampiran, tanggal custom) redirect ke form full.
+2. **QuickAddSheet** sekarang menjadi form transaksi tunggal untuk tambah, edit, Pengeluaran Rutin, scan struk AI, lampiran, tanggal custom, read-only shared account, dan conflict resolution.
 3. **ActionSheet** pattern bisa direplikasi untuk modul lain (Budget, Debt, Plan)
 4. **Frequent categories** dihitung on-the-fly dari 30 hari terakhir, tidak perlu Firestore collection baru.

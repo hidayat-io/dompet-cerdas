@@ -25,11 +25,11 @@ import Divider from '@mui/material/Divider';
 import { onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getScopedCollectionRefForAccount } from '../services/accountService';
-import { RoutineExpense, RoutineExpenseRecord, Category, FinancialAccount, Transaction } from '../types';
+import { RoutineExpense, RoutineExpenseRecord, Category, FinancialAccount } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
 import ConfirmDialog from './ConfirmDialog';
-import TransactionForm from './TransactionForm';
+import QuickAddSheetLoader from './QuickAddSheetLoader';
 import PageHeader from './PageHeader';
 import { formatRp, formatRupiahInput } from '../utils/format';
 import { NotificationType } from './NotificationModal';
@@ -265,15 +265,16 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
     })();
 
     return (
-      <TransactionForm
+      <QuickAddSheetLoader
+        quickAddType="EXPENSE"
         categories={categories}
-        initialData={{
-          id: '',
+        transactions={[]}
+        prefill={{
           amount: selectedExpenseForTx.amount,
           categoryId: selectedExpenseForTx.categoryId,
           date: todayStr,
           description: `Pembayaran ${selectedExpenseForTx.name} - ${monthLabel}`,
-        } as Transaction}
+        }}
         onAdd={handleSaveTransaction}
         onAddCategory={onAddCategory}
         onClose={() => {

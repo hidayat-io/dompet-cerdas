@@ -115,7 +115,6 @@ const Settings = lazy(() => import('./components/Settings'));
 const AiAdvisor = lazy(() => import('./components/AiAdvisor'));
 const LinkTelegram = lazy(() => import('./components/LinkTelegram'));
 const AuthLogin = lazy(() => import('./components/AuthLogin'));
-const TransactionForm = lazy(() => import('./components/TransactionForm'));
 const OnboardingModal = lazy(() => import('./components/OnboardingModal'));
 const NotificationModal = lazy(() => import('./components/NotificationModal'));
 const QuickAddSheetLoader = lazy(() => import('./components/QuickAddSheetLoader'));
@@ -238,7 +237,6 @@ function App() {
 
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [moreMenuAnchorEl, setMoreMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddType, setQuickAddType] = useState<QuickAddType>('EXPENSE');
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -2989,32 +2987,6 @@ function App() {
                 categories={categories}
                 transactions={transactions}
                 onClose={() => setShowQuickAdd(false)}
-                onOpenFullForm={() => {
-                  setShowQuickAdd(false);
-                  setShowAddModal(true);
-                }}
-                onAdd={addTransaction}
-                onAddCategory={addCategory}
-                onShowNotification={showNotification}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-
-        {/* Transaction Modal */}
-        {showAddModal && (
-          <ErrorBoundary
-            fallback={null}
-            onError={() => {
-              setShowAddModal(false);
-              showNotification('error', 'Gagal memuat form', 'Form transaksi gagal dimuat. Periksa koneksi internet lalu coba lagi.');
-            }}
-          >
-            <Suspense fallback={<ViewLoadingFallback />}>
-              <TransactionForm
-                categories={categories}
-                currentUserId={user.uid}
-                onClose={() => setShowAddModal(false)}
                 onAdd={addTransaction}
                 onAddCategory={addCategory}
                 onShowNotification={showNotification}
