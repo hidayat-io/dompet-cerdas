@@ -61,6 +61,7 @@ import {
   getUserDocRef
 } from './services/accountService';
 import { callCloudFunction, deleteFileFromStorage, getLegacyStoragePathFromUrl, uploadFileToStorage } from './services/firebaseRuntime';
+import { readCachedSnapshot, writeCachedSnapshot, clearCachedSnapshot, CachedSnapshot } from './services/startupCache';
 import {
   deleteOfflineAttachmentUploadJob,
   deleteOfflineAttachmentUploadJobsForTransactions,
@@ -246,6 +247,7 @@ function App() {
   const [showSyncCompletedToast, setShowSyncCompletedToast] = useState(false);
   const [attachmentQueueVersion, setAttachmentQueueVersion] = useState(0);
   const [pendingAttachmentUploads, setPendingAttachmentUploads] = useState<Record<string, OfflineAttachmentUploadJob>>({});
+  const [attachmentQueueLoaded, setAttachmentQueueLoaded] = useState(false);
   const wasOfflineRef = useRef(isOffline);
   const isApplyingUpdateRef = useRef(false);
   const hadPendingWritesRef = useRef(false);
@@ -263,6 +265,8 @@ function App() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [accountLoading, setAccountLoading] = useState(true);
+  const [hydratedFromCache, setHydratedFromCache] = useState(false);
+  const preservedCacheOnceRef = useRef(false);
   const [telegramDefaultAccountId, setTelegramDefaultAccountId] = useState<string | null>(null);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [telegramReminderEnabled, setTelegramReminderEnabled] = useState<boolean>(false);
@@ -511,6 +515,28 @@ function App() {
     bumpAttachmentQueueVersion();
   };
 
+  const retryOfflineAttachmentUpload = async (transactionId: string) => {
+    if (!user || !activeAccountId) return;
+
+    const job = pendingAttachmentUploads[transactionId];
+    if (!job) return;
+
+    await putOfflineAttachmentUploadJob({
+      ...job,
+      retryCount: 0,
+      status: 'pending',
+      updatedAt: new Date().toISOString(),
+    });
+    bumpAttachmentQueueVersion();
+  };
+
+  const cancelOfflineAttachmentUpload = async (transactionId: string) => {
+    if (!user || !activeAccountId) return;
+
+    await clearOfflineAttachmentUpload(transactionId);
+    showNotification('info', 'Upload Dibatalkan', 'Antrean upload lampiran sudah dihapus. Transaksi tetap tersimpan.', true);
+  };
+
   const getActiveScopedCollection = <T,>(collectionName: AccountScopedCollectionName) => {
     if (!user || !activeAccount) return null;
     return getScopedCollectionRefForAccount<T>(db, user.uid, activeAccount, collectionName);
@@ -654,10 +680,12 @@ function App() {
   useEffect(() => {
     if (!user || !activeAccountId) {
       setPendingAttachmentUploads({});
+      setAttachmentQueueLoaded(false);
       return undefined;
     }
 
     let cancelled = false;
+    setAttachmentQueueLoaded(false);
 
     const loadPendingAttachmentUploads = async () => {
       try {
@@ -670,8 +698,10 @@ function App() {
             return accumulator;
           }, {})
         );
+        setAttachmentQueueLoaded(true);
       } catch (error) {
         console.error('Failed to load pending attachment uploads:', error);
+        if (!cancelled) setAttachmentQueueLoaded(true);
       }
     };
 
@@ -699,19 +729,29 @@ function App() {
         for (const job of jobs) {
           if (cancelled) break;
 
-          // Skip permanently failed jobs
-          if (job.status === 'failed') continue;
-
           const accountScope = { id: job.accountId, sharedAccountId: job.sharedAccountId || undefined };
           const transactionsRef = getScopedCollectionRefForAccount<Transaction>(db, user.uid, accountScope, 'transactions');
           const txRef = doc(transactionsRef, job.transactionId);
           const txSnap = await getDoc(txRef);
 
           if (!txSnap.exists()) {
-            await deleteOfflineAttachmentUploadJob(job.id);
-            anyChange = true;
+            // Keep the job visible when its transaction cannot be found. The
+            // user must explicitly cancel it; silently deleting the job hides
+            // a failed upload and makes the dashboard look falsely synced.
+            if (job.status !== 'failed') {
+              await putOfflineAttachmentUploadJob({
+                ...job,
+                retryCount: Math.max(job.retryCount || 0, MAX_RETRY_COUNT),
+                status: 'failed',
+                updatedAt: new Date().toISOString(),
+              });
+              anyChange = true;
+            }
             continue;
           }
+
+          // Failed jobs stay visible until the user retries or cancels them.
+          if (job.status === 'failed') continue;
 
           try {
             const fileExt = job.fileName.split('.').pop();
@@ -891,6 +931,24 @@ function App() {
     const bootstrapAccounts = async () => {
       setAccountLoading(true);
 
+      // Cache-first: hydrate shell immediately from IndexedDB so returning
+      // users see their dashboard before the network round-trip completes.
+      const cached = await readCachedSnapshot(user.uid);
+      if (!cancelled && cached) {
+        const cacheMatchesActiveAccount = !cached.dataAccountId || cached.dataAccountId === cached.activeAccountId;
+        setAccounts((cached.accounts as unknown) as FinancialAccount[]);
+        if (cached.activeAccountId) setActiveAccountId(cached.activeAccountId);
+        if (cacheMatchesActiveAccount) {
+          if (cached.categories.length > 0) setCategories((cached.categories as unknown) as Category[]);
+          if (cached.transactions.length > 0) setTransactions((cached.transactions as unknown) as Transaction[]);
+          if (cached.plans && cached.plans.length > 0) setPlans((cached.plans as unknown) as Plan[]);
+          if (cached.budgets && cached.budgets.length > 0) setBudgets((cached.budgets as unknown) as Budget[]);
+          if (cached.debts && cached.debts.length > 0) setDebts((cached.debts as unknown) as DebtRecord[]);
+        }
+        setHydratedFromCache(true);
+        setAccountLoading(false);
+      }
+
       const userRef = getUserDocRef(db, user.uid);
       const accountsRef = getAccountsCollectionRef(db, user.uid);
       const [userSnap, accountsSnap] = await Promise.all([
@@ -1044,6 +1102,15 @@ function App() {
       if (!cancelled) {
         setActiveAccountId(resolvedAccountId || null);
         setAccountLoading(false);
+
+        // Mirror resolved accounts + active account to cache for next startup.
+        void writeCachedSnapshot(user.uid, {
+          activeAccountId: resolvedAccountId,
+          accounts: (existingAccounts as unknown) as CachedSnapshot['accounts'],
+          categories: [],
+          transactions: [],
+          cachedAt: Date.now(),
+        });
       }
     };
 
@@ -1244,11 +1311,17 @@ function App() {
       return;
     }
 
-    setCategories([]);
-    setTransactions([]);
-    setPlans([]);
-    setBudgets([]);
-    setDebts([]);
+    // Keep cached data visible while the first network snapshot arrives.
+    // Only applies on the very first mount after cache hydration; switching
+    // accounts must reset immediately so stale data from the previous account
+    // is never shown.
+    const preserveCached = !preservedCacheOnceRef.current && hydratedFromCache;
+    preservedCacheOnceRef.current = true;
+    setCategories((current) => (preserveCached && current.length > 0 ? current : []));
+    setTransactions((current) => (preserveCached && current.length > 0 ? current : []));
+    setPlans((current) => (preserveCached && current.length > 0 ? current : []));
+    setBudgets((current) => (preserveCached && current.length > 0 ? current : []));
+    setDebts((current) => (preserveCached && current.length > 0 ? current : []));
 
     let unsubCat: (() => void) | null = null;
     let unsubTx: (() => void) | null = null;
@@ -1375,7 +1448,27 @@ function App() {
       unsubBudgets?.();
       unsubDebts?.();
     };
-  }, [user, activeAccount]);
+  }, [user, activeAccount, hydratedFromCache]);
+
+  // --- Cache-first background writer ---
+  // Mirrors core data to IndexedDB so the next startup can render instantly.
+  // dataAccountId guards against writing the previous account's data while a
+  // switch is still in flight.
+  useEffect(() => {
+    if (!user) return;
+    const snapshot: CachedSnapshot = {
+      activeAccountId,
+      dataAccountId: activeAccountId,
+      accounts: (accounts as unknown) as CachedSnapshot['accounts'],
+      categories: (categories as unknown) as CachedSnapshot['categories'],
+      transactions: (transactions as unknown) as CachedSnapshot['transactions'],
+      plans: (plans as unknown) as CachedSnapshot['plans'],
+      budgets: (budgets as unknown) as CachedSnapshot['budgets'],
+      debts: (debts as unknown) as CachedSnapshot['debts'],
+      cachedAt: Date.now(),
+    };
+    void writeCachedSnapshot(user.uid, snapshot);
+  }, [user, activeAccountId, accounts, categories, transactions, plans, budgets, debts]);
 
   // --- CRUD Handlers (Firestore) ---
 
@@ -2353,6 +2446,9 @@ function App() {
     ? localStorage.getItem(gettingStartedStorageKey) === '1'
     : false;
   const hasStarterData = transactions.length > 0 || plans.length > 0 || budgets.length > 0 || debts.length > 0;
+  const attachmentUploadJobs = Object.values(pendingAttachmentUploads);
+  const failedAttachmentUploadCount = attachmentUploadJobs.filter((job) => job.status === 'failed').length;
+  const pendingAttachmentUploadCount = attachmentUploadJobs.length - failedAttachmentUploadCount;
 
   useEffect(() => {
     if (!user || !activeAccountId || accountLoading || !onboardingStorageKey) return;
@@ -2414,7 +2510,7 @@ function App() {
     );
   }
 
-  if (accountLoading) {
+  if (accountLoading && !hydratedFromCache) {
     return (
       <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, bgcolor: 'background.default' }}>
         <CircularProgress />
@@ -2723,7 +2819,9 @@ function App() {
                   plans={plans}
                   isOffline={isOffline}
                   hasPendingWrites={hasPendingWrites}
-                  pendingAttachmentCount={Object.keys(pendingAttachmentUploads).length}
+                  pendingAttachmentCount={pendingAttachmentUploadCount}
+                  failedAttachmentCount={failedAttachmentUploadCount}
+                  attachmentQueueLoading={!attachmentQueueLoaded && !!user && !!activeAccountId}
                   showGettingStarted={!hasStarterData}
                   isGettingStartedDismissed={isGettingStartedDismissed || hasSeenOnboarding}
                   activeAccountName={activeAccount?.name || 'Akun Keuangan'}
@@ -2744,6 +2842,8 @@ function App() {
                   currentUserId={user?.uid}
                   activeAccountRole={activeAccount?.role}
                   pendingAttachmentUploads={pendingAttachmentUploads}
+                  onRetryAttachmentUpload={retryOfflineAttachmentUpload}
+                  onCancelAttachmentUpload={cancelOfflineAttachmentUpload}
                   onUpdate={updateTransaction}
                   onDelete={deleteTransaction}
                   onAddCategory={addCategory}

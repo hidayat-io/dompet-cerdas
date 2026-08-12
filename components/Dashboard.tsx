@@ -25,6 +25,8 @@ interface DashboardProps {
     isOffline?: boolean;
     hasPendingWrites?: boolean;
     pendingAttachmentCount?: number;
+    failedAttachmentCount?: number;
+    attachmentQueueLoading?: boolean;
     showGettingStarted: boolean;
     isGettingStartedDismissed: boolean;
     activeAccountName: string;
@@ -53,6 +55,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     isOffline = false,
     hasPendingWrites = false,
     pendingAttachmentCount = 0,
+    failedAttachmentCount = 0,
+    attachmentQueueLoading = false,
     showGettingStarted,
     isGettingStartedDismissed,
     activeAccountName,
@@ -229,8 +233,24 @@ const Dashboard: React.FC<DashboardProps> = ({
         },
     ];
 
-    const syncStatus = isOffline ? 'offline' : hasPendingWrites || pendingAttachmentCount > 0 ? 'pending' : 'synced';
-    const syncLabel = isOffline ? 'Offline' : pendingAttachmentCount > 0 ? `${pendingAttachmentCount} upload tertunda` : undefined;
+    const attachmentQueueLabel = [
+        failedAttachmentCount > 0 ? failedAttachmentCount + ' upload gagal' : '',
+        pendingAttachmentCount > 0 ? pendingAttachmentCount + ' upload tertunda' : '',
+    ].filter(Boolean).join(' • ');
+    const syncStatus = isOffline
+        ? 'offline'
+        : attachmentQueueLoading
+        ? 'pending'
+        : failedAttachmentCount > 0
+        ? 'error'
+        : hasPendingWrites || pendingAttachmentCount > 0
+        ? 'pending'
+        : 'synced';
+    const syncLabel = isOffline
+        ? 'Offline'
+        : attachmentQueueLoading
+        ? 'Memuat status upload...'
+        : attachmentQueueLabel || undefined;
 
     return (
         <Box sx={{ pb: { xs: 12, md: 0 } }}>

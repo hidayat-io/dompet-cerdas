@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Transaction, Category } from '../types';
 import IconDisplay from './IconDisplay';
 import { useTheme } from '../contexts/ThemeContext';
@@ -6,6 +6,7 @@ import QuickAddSheetLoader from './QuickAddSheetLoader';
 import TransactionActionSheet from './TransactionActionSheet';
 import { NotificationType } from './NotificationModal';
 import { formatRp } from '../utils/format';
+import { resolveAttachmentUrl } from '../services/firebaseRuntime';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -42,6 +43,8 @@ interface TransactionListProps {
   currentUserId?: string | null;
   activeAccountRole?: 'OWNER' | 'MEMBER';
   pendingAttachmentUploads?: Record<string, OfflineAttachmentUploadJob>;
+  onRetryAttachmentUpload?: (transactionId: string) => Promise<void>;
+  onCancelAttachmentUpload?: (transactionId: string) => Promise<void>;
   onDelete: (id: string) => void;
   onUpdate?: (
     id: string,
@@ -58,11 +61,26 @@ interface TransactionListProps {
 // Modal for viewing attachment
 const AttachmentModal: React.FC<{
   url: string;
+  path?: string;
   name: string;
   type: 'image' | 'pdf';
   onClose: () => void;
-}> = ({ url, name, type, onClose }) => {
+}> = ({ url, path, name, type, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
+  // Private attachments (e.g. Telegram receipts) carry a Storage path instead
+  // of a durable URL; resolve it client-side, falling back to the stored url.
+  const [resolvedUrl, setResolvedUrl] = useState(path ? '' : url);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (path) {
+      setIsLoading(true);
+      resolveAttachmentUrl({ url, path }).then((resolved) => {
+        if (!cancelled) setResolvedUrl(resolved);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [url, path]);
 
   return (
     <FullScreenDialog
@@ -73,7 +91,7 @@ const AttachmentModal: React.FC<{
       headerActions={
         <IconButton
           component="a"
-          href={url}
+          href={resolvedUrl}
           target="_blank"
           rel="noopener noreferrer"
           size="small"
@@ -95,7 +113,7 @@ const AttachmentModal: React.FC<{
         {type === 'image' ? (
           <Box
             component="img"
-            src={url}
+            src={resolvedUrl}
             alt={name}
             onLoad={() => setIsLoading(false)}
             onError={() => setIsLoading(false)}
@@ -104,7 +122,7 @@ const AttachmentModal: React.FC<{
         ) : (
           <Box
             component="iframe"
-            src={url}
+            src={resolvedUrl}
             title={name}
             onLoad={() => setIsLoading(false)}
             sx={{ width: '100%', height: '70vh', border: '1px solid', borderColor: 'divider', borderRadius: 2, display: isLoading ? 'none' : 'block' }}
@@ -126,11 +144,12 @@ const getMonthName = (month: number): string => {
 
 type FilterMode = 'month' | 'range';
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, currentUserId, activeAccountRole, pendingAttachmentUploads = {}, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, currentUserId, activeAccountRole, pendingAttachmentUploads = {}, onRetryAttachmentUpload, onCancelAttachmentUpload, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
   const { theme } = useTheme();
 
   const [viewingAttachment, setViewingAttachment] = useState<{
     url: string;
+    path?: string;
     name: string;
     type: 'image' | 'pdf';
   } | null>(null);
@@ -306,6 +325,12 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
   };
 
   const hasActiveFilters = searchQuery || selectedCategoryId !== 'all' || selectedType !== 'all';
+  const attachmentUploadJobs = useMemo(
+    () => Object.values(pendingAttachmentUploads).sort((left, right) => left.queuedAt.localeCompare(right.queuedAt)),
+    [pendingAttachmentUploads]
+  );
+  const failedAttachmentUploadCount = attachmentUploadJobs.filter((job) => job.status === 'failed').length;
+  const pendingAttachmentUploadCount = attachmentUploadJobs.length - failedAttachmentUploadCount;
 
   return (
     <>
@@ -313,6 +338,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
       {viewingAttachment && (
         <AttachmentModal
           url={viewingAttachment.url}
+          path={viewingAttachment.path}
           name={viewingAttachment.name}
           type={viewingAttachment.type}
           onClose={() => setViewingAttachment(null)}
@@ -356,6 +382,120 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             </Box>
           }
         />
+
+        {attachmentUploadJobs.length > 0 && (
+          <Card
+            variant="outlined"
+            data-testid="attachment-upload-status"
+            sx={{
+              mb: 2,
+              borderRadius: 3,
+              borderColor: failedAttachmentUploadCount > 0 ? theme.colors.error : theme.colors.warning,
+              bgcolor: failedAttachmentUploadCount > 0 ? theme.colors.errorLight : theme.colors.warningBg,
+            }}
+          >
+            <Box sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25 }}>
+                <IconDisplay
+                  name={failedAttachmentUploadCount > 0 ? 'AlertCircle' : 'Loader'}
+                  size={20}
+                  sx={{ color: failedAttachmentUploadCount > 0 ? theme.colors.error : theme.colors.warning, mt: 0.25 }}
+                />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Status upload lampiran
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {failedAttachmentUploadCount > 0
+                      ? failedAttachmentUploadCount + ' upload gagal' + (pendingAttachmentUploadCount > 0 ? ', ' + pendingAttachmentUploadCount + ' masih tertunda' : '') + '.'
+                      : pendingAttachmentUploadCount + ' upload menunggu koneksi.'}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {failedAttachmentUploadCount > 0 && (
+                    <Chip
+                      size="small"
+                      label={failedAttachmentUploadCount + ' gagal'}
+                      sx={{ height: 22, color: theme.colors.error, bgcolor: theme.colors.errorLight, fontWeight: 700 }}
+                    />
+                  )}
+                  {pendingAttachmentUploadCount > 0 && (
+                    <Chip
+                      size="small"
+                      label={pendingAttachmentUploadCount + ' tertunda'}
+                      sx={{ height: 22, color: theme.colors.warning, bgcolor: theme.colors.warningBg, fontWeight: 700 }}
+                    />
+                  )}
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 1.5, maxHeight: 220, overflowY: 'auto' }}>
+                {attachmentUploadJobs.map((job) => {
+                  const transaction = transactions.find((item) => item.id === job.transactionId);
+                  const isFailed = job.status === 'failed';
+
+                  return (
+                    <Box
+                      key={job.id}
+                      data-testid={'attachment-upload-' + job.transactionId}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 1,
+                        p: 1,
+                        borderRadius: 2,
+                        bgcolor: 'background.paper',
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {transaction?.description?.trim() || job.fileName || 'Lampiran transaksi'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                          {transaction ? 'Transaksi ' + transaction.date : 'Transaksi tidak ditemukan pada daftar saat ini'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                        <Chip
+                          size="small"
+                          icon={<IconDisplay name={isFailed ? 'AlertCircle' : 'Loader'} size={11} />}
+                          label={isFailed ? 'Gagal' : 'Sync...'}
+                          sx={{
+                            height: 22,
+                            fontSize: 10,
+                            color: isFailed ? theme.colors.error : theme.colors.warning,
+                            bgcolor: isFailed ? theme.colors.errorLight : theme.colors.warningBg,
+                            '& .MuiChip-label': { px: 0.75 },
+                          }}
+                        />
+                        {isFailed && onRetryAttachmentUpload && (
+                          <Button
+                            size="small"
+                            onClick={() => { void onRetryAttachmentUpload(job.transactionId); }}
+                            sx={{ minWidth: 0, px: 0.75, fontSize: 10, textTransform: 'none' }}
+                          >
+                            Coba lagi
+                          </Button>
+                        )}
+                        {onCancelAttachmentUpload && (
+                          <Button
+                            size="small"
+                            color="error"
+                            onClick={() => { void onCancelAttachmentUpload(job.transactionId); }}
+                            sx={{ minWidth: 0, px: 0.75, fontSize: 10, textTransform: 'none' }}
+                          >
+                            Batalkan
+                          </Button>
+                        )}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          </Card>
+        )}
 
         {/* Advanced filter modal */}
         <Dialog open={showFilters} onClose={() => setShowFilters(false)} fullWidth maxWidth="sm">
@@ -552,7 +692,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                       const attachmentData = t.attachmentUrl
                         ? { url: t.attachmentUrl, name: t.attachmentName || 'Lampiran', type: t.attachmentType || 'image' as 'image' | 'pdf' }
                         : t.attachment
-                        ? { url: t.attachment.url, name: t.attachment.name, type: t.attachment.type }
+                        ? { url: t.attachment.url, path: t.attachment.path, name: t.attachment.name, type: t.attachment.type }
                         : null;
                       const pendingAttachmentUpload = pendingAttachmentUploads[t.id];
 
@@ -686,6 +826,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
               } else if (actionSheetTransaction.attachment) {
                 setViewingAttachment({
                   url: actionSheetTransaction.attachment.url,
+                  path: actionSheetTransaction.attachment.path,
                   name: actionSheetTransaction.attachment.name,
                   type: actionSheetTransaction.attachment.type,
                 });

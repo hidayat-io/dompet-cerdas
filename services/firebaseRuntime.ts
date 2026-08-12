@@ -127,6 +127,31 @@ export const deleteFileFromStorage = async (path: string) => {
   await deleteObject(ref(storage, path));
 };
 
+/**
+ * Ambil URL tampilan sebuah lampiran.
+ *
+ * Lampiran baru (mis. struk dari bot Telegram) disimpan privat tanpa URL —
+ * hanya path Storage — jadi URL di-resolve di sisi klien lewat getDownloadURL
+ * yang tahan lama dan terproteksi aturan akses. Bila path tidak ada atau
+ * ditolak (dokumen lama dengan path di luar aturan), jatuh kembali ke url yang
+ * tersimpan.
+ */
+export const resolveAttachmentUrl = async (attachment: {
+  url?: string | null;
+  path?: string | null;
+}): Promise<string> => {
+  if (attachment.path) {
+    try {
+      const { getStorage, getDownloadURL, ref } = await import('firebase/storage');
+      const storage = getStorage(firebaseApp);
+      return await getDownloadURL(ref(storage, attachment.path));
+    } catch (error) {
+      console.warn('[STORAGE] gagal resolve URL lampiran dari path, pakai url tersimpan:', error);
+    }
+  }
+  return attachment.url ?? '';
+};
+
 export const getLegacyStoragePathFromUrl = (url: string) => {
   const urlPattern = /\/o\/(.+?)\?/;
   const match = url.match(urlPattern);
