@@ -77,7 +77,9 @@ const trimRuntimeCache = async () => {
   await Promise.all(keys.slice(0, keys.length - MAX_RUNTIME_ENTRIES).map((key) => cache.delete(key)));
 };
 
-const staleWhileRevalidate = async (request, cacheName) => {
+// Tanpa event.waitUntil, SW dapat di-terminate begitu respondWith selesai
+// sehingga revalidasi background tidak pernah tersimpan (cache beku selamanya).
+const staleWhileRevalidate = async (event, request, cacheName) => {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
@@ -91,7 +93,11 @@ const staleWhileRevalidate = async (request, cacheName) => {
     })
     .catch(() => cached);
 
-  return cached || networkPromise;
+  if (cached) {
+    event.waitUntil(networkPromise.then(() => {}).catch(() => {}));
+    return cached;
+  }
+  return networkPromise;
 };
 
 self.addEventListener('fetch', (event) => {
@@ -130,7 +136,11 @@ self.addEventListener('fetch', (event) => {
         }
       })();
 
-      return cachedShell || networkPromise;
+      if (cachedShell) {
+        event.waitUntil(networkPromise.then(() => {}).catch(() => {}));
+        return cachedShell;
+      }
+      return networkPromise;
     })());
     return;
   }
@@ -144,11 +154,11 @@ self.addEventListener('fetch', (event) => {
     (request.destination === 'style' || request.destination === 'font');
 
   if (isSameOriginAsset || isFontRequest) {
-    event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
+    event.respondWith(staleWhileRevalidate(event, request, RUNTIME_CACHE));
     return;
   }
 
   if (url.origin === self.location.origin && PRECACHE_URLS.includes(url.pathname)) {
-    event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
+    event.respondWith(staleWhileRevalidate(event, request, STATIC_CACHE));
   }
 });
