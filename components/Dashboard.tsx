@@ -122,18 +122,22 @@ const Dashboard: React.FC<DashboardProps> = ({
             .reduce((sum, t) => sum + t.amount, 0);
     }, [transactions, categories, currentMonthKey]);
 
-    const expenseByCategory = useMemo(() => categories
+    const expenseByCategory = useMemo(() => {
+        const totalsByCategory = new Map<string, number>();
+        for (const tx of transactions) {
+            totalsByCategory.set(tx.categoryId, (totalsByCategory.get(tx.categoryId) ?? 0) + tx.amount);
+        }
+        return categories
         .filter(c => c.type === 'EXPENSE')
         .map(cat => ({
             name: cat.name,
-            value: transactions.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + t.amount, 0),
+            value: totalsByCategory.get(cat.id) ?? 0,
             color: cat.color,
             icon: cat.icon,
         }))
         .filter(item => item.value > 0)
-        .sort((a, b) => b.value - a.value),
-        [transactions, categories]
-    );
+        .sort((a, b) => b.value - a.value);
+    }, [transactions, categories]);
 
     const recentTransactions = useMemo(() => [...transactions]
         .sort((a, b) => {

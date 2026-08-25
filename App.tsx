@@ -270,6 +270,8 @@ function App() {
   const [accountLoading, setAccountLoading] = useState(true);
   const [hydratedFromCache, setHydratedFromCache] = useState(false);
   const preservedCacheOnceRef = useRef(false);
+  const cacheWriteTimeoutRef = useRef<number | null>(null);
+  const pendingCacheSnapshotRef = useRef<CachedSnapshot | null>(null);
   const [telegramDefaultAccountId, setTelegramDefaultAccountId] = useState<string | null>(null);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [telegramReminderEnabled, setTelegramReminderEnabled] = useState<boolean>(false);
@@ -1453,7 +1455,19 @@ function App() {
   // switch is still in flight.
   useEffect(() => {
     if (!user) return;
-    const snapshot: CachedSnapshot = {
+
+    const flushPendingCache = () => {
+      const snapshot = pendingCacheSnapshotRef.current;
+      if (!snapshot) return;
+      pendingCacheSnapshotRef.current = null;
+      if (cacheWriteTimeoutRef.current !== null) {
+        window.clearTimeout(cacheWriteTimeoutRef.current);
+        cacheWriteTimeoutRef.current = null;
+      }
+      void writeCachedSnapshot(user.uid, snapshot);
+    };
+
+    pendingCacheSnapshotRef.current = {
       activeAccountId,
       dataAccountId: activeAccountId,
       accounts: (accounts as unknown) as CachedSnapshot['accounts'],
@@ -1464,8 +1478,34 @@ function App() {
       debts: (debts as unknown) as CachedSnapshot['debts'],
       cachedAt: Date.now(),
     };
-    void writeCachedSnapshot(user.uid, snapshot);
+
+    if (cacheWriteTimeoutRef.current !== null) window.clearTimeout(cacheWriteTimeoutRef.current);
+    cacheWriteTimeoutRef.current = window.setTimeout(() => {
+      cacheWriteTimeoutRef.current = null;
+      flushPendingCache();
+    }, 1200);
+
+    const handleVisibilityHidden = () => {
+      if (document.visibilityState === 'hidden') flushPendingCache();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityHidden);
+    window.addEventListener('pagehide', flushPendingCache);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityHidden);
+      window.removeEventListener('pagehide', flushPendingCache);
+    };
   }, [user, activeAccountId, accounts, categories, transactions, plans, budgets, debts]);
+
+  useEffect(() => {
+    return () => {
+      if (cacheWriteTimeoutRef.current !== null) {
+        window.clearTimeout(cacheWriteTimeoutRef.current);
+        cacheWriteTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // --- CRUD Handlers (Firestore) ---
 
