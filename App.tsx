@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'rea
 import {
   collection, query, onSnapshot, addDoc, deleteDoc, doc, setDoc, writeBatch, getDocs, getDoc, updateDoc, orderBy, limit
 } from 'firebase/firestore';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, signOut, getRedirectResult, User } from 'firebase/auth';
 import { auth, db } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
@@ -657,6 +657,15 @@ function App() {
       perfMark(currentUser ? 'dc-auth-yes' : 'dc-auth-no');
     });
     return () => unsubscribe();
+  }, []);
+
+  // Consume leftover signInWithRedirect state at boot. When the flag is stuck
+  // (redirect login finished but result was never consumed because AuthLogin
+  // only mounts for logged-out users), Firebase blocks the first
+  // onAuthStateChanged on a network round-trip — measured ~9s on mobile.
+  // With no pending redirect this resolves instantly to null.
+  useEffect(() => {
+    void getRedirectResult(auth).catch(() => {});
   }, []);
 
   useEffect(() => {
