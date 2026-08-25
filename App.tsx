@@ -14,6 +14,14 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useTheme } from './contexts/ThemeContext';
 import { activateServiceWorkerUpdate, PWA_UPDATE_EVENT } from './utils/pwa';
 
+const perfMark = (name: string) => {
+  try {
+    performance.mark(name);
+    const t = Math.round(performance.now());
+    console.log(`[perf] ${name} @ ${t}ms`);
+  } catch {}
+};
+
 // MUI Components
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
@@ -232,6 +240,7 @@ const normalizePlan = (planId: string, rawPlan: Partial<Plan>): Plan => ({
 });
 
 function App() {
+  useEffect(() => { perfMark('dc-app-mount'); }, []);
   const { theme, isDark, toggleTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -637,6 +646,7 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
+      perfMark(currentUser ? 'dc-auth-yes' : 'dc-auth-no');
     });
     return () => unsubscribe();
   }, []);
@@ -952,6 +962,7 @@ function App() {
         }
         setHydratedFromCache(true);
         setAccountLoading(false);
+        perfMark('dc-cache-hydrated');
       }
 
       const userRef = getUserDocRef(db, user.uid);
@@ -3270,6 +3281,20 @@ function App() {
         )}
 
       </Box>
+      {/* Perf overlay — visible only with ?perf=1 */}
+      {typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('perf') && (
+        <Box sx={{ position: 'fixed', bottom: 8, left: 8, right: 8, zIndex: 9999, bgcolor: 'rgba(0,0,0,0.85)', color: '#fff', p: 1.2, borderRadius: 2, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.4, maxWidth: 360, mx: 'auto' }}>
+          <Box sx={{ fontWeight: 700, mb: 0.5 }}>perf {Math.round(performance.now())}ms</Box>
+          <Box>
+            {(() => {
+              try {
+                return performance.getEntriesByType('mark').map((m: any) => `${m.name.replace('dc-','')}:${Math.round(m.startTime)}ms`).join(' → ');
+              } catch { return ''; }
+            })()}
+          </Box>
+          <Box sx={{ opacity: 0.7, mt: 0.5, fontSize: 10 }}>cache:{hydratedFromCache ? 'hit' : 'miss'} tx:{transactions.length} cat:{categories.length} acct:{activeAccount?.id?.slice(0,6) || '-'}</Box>
+        </Box>
+      )}
     </Box>
   );
 }
