@@ -1,6 +1,7 @@
 import React from 'react';
 import Box from '@mui/material/Box';
 import type { SxProps, Theme } from '@mui/material';
+import { ICON_CODEPOINTS } from './iconCodepoints';
 
 const iconMap: Record<string, string> = {
   // Finance & Money
@@ -289,7 +290,7 @@ interface IconDisplayProps {
 }
 
 const IconDisplay: React.FC<IconDisplayProps> = ({ name, className, size = 20, sx }) => {
-  const symbolName = iconMap[name] ?? 'help_outline';
+  const codepoint = ICON_CODEPOINTS[name];
 
   return (
     <Box
@@ -315,7 +316,7 @@ const IconDisplay: React.FC<IconDisplayProps> = ({ name, className, size = 20, s
         ...sx as object,
       }}
     >
-      {symbolName}
+      {codepoint !== undefined ? String.fromCodePoint(codepoint) : '?'}
     </Box>
   );
 };

@@ -21,14 +21,43 @@
   <meta name="apple-mobile-web-app-title" content="DompetCerdas">
   <meta name="description" content="Aplikasi pencatatan keuangan pribadi yang cerdas dengan analisis AI">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap" rel="stylesheet">
-
-  <!-- Self-hosted Space Grotesk (variable font, weights 300-700 in one file) -->
+  <!-- Self-hosted fonts: @font-face di-inline supaya tidak ada stylesheet render-blocking.
+       Material Symbols sudah disubset ke ikon yang dipakai app saja (713KB -> 42KB). -->
   <link rel="preload" as="font" type="font/woff2" href="/fonts/space-grotesk-variable.woff2" crossorigin>
-  <link rel="stylesheet" href="/fonts/fonts.css">
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/material-symbols-outlined.woff2" crossorigin>
+  <style>
+    @font-face {
+      font-family: 'Space Grotesk';
+      font-style: normal;
+      font-weight: 300 700;
+      font-display: swap;
+      src: url('/fonts/space-grotesk-variable.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Space Grotesk Fallback Arial';
+      src: local('Arial');
+      size-adjust: 109.69%;
+      ascent-override: 89.71%;
+      descent-override: 26.62%;
+      line-gap-override: 0%;
+    }
+    @font-face {
+      font-family: 'Space Grotesk Fallback Helvetica';
+      src: local('Helvetica');
+      size-adjust: 109.69%;
+      ascent-override: 89.71%;
+      descent-override: 26.62%;
+      line-gap-override: 0%;
+    }
+    @font-face {
+      font-family: 'Material Symbols Outlined';
+      font-style: normal;
+      font-weight: 400;
+      /* block, bukan swap: mencegah nama ikon tampil sebagai teks mentah saat font loading */
+      font-display: block;
+      src: url('/fonts/material-symbols-outlined.woff2') format('woff2');
+    }
+  </style>
 </head>
 
 <body>
