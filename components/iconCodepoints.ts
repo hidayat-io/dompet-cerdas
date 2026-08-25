@@ -1,5 +1,5 @@
-// AUTO-GENERATED from Material Symbols Outlined v367 — jangan edit manual.
-// Map nama ikon -> codepoint (subset font hanya memuat glyph di daftar ini).
+// AUTO-GENERATED dari Material Symbols Outlined v367 - jangan edit manual.
+// Map nama simbol -> codepoint. Subset font hanya memuat glyph di daftar ini (+fallback 'help').
 export const ICON_CODEPOINTS: Record<string, number> = {
   'ac_unit': 0xeb3b,
   'account_balance': 0xe84f,
