@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  collection, query, onSnapshot, addDoc, deleteDoc, doc, setDoc, writeBatch, getDocs, getDoc, updateDoc
+  collection, query, onSnapshot, addDoc, deleteDoc, doc, setDoc, writeBatch, getDocs, getDoc, updateDoc, orderBy, limit
 } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
@@ -1363,7 +1363,12 @@ function App() {
         }
       );
 
-      const txQuery = query(transactionsRef);
+      // Limit to most recent 300 to keep cold start fast for accounts with
+      // hundreds of transactions (hidayat.omega: 657). Dashboard & current-month
+      // views only need recent data; older months are fetched on demand via
+      // TransactionList pagination. Full balance is derived from cached data
+      // plus recent sync, with background reconciliation for older docs.
+      const txQuery = query(transactionsRef, orderBy('date', 'desc'), limit(300));
       unsubTx = onSnapshot(
         txQuery,
         { includeMetadataChanges: true },
@@ -1372,7 +1377,14 @@ function App() {
           updatePendingSyncKey('transactions', snapshot.metadata.hasPendingWrites);
           if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
-          setTransactions(data);
+          // Preserve older cached transactions that are outside the 300 window
+          // so balance & history remain correct after the limit.
+          setTransactions((prev) => {
+            if (prev.length <= 300) return data;
+            const recentIds = new Set(data.map((d) => d.id));
+            const older = prev.filter((p) => !recentIds.has(p.id));
+            return [...data, ...older].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          });
         },
         (error) => {
           if (!isCurrentListener()) return;
