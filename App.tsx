@@ -244,6 +244,13 @@ function App() {
   const { theme, isDark, toggleTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showPerfOverlay, setShowPerfOverlay] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      if (new URLSearchParams(window.location.search).get('perf') === '0') return false;
+      return localStorage.getItem('dcPerfOverlay') !== 'off';
+    } catch { return false; }
+  });
 
   // Check if current path is /link-telegram
   const isLinkTelegramRoute = window.location.pathname === '/link-telegram';
@@ -280,6 +287,7 @@ function App() {
   const [hydratedFromCache, setHydratedFromCache] = useState(false);
   const preservedCacheOnceRef = useRef(false);
   const cacheWriteTimeoutRef = useRef<number | null>(null);
+  const txFirstSyncRef = useRef(false);
   const pendingCacheSnapshotRef = useRef<CachedSnapshot | null>(null);
   const [telegramDefaultAccountId, setTelegramDefaultAccountId] = useState<string | null>(null);
   const [telegramLinked, setTelegramLinked] = useState(false);
@@ -971,6 +979,7 @@ function App() {
         getDoc(userRef),
         getDocs(accountsRef),
       ]);
+      perfMark('dc-bootstrap-net');
       const userMeta = (userSnap.data() || {}) as UserMeta;
       const existingAccounts = accountsSnap.docs.map((accountDoc) => ({
         id: accountDoc.id,
@@ -1385,6 +1394,10 @@ function App() {
         { includeMetadataChanges: true },
         (snapshot) => {
           if (!isCurrentListener()) return;
+          if (!txFirstSyncRef.current) {
+            txFirstSyncRef.current = true;
+            perfMark('dc-tx-first');
+          }
           updatePendingSyncKey('transactions', snapshot.metadata.hasPendingWrites);
           if (snapshot.docChanges({ includeMetadataChanges: false }).length === 0) return;
           const data = snapshot.docs.map((transactionDoc) => ({ id: transactionDoc.id, ...transactionDoc.data() } as Transaction));
@@ -3298,18 +3311,40 @@ function App() {
         )}
 
       </Box>
-      {/* Perf overlay — visible only with ?perf=1 */}
-      {typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('perf') && (
-        <Box sx={{ position: 'fixed', bottom: 8, left: 8, right: 8, zIndex: 9999, bgcolor: 'rgba(0,0,0,0.85)', color: '#fff', p: 1.2, borderRadius: 2, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.4, maxWidth: 360, mx: 'auto' }}>
-          <Box sx={{ fontWeight: 700, mb: 0.5 }}>perf {Math.round(performance.now())}ms</Box>
+      {/* Perf overlay: auto-on sampai user tutup (tersimpan di localStorage), ?perf=0 memaksa sembunyi */}
+      {showPerfOverlay && (
+        <Box sx={{ position: 'fixed', bottom: 8, left: 8, right: 8, zIndex: 9999, bgcolor: 'rgba(0,0,0,0.88)', color: '#fff', p: 1.2, borderRadius: 2, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.5, maxWidth: 360, mx: 'auto' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ fontWeight: 700 }}>perf {Math.round(performance.now())}ms</Box>
+            <Box
+              component="button"
+              onClick={() => {
+                try { localStorage.setItem('dcPerfOverlay', 'off'); } catch {}
+                setShowPerfOverlay(false);
+              }}
+              sx={{ bgcolor: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', px: 1 }}
+            >
+              ✕
+            </Box>
+          </Box>
           <Box>
             {(() => {
               try {
-                return performance.getEntriesByType('mark').map((m: any) => `${m.name.replace('dc-','')}:${Math.round(m.startTime)}ms`).join(' → ');
+                return performance.getEntriesByType('mark').map((m: any) => `${m.name.replace('dc-','')}:${Math.round(m.startTime)}`).join(' → ');
               } catch { return ''; }
             })()}
           </Box>
-          <Box sx={{ opacity: 0.7, mt: 0.5, fontSize: 10 }}>cache:{hydratedFromCache ? 'hit' : 'miss'} tx:{transactions.length} cat:{categories.length} acct:{activeAccount?.id?.slice(0,6) || '-'}</Box>
+          <Box sx={{ opacity: 0.75, mt: 0.5, fontSize: 10 }}>
+            {(() => {
+              try {
+                const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+                const res = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+                const kb = Math.round(res.filter(r => r.name.includes('/assets/')).reduce((s, r) => s + r.transferSize, 0) / 1024);
+                const proto = nav?.nextHopProtocol || '-';
+                return `net:${proto} jsDL:${kb}KB fcp:${(() => { const p = performance.getEntriesByType('paint').find(x => x.name === 'first-contentful-paint'); return p ? Math.round(p.startTime) : '-'; })()} | cache:${hydratedFromCache ? 'hit' : 'miss'} tx:${transactions.length}`;
+              } catch { return ''; }
+            })()}
+          </Box>
         </Box>
       )}
     </Box>
