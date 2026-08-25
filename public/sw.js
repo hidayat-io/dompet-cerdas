@@ -101,6 +101,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
+  // Firebase Auth handler must bypass SW entirely; intercepting it breaks
+  // signInWithRedirect (hangs on dompas.indoomega.my.id/__/auth/handler).
+  if (url.pathname.startsWith('/__/auth/')) return;
+
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       // Stale-while-revalidate: HTML cache langsung dipakai supaya buka ulang
