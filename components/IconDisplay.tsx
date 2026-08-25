@@ -290,7 +290,8 @@ interface IconDisplayProps {
 }
 
 const IconDisplay: React.FC<IconDisplayProps> = ({ name, className, size = 20, sx }) => {
-  const codepoint = ICON_CODEPOINTS[name];
+  const symbolName = iconMap[name];
+  const codepoint = (symbolName && ICON_CODEPOINTS[symbolName]) ?? ICON_CODEPOINTS['help'];
 
   return (
     <Box
@@ -316,7 +317,7 @@ const IconDisplay: React.FC<IconDisplayProps> = ({ name, className, size = 20, s
         ...sx as object,
       }}
     >
-      {codepoint !== undefined ? String.fromCodePoint(codepoint) : '?'}
+      {String.fromCodePoint(codepoint)}
     </Box>
   );
 };
