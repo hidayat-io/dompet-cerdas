@@ -49,13 +49,14 @@ try {
             localCache: persistentLocalCache({
                 tabManager: persistentMultipleTabManager(),
             }),
-            experimentalAutoDetectLongPolling: true,
+            experimentalForceLongPolling: true,
         });
     } catch (firestoreInitError) {
         console.warn("Firestore persistence fallback:", firestoreInitError);
         dbInstance = getFirestore(app);
     }
     googleProviderInstance = new GoogleAuthProvider();
+    googleProviderInstance.setCustomParameters({ prompt: 'select_account' });
 
     if (useEmulators) {
         connectAuthEmulator(authInstance, authEmulatorUrl, { disableWarnings: true });
