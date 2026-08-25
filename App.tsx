@@ -1455,10 +1455,27 @@ function App() {
       );
     };
 
-    void attachListeners();
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+
+    const scheduleAttach = () => {
+      if (cancelled || !isCurrentListener()) return;
+      perfMark('dc-firestore-start');
+      void attachListeners();
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = (window as any).requestIdleCallback(scheduleAttach, { timeout: 900 });
+    } else {
+      timeoutId = setTimeout(() => requestAnimationFrame(scheduleAttach), 320) as unknown as number;
+    }
 
     return () => {
       cancelled = true;
+      if (idleId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        try { (window as any).cancelIdleCallback(idleId); } catch {}
+      }
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
       updatePendingSyncKey('categories', false);
       updatePendingSyncKey('transactions', false);
       updatePendingSyncKey('plans', false);
