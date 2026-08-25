@@ -103,6 +103,9 @@ type TelegramLinkMeta = {
 type QuickAddType = 'INCOME' | 'EXPENSE';
 
 const MIGRATION_BATCH_SIZE = 400;
+// Naikkan versi ini hanya bila logika migrasi legacy berubah dan perlu
+// dijalankan ulang untuk semua user. Jangan naikkan untuk perubahan biasa.
+const ACCOUNT_MIGRATION_VERSION = 1;
 const DEFAULT_PLAN_ITEM_STATUS: PlanItemStatus = 'PLANNED';
 
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -1026,7 +1029,10 @@ function App() {
         }
       }
 
-      if (resolvedAccountId && resolvedAccount && !resolvedAccount.sharedAccountId) {
+      // One-time gate: without it every launch re-scanned legacy collections,
+      // downloading the full transaction history twice on mobile networks.
+      const migrationDone = (userMeta.accountMigrationVersion ?? 0) >= ACCOUNT_MIGRATION_VERSION;
+      if (resolvedAccountId && resolvedAccount && !resolvedAccount.sharedAccountId && !migrationDone) {
         const targetCategoriesRef = getScopedCollectionRefForAccount<Category>(db, user.uid, resolvedAccount, 'categories');
         const targetTransactionsRef = getScopedCollectionRefForAccount<Transaction>(db, user.uid, resolvedAccount, 'transactions');
         const targetPlansRef = getScopedCollectionRefForAccount<Plan>(db, user.uid, resolvedAccount, 'plans');
@@ -1102,15 +1108,6 @@ function App() {
       if (!cancelled) {
         setActiveAccountId(resolvedAccountId || null);
         setAccountLoading(false);
-
-        // Mirror resolved accounts + active account to cache for next startup.
-        void writeCachedSnapshot(user.uid, {
-          activeAccountId: resolvedAccountId,
-          accounts: (existingAccounts as unknown) as CachedSnapshot['accounts'],
-          categories: [],
-          transactions: [],
-          cachedAt: Date.now(),
-        });
       }
     };
 

@@ -1,7 +1,11 @@
 const SW_VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
 const STATIC_CACHE = `dompetcerdas-static-${SW_VERSION}`;
-const RUNTIME_CACHE = `dompetcerdas-runtime-${SW_VERSION}`;
-const APP_SHELL_CACHE = `dompetcerdas-app-shell-${SW_VERSION}`;
+// Runtime & app-shell cache sengaja TANPA suffix versi supaya aset yang sudah
+// tercache tetap valid lintas rilis. Chunk hasil hash versi lama dipertahankan
+// agar HTML cache lama tidak pernah 404, dan hanya dibersihkan lewat cap entri.
+const RUNTIME_CACHE = 'dompetcerdas-runtime';
+const APP_SHELL_CACHE = 'dompetcerdas-app-shell';
+const MAX_RUNTIME_ENTRIES = 150;
 
 const PRECACHE_URLS = [
   '/',
@@ -64,6 +68,15 @@ self.addEventListener('message', (event) => {
 
 const isCacheableResponse = (response) => response && response.ok;
 
+// Chunk hasil hash menumpuk tiap rilis; buang yang paling lama tidak dipakai
+// supaya storage tidak tumbuh tanpa batas.
+const trimRuntimeCache = async () => {
+  const cache = await caches.open(RUNTIME_CACHE);
+  const keys = await cache.keys();
+  if (keys.length <= MAX_RUNTIME_ENTRIES) return;
+  await Promise.all(keys.slice(0, keys.length - MAX_RUNTIME_ENTRIES).map((key) => cache.delete(key)));
+};
+
 const staleWhileRevalidate = async (request, cacheName) => {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
@@ -72,6 +85,7 @@ const staleWhileRevalidate = async (request, cacheName) => {
     .then((response) => {
       if (isCacheableResponse(response)) {
         cache.put(request, response.clone());
+        if (cacheName === RUNTIME_CACHE) void trimRuntimeCache();
       }
       return response;
     })
@@ -89,29 +103,30 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      try {
-        // NETWORK FIRST strategy for index.html to avoid chunk load errors (blank screen)
-        const networkResponse = await fetch(request);
-        if (networkResponse && networkResponse.ok) {
-          const cache = await caches.open(APP_SHELL_CACHE);
-          cache.put('/index.html', networkResponse.clone());
-          return networkResponse;
-        }
-      } catch (error) {
-        // Network failed, fallback to cache below
-      }
-
-      // FALLBACK TO CACHE
+      // Stale-while-revalidate: HTML cache langsung dipakai supaya buka ulang
+      // PWA terasa instan, sementara versi baru direvalidasi di background.
       const cache = await caches.open(APP_SHELL_CACHE);
       const cachedShell = await cache.match('/index.html');
-      if (cachedShell) return cachedShell;
 
-      const staticCache = await caches.open(STATIC_CACHE);
-      const precachedShell = await staticCache.match('/index.html');
-      if (precachedShell) return precachedShell;
+      const networkPromise = (async () => {
+        try {
+          const networkResponse = await fetch(request);
+          if (networkResponse && networkResponse.ok) {
+            await cache.put('/index.html', networkResponse.clone());
+          }
+          return networkResponse;
+        } catch (error) {
+          if (cachedShell) return cachedShell;
+          const staticCache = await caches.open(STATIC_CACHE);
+          return (
+            (await staticCache.match('/index.html')) ||
+            (await staticCache.match('/offline.html')) ||
+            Response.error()
+          );
+        }
+      })();
 
-      const offline = await staticCache.match('/offline.html');
-      return offline || Response.error();
+      return cachedShell || networkPromise;
     })());
     return;
   }
