@@ -51,9 +51,12 @@ try {
     }
 
     // Setup Services
+    // PENTING: popupRedirectResolver sengaja TIDAK dipasang di initializeAuth.
+    // Kalau dipasang, Firebase melakukan proactive init resolver di mobile
+    // (load gapi + iframe auth) SEBELUM onAuthStateChanged fire, menambah
+    // ~8 detik cold start. Resolver hanya di-pass eksplisit di titik login.
     authInstance = initializeAuth(app, {
         persistence: [browserLocalPersistence, indexedDBLocalPersistence],
-        popupRedirectResolver: browserPopupRedirectResolver,
     });
     try {
         dbInstance = initializeFirestore(app, {
@@ -83,3 +86,4 @@ export const auth = authInstance!;
 export const db = dbInstance!;
 export const googleProvider = googleProviderInstance!;
 export const firebaseApp = app!;
+export { browserPopupRedirectResolver };

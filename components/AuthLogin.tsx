@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createUserWithEmailAndPassword, getRedirectResult, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, Auth } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import { auth, googleProvider, browserPopupRedirectResolver } from '../firebase';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -41,7 +41,7 @@ const AuthLogin: React.FC = () => {
         let active = true;
         const checkRedirectResult = async () => {
             try {
-                const result = await getRedirectResult(auth as Auth);
+                const result = await getRedirectResult(auth as Auth, browserPopupRedirectResolver);
                 if (result && active) {
                     console.log('Redirect sign-in successful:', result.user.email);
                 }
@@ -75,10 +75,10 @@ const AuthLogin: React.FC = () => {
 
         try {
             if (isMobile()) {
-                await signInWithRedirect(auth as Auth, googleProvider as any);
+                await signInWithRedirect(auth as Auth, googleProvider as any, browserPopupRedirectResolver);
                 return;
             }
-            await signInWithPopup(auth as Auth, googleProvider as any);
+            await signInWithPopup(auth as Auth, googleProvider as any, browserPopupRedirectResolver);
         } catch (err: any) {
             console.error("Login Error:", err);
             const errorCode = err.code;
@@ -89,7 +89,7 @@ const AuthLogin: React.FC = () => {
             } else if (errorCode === 'auth/popup-closed-by-user') {
                 setError('Popup ditutup. Mencoba redirect...');
                 try {
-                    await signInWithRedirect(auth as Auth, googleProvider as any);
+                    await signInWithRedirect(auth as Auth, googleProvider as any, browserPopupRedirectResolver);
                     return;
                 } catch {
                     setError('Gagal login. Silakan coba lagi.');
@@ -97,7 +97,7 @@ const AuthLogin: React.FC = () => {
             } else if (errorCode === 'auth/popup-blocked') {
                 setError('Popup diblokir. Mencoba redirect...');
                 try {
-                    await signInWithRedirect(auth as Auth, googleProvider as any);
+                    await signInWithRedirect(auth as Auth, googleProvider as any, browserPopupRedirectResolver);
                     return;
                 } catch {
                     setError('Gagal login. Silakan coba lagi.');

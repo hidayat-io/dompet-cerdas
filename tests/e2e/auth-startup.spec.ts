@@ -8,17 +8,19 @@ test.use({
 });
 
 test.describe('Auth startup', () => {
-  test('renders login without waiting for redirect resolver network', async ({ page }) => {
-    const iframeRequests: string[] = [];
+  test('boots auth without loading the popup/redirect iframe machinery', async ({ page }) => {
+    const resolverRequests: string[] = [];
     page.on('request', (request) => {
-      if (request.url().includes('/__/auth/iframe')) {
-        iframeRequests.push(request.url());
+      const url = request.url();
+      if (url.includes('/__/auth/') || url.includes('apis.google.com')) {
+        resolverRequests.push(url);
       }
     });
 
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Masuk dengan Google' })).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(3_000);
 
-    expect(iframeRequests).toHaveLength(0);
+    expect(resolverRequests).toHaveLength(0);
   });
 });
