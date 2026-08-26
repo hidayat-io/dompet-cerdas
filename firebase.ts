@@ -1,5 +1,13 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { connectAuthEmulator, getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
+import {
+    browserLocalPersistence,
+    browserPopupRedirectResolver,
+    connectAuthEmulator,
+    GoogleAuthProvider,
+    indexedDBLocalPersistence,
+    initializeAuth,
+    Auth,
+} from "firebase/auth";
 import {
     Firestore,
     connectFirestoreEmulator,
@@ -43,7 +51,10 @@ try {
     }
 
     // Setup Services
-    authInstance = getAuth(app);
+    authInstance = initializeAuth(app, {
+        persistence: [browserLocalPersistence, indexedDBLocalPersistence],
+        popupRedirectResolver: browserPopupRedirectResolver,
+    });
     try {
         dbInstance = initializeFirestore(app, {
             localCache: persistentLocalCache({
