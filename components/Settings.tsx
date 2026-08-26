@@ -49,6 +49,7 @@ interface SettingsProps {
     onSwitchAccount: (accountId: string) => Promise<void>;
     onDeleteAccount: (accountId: string) => Promise<void>;
     onDeleteAllTransactions: () => Promise<void>;
+    onLogout: () => void;
     transactionCount: number;
     transactions: Transaction[];
     categories: Category[];
@@ -75,6 +76,7 @@ const Settings: React.FC<SettingsProps> = ({
     onSwitchAccount,
     onDeleteAccount,
     onDeleteAllTransactions,
+    onLogout,
     transactionCount,
     transactions,
     categories
@@ -968,6 +970,25 @@ const Settings: React.FC<SettingsProps> = ({
                 message={toast.message}
                 type={toast.type}
             />
+
+            {/* Logout */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Keluar</Typography>
+                        <Typography variant="body2" color="text.secondary">Logout dari akun Google di perangkat ini.</Typography>
+                    </Box>
+                    <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={onLogout}
+                        startIcon={<IconDisplay name="LogOut" size={16} />}
+                        sx={{ borderRadius: 2, flexShrink: 0 }}
+                    >
+                        Keluar
+                    </Button>
+                </Box>
+            </Paper>
 
             {/* Version */}
             <Divider sx={{ mt: 4, mb: 2 }} />

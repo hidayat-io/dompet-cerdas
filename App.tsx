@@ -3028,6 +3028,7 @@ function App() {
                   onJoinSharedAccount={joinSharedAccount}
                   onSwitchAccount={switchAccount}
                   onDeleteAccount={deleteAccount}
+                  onLogout={handleLogout}
                   onDeleteAllTransactions={deleteAllTransactions}
                   transactionCount={transactions.length}
                   transactions={transactions}
