@@ -247,9 +247,8 @@ function App() {
   const [showPerfOverlay, setShowPerfOverlay] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
-      if (new URLSearchParams(window.location.search).get('perf') === '0') return false;
-      return true;
-    } catch { return true; }
+      return new URLSearchParams(window.location.search).has('perf');
+    } catch { return false; }
   });
 
   // Check if current path is /link-telegram
