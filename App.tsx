@@ -248,8 +248,8 @@ function App() {
     if (typeof window === 'undefined') return false;
     try {
       if (new URLSearchParams(window.location.search).get('perf') === '0') return false;
-      return localStorage.getItem('dcPerfOverlay') !== 'off';
-    } catch { return false; }
+      return true;
+    } catch { return true; }
   });
 
   // Check if current path is /link-telegram
