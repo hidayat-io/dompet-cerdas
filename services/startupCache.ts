@@ -11,7 +11,6 @@
 const DB_NAME = 'dompetcerdas-cache';
 const DB_VERSION = 1;
 const STORE = 'kv';
-
 export interface AccountCache {
   id: string;
   name: string;
@@ -66,7 +65,67 @@ async function withStore<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore
   });
 }
 
+export const LAST_USER_ID_KEY = 'dompetcerdas_last_uid';
+export const LAST_USER_PROFILE_KEY = 'dompetcerdas_last_profile';
+
+export function getLastActiveUserId(): string | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER_ID_KEY) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLastActiveUserId(userId: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LAST_USER_ID_KEY, userId);
+    }
+  } catch {}
+}
+
+export function clearLastActiveUserId(): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(LAST_USER_ID_KEY);
+      localStorage.removeItem(LAST_USER_PROFILE_KEY);
+    }
+  } catch {}
+}
+
+export function getLastUserProfile(): { displayName?: string | null; photoURL?: string | null } | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(LAST_USER_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLastUserProfile(profile: { displayName?: string | null; photoURL?: string | null }): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LAST_USER_PROFILE_KEY, JSON.stringify(profile));
+    }
+  } catch {}
+}
+
+const SNAPSHOT_STORAGE_KEY = (userId: string) => `dompetcerdas_snap_${userId}`;
+
+export function readCachedSnapshotSync(userId: string): CachedSnapshot | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY(userId));
+    return raw ? (JSON.parse(raw) as CachedSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function readCachedSnapshot(userId: string): Promise<CachedSnapshot | null> {
+  const syncSnap = readCachedSnapshotSync(userId);
+  if (syncSnap) return syncSnap;
   try {
     const raw = await withStore<string | undefined>('readonly', (store) => store.get(`user:${userId}`));
     if (!raw) return null;
@@ -79,6 +138,17 @@ export async function readCachedSnapshot(userId: string): Promise<CachedSnapshot
 
 export async function writeCachedSnapshot(userId: string, snapshot: CachedSnapshot): Promise<void> {
   try {
+    setLastActiveUserId(userId);
+    // Tulis snapshot ringkas ke localStorage untuk hidrasi instan 0ms saat boot berikutnya
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const syncCopy: CachedSnapshot = {
+          ...snapshot,
+          transactions: snapshot.transactions.slice(0, 30),
+        };
+        localStorage.setItem(SNAPSHOT_STORAGE_KEY(userId), JSON.stringify(syncCopy));
+      }
+    } catch {}
     await withStore<IDBValidKey>('readwrite', (store) => store.put(JSON.stringify(snapshot), `user:${userId}`));
   } catch (error) {
     // Cache writes must never block the app.
@@ -88,6 +158,12 @@ export async function writeCachedSnapshot(userId: string, snapshot: CachedSnapsh
 
 export async function clearCachedSnapshot(userId: string): Promise<void> {
   try {
+    clearLastActiveUserId();
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(SNAPSHOT_STORAGE_KEY(userId));
+      }
+    } catch {}
     await withStore<void>('readwrite', (store) => store.delete(`user:${userId}`));
   } catch (error) {
     console.warn('[cache] clear snapshot failed:', error);

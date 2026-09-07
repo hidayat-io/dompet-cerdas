@@ -20,13 +20,11 @@ const watchInstallingWorker = (worker: ServiceWorker | null) => {
 export const registerServiceWorker = async () => {
   if (!('serviceWorker' in navigator)) return;
 
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    window.location.reload();
-  });
-
+  // PENTING: JANGAN reload pada controllerchange. Saat install pertama, SW
+  // melakukan clients.claim() sehingga controllerchange fire dan dulu memicu
+  // reload penuh tepat setelah load pertama selesai (aplikasi terasa dibuka
+  // dua kali). Pembaruan versi kini cukup ditangani SATU mekanisme: activate
+  // di sw.js me-navigate semua client ketika ada cache versi lama.
   try {
     const registration = await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`, {
       scope: '/',

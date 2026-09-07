@@ -27,10 +27,39 @@ const FONT_ORIGINS = new Set([
   'https://fonts.gstatic.com',
 ]);
 
+const PRECACHE_MANIFEST_URL = '/precache-manifest.json';
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS))
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(STATIC_CACHE);
+    await cache.addAll(PRECACHE_URLS);
+
+    // Precache shell ke APP_SHELL_CACHE sedini mungkin saat install
+    // agar navigasi pertama tidak pernah menunggu network.
+    const appShellCache = await caches.open(APP_SHELL_CACHE);
+    const indexResponse = (await cache.match('/index.html')) || (await cache.match('/'));
+    if (indexResponse) {
+      await appShellCache.put('/index.html', indexResponse.clone());
+      await appShellCache.put('/', indexResponse.clone());
+    }
+
+    // Precache SEMUA chunk hasil build (manifest di-generate Vite saat build).
+    // Ini krusial: sebelum activate, chunk milik rilis baru sudah tercache
+    // sehingga reload pascapdate langsung instan dan tidak pernah 404.
+    try {
+      const manifestResponse = await fetch(PRECACHE_MANIFEST_URL, { cache: 'no-cache' });
+      if (manifestResponse.ok) {
+        const manifest = await manifestResponse.json();
+        const urls = Array.isArray(manifest.files)
+          ? manifest.files.filter((u) => typeof u === 'string' && u.startsWith('/'))
+          : [];
+        await Promise.allSettled(urls.map((u) => cache.add(u)));
+      }
+    } catch {
+      // Manifest gagal diambil (mis. offline saat update): abaikan, runtime
+      // cache tetap mengisi aset secara lazy seperti biasa.
+    }
+  })());
   self.skipWaiting();
 });
 
@@ -113,21 +142,28 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      // Stale-while-revalidate: HTML cache langsung dipakai supaya buka ulang
-      // PWA terasa instan, sementara versi baru direvalidasi di background.
-      const cache = await caches.open(APP_SHELL_CACHE);
-      const cachedShell = await cache.match('/index.html');
+      // Stale-while-revalidate: Cek cache terlebih dahulu (APP_SHELL_CACHE atau STATIC_CACHE)
+      // agar buka ulang PWA terasa instan tanpa jeda jaringan sedetik pun.
+      const appShellCache = await caches.open(APP_SHELL_CACHE);
+      const staticCache = await caches.open(STATIC_CACHE);
+
+      const cachedShell =
+        (await appShellCache.match('/index.html')) ||
+        (await appShellCache.match('/')) ||
+        (await staticCache.match('/index.html')) ||
+        (await staticCache.match('/')) ||
+        (await staticCache.match(request));
 
       const networkPromise = (async () => {
         try {
           const networkResponse = await fetch(request);
           if (networkResponse && networkResponse.ok) {
-            await cache.put('/index.html', networkResponse.clone());
+            await appShellCache.put('/index.html', networkResponse.clone());
+            await appShellCache.put('/', networkResponse.clone());
           }
           return networkResponse;
         } catch (error) {
           if (cachedShell) return cachedShell;
-          const staticCache = await caches.open(STATIC_CACHE);
           return (
             (await staticCache.match('/index.html')) ||
             (await staticCache.match('/offline.html')) ||

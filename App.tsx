@@ -14,11 +14,23 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useTheme } from './contexts/ThemeContext';
 import { activateServiceWorkerUpdate, PWA_UPDATE_EVENT } from './utils/pwa';
 
+const BOOT_STAGE_LABELS: Record<string, string> = {
+  'dc-app-mount': 'memeriksa sesi login',
+  'dc-auth-yes': 'sesi login ditemukan',
+  'dc-cache-hydrated': 'memuat data lokal',
+  'dc-bootstrap-net': 'menyambung ke server',
+  'dc-firestore-start': 'menyiapkan data',
+  'dc-tx-first': 'sinkronisasi transaksi',
+};
+
 const perfMark = (name: string) => {
   try {
     performance.mark(name);
     const t = Math.round(performance.now());
     console.log(`[perf] ${name} @ ${t}ms`);
+    // Sinkron dengan diagnostik boot di initial-loader (index.html).
+    (window as unknown as { __dcBootStage?: string }).__dcBootStage =
+      BOOT_STAGE_LABELS[name] || name;
   } catch {}
 };
 
@@ -69,7 +81,16 @@ import {
   getUserDocRef
 } from './services/accountService';
 import { callCloudFunction, deleteFileFromStorage, getLegacyStoragePathFromUrl, uploadFileToStorage } from './services/firebaseRuntime';
-import { readCachedSnapshot, writeCachedSnapshot, clearCachedSnapshot, CachedSnapshot } from './services/startupCache';
+import {
+  readCachedSnapshot,
+  writeCachedSnapshot,
+  clearCachedSnapshot,
+  setLastActiveUserId,
+  setLastUserProfile,
+  clearLastActiveUserId,
+  CachedSnapshot
+} from './services/startupCache';
+import Dashboard from './components/Dashboard';
 import {
   deleteOfflineAttachmentUploadJob,
   deleteOfflineAttachmentUploadJobsForTransactions,
@@ -116,7 +137,6 @@ const MIGRATION_BATCH_SIZE = 400;
 const ACCOUNT_MIGRATION_VERSION = 1;
 const DEFAULT_PLAN_ITEM_STATUS: PlanItemStatus = 'PLANNED';
 
-const Dashboard = lazy(() => import('./components/Dashboard'));
 const BudgetManager = lazy(() => import('./components/BudgetManager'));
 const TransactionList = lazy(() => import('./components/TransactionList'));
 const CategoryManager = lazy(() => import('./components/CategoryManager'));
@@ -239,7 +259,12 @@ const normalizePlan = (planId: string, rawPlan: Partial<Plan>): Plan => ({
   createdByName: rawPlan.createdByName,
 });
 
-function App() {
+interface AppProps {
+  initialCached?: CachedSnapshot | null;
+  cachedProfile?: { displayName?: string | null; photoURL?: string | null } | null;
+}
+
+function App({ initialCached, cachedProfile }: AppProps = {}) {
   useEffect(() => { perfMark('dc-app-mount'); }, []);
   const { theme, isDark, toggleTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
@@ -275,15 +300,43 @@ function App() {
   const backfilledPlanIdsRef = useRef<Set<string>>(new Set());
 
   // Data States (Synced with Firestore)
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [debts, setDebts] = useState<DebtRecord[]>([]);
-  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
-  const [accountLoading, setAccountLoading] = useState(true);
-  const [hydratedFromCache, setHydratedFromCache] = useState(false);
+  const initialMatchesActiveAccount = initialCached
+    ? !initialCached.dataAccountId || initialCached.dataAccountId === initialCached.activeAccountId
+    : false;
+
+  const [categories, setCategories] = useState<Category[]>(() =>
+    initialMatchesActiveAccount && initialCached?.categories
+      ? ((initialCached.categories as unknown) as Category[])
+      : []
+  );
+  const [transactions, setTransactions] = useState<Transaction[]>(() =>
+    initialMatchesActiveAccount && initialCached?.transactions
+      ? ((initialCached.transactions as unknown) as Transaction[])
+      : []
+  );
+  const [plans, setPlans] = useState<Plan[]>(() =>
+    initialMatchesActiveAccount && initialCached?.plans
+      ? ((initialCached.plans as unknown) as Plan[])
+      : []
+  );
+  const [budgets, setBudgets] = useState<Budget[]>(() =>
+    initialMatchesActiveAccount && initialCached?.budgets
+      ? ((initialCached.budgets as unknown) as Budget[])
+      : []
+  );
+  const [debts, setDebts] = useState<DebtRecord[]>(() =>
+    initialMatchesActiveAccount && initialCached?.debts
+      ? ((initialCached.debts as unknown) as DebtRecord[])
+      : []
+  );
+  const [accounts, setAccounts] = useState<FinancialAccount[]>(() =>
+    initialCached?.accounts ? ((initialCached.accounts as unknown) as FinancialAccount[]) : []
+  );
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(() =>
+    initialCached?.activeAccountId || null
+  );
+  const [accountLoading, setAccountLoading] = useState(!initialCached);
+  const [hydratedFromCache, setHydratedFromCache] = useState(!!initialCached);
   const preservedCacheOnceRef = useRef(false);
   const cacheWriteTimeoutRef = useRef<number | null>(null);
   const txFirstSyncRef = useRef(false);
@@ -654,6 +707,17 @@ function App() {
       setUser(currentUser);
       setAuthLoading(false);
       perfMark(currentUser ? 'dc-auth-yes' : 'dc-auth-no');
+      if (currentUser) {
+        setLastActiveUserId(currentUser.uid);
+        if (currentUser.displayName || currentUser.photoURL) {
+          setLastUserProfile({
+            displayName: currentUser.displayName,
+            photoURL: currentUser.photoURL,
+          });
+        }
+      } else {
+        clearLastActiveUserId();
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -951,25 +1015,28 @@ function App() {
     let cancelled = false;
 
     const bootstrapAccounts = async () => {
-      setAccountLoading(true);
+      // Hanya set loading jika belum terhidrasi dari cache awal
+      if (!hydratedFromCache) {
+        setAccountLoading(true);
 
-      // Cache-first: hydrate shell immediately from IndexedDB so returning
-      // users see their dashboard before the network round-trip completes.
-      const cached = await readCachedSnapshot(user.uid);
-      if (!cancelled && cached) {
-        const cacheMatchesActiveAccount = !cached.dataAccountId || cached.dataAccountId === cached.activeAccountId;
-        setAccounts((cached.accounts as unknown) as FinancialAccount[]);
-        if (cached.activeAccountId) setActiveAccountId(cached.activeAccountId);
-        if (cacheMatchesActiveAccount) {
-          if (cached.categories.length > 0) setCategories((cached.categories as unknown) as Category[]);
-          if (cached.transactions.length > 0) setTransactions((cached.transactions as unknown) as Transaction[]);
-          if (cached.plans && cached.plans.length > 0) setPlans((cached.plans as unknown) as Plan[]);
-          if (cached.budgets && cached.budgets.length > 0) setBudgets((cached.budgets as unknown) as Budget[]);
-          if (cached.debts && cached.debts.length > 0) setDebts((cached.debts as unknown) as DebtRecord[]);
+        // Cache-first: hydrate shell immediately from IndexedDB so returning
+        // users see their dashboard before the network round-trip completes.
+        const cached = await readCachedSnapshot(user.uid);
+        if (!cancelled && cached) {
+          const cacheMatchesActiveAccount = !cached.dataAccountId || cached.dataAccountId === cached.activeAccountId;
+          setAccounts((cached.accounts as unknown) as FinancialAccount[]);
+          if (cached.activeAccountId) setActiveAccountId(cached.activeAccountId);
+          if (cacheMatchesActiveAccount) {
+            if (cached.categories.length > 0) setCategories((cached.categories as unknown) as Category[]);
+            if (cached.transactions.length > 0) setTransactions((cached.transactions as unknown) as Transaction[]);
+            if (cached.plans && cached.plans.length > 0) setPlans((cached.plans as unknown) as Plan[]);
+            if (cached.budgets && cached.budgets.length > 0) setBudgets((cached.budgets as unknown) as Budget[]);
+            if (cached.debts && cached.debts.length > 0) setDebts((cached.debts as unknown) as DebtRecord[]);
+          }
+          setHydratedFromCache(true);
+          setAccountLoading(false);
+          perfMark('dc-cache-hydrated');
         }
-        setHydratedFromCache(true);
-        setAccountLoading(false);
-        perfMark('dc-cache-hydrated');
       }
 
       const userRef = getUserDocRef(db, user.uid);
@@ -1348,20 +1415,7 @@ function App() {
     let unsubDebts: (() => void) | null = null;
     let cancelled = false;
 
-    const attachListeners = async () => {
-      if (activeAccount.sharedAccountId) {
-        try {
-          const preflightSnap = await getDoc(getSharedAccountDocRef(db, activeAccount.sharedAccountId));
-          if (!preflightSnap.exists()) {
-            throw new Error('permission-denied: shared account does not exist or is no longer accessible');
-          }
-        } catch (error) {
-          if (cancelled || !isCurrentListener()) return;
-          handleFirestoreListenerError('scoped-data-preflight', error);
-          return;
-        }
-      }
-
+    const attachListeners = () => {
       if (cancelled || !isCurrentListener()) return;
 
       const catQuery = query(categoriesRef);
@@ -2581,7 +2635,9 @@ function App() {
     );
   }
 
-  if (authLoading) {
+  // Hanya tampilkan loading auth jika BELUM terhidrasi dari cache awal.
+  // Jika sudah terhidrasi dari cache, shell dan dashboard langsung tampil instan!
+  if (authLoading && !hydratedFromCache) {
     return (
       <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
         <CircularProgress />
@@ -2589,7 +2645,8 @@ function App() {
     );
   }
 
-  if (!user) {
+  // Jika auth sudah selesai dan ternyata memang belum/tidak login
+  if (!user && !authLoading) {
     return (
       <ErrorBoundary>
         <Suspense fallback={<ViewLoadingFallback />}>
@@ -2607,6 +2664,8 @@ function App() {
       </Box>
     );
   }
+
+  const displayUser = user || cachedProfile;
 
   const SIDEBAR_WIDTH = 264;
 
@@ -2726,10 +2785,10 @@ function App() {
             elevation={0}
             sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, borderRadius: 3, bgcolor: theme.colors.bgHover, border: `1px solid ${theme.colors.border}` }}
           >
-            <Avatar src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt={user.displayName || 'User'} sx={{ width: 40, height: 40 }} />
+            <Avatar src={displayUser?.photoURL || (displayUser?.displayName ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayUser.displayName)}` : undefined)} alt={displayUser?.displayName || 'User'} sx={{ width: 40, height: 40 }} />
             <Box sx={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
               <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: theme.colors.textPrimary }}>
-                {user.displayName}
+                {displayUser?.displayName || 'Pengguna'}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
                 <Button size="small" onClick={handleLogout} sx={{ p: 0, minWidth: 'auto', color: theme.colors.expense, textTransform: 'none', fontSize: '0.75rem', fontWeight: 500 }}>
@@ -2886,8 +2945,8 @@ function App() {
                 <IconDisplay name="Settings" size={18} />
               </IconButton>
               <Avatar
-                src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`}
-                alt={user.displayName || 'User'}
+                src={displayUser?.photoURL || (displayUser?.displayName ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayUser.displayName)}` : undefined)}
+                alt={displayUser?.displayName || 'User'}
                 sx={{ width: 32, height: 32, border: `1px solid ${theme.colors.border}`, ml: 0.5 }}
               />
             </Box>
@@ -2943,7 +3002,7 @@ function App() {
                 <PlanManager
                   plans={plans}
                   categories={categories}
-                  currentUserId={user.uid}
+                  currentUserId={user?.uid || ''}
                   isSharedAccount={isOperationalSharedAccount}
                   isSharedOwner={activeAccount?.role === 'OWNER'}
                   currentBalance={currentBalance}
@@ -2963,7 +3022,7 @@ function App() {
                   budgets={normalizedBudgets}
                   transactions={transactions}
                   categories={categories}
-                  currentUserId={user.uid}
+                  currentUserId={user?.uid || ''}
                   onSaveBudget={saveBudget}
                   onDeleteBudget={deleteBudget}
                   onCopyBudgetsFromPreviousMonth={copyBudgetsFromPreviousMonth}
@@ -2972,7 +3031,7 @@ function App() {
               {currentView === 'DEBTS' && (
                 <DebtManager
                   debts={debts}
-                  currentUserId={user.uid}
+                  currentUserId={user?.uid || ''}
                   onSaveDebt={saveDebt}
                   onDeleteDebt={deleteDebt}
                   onRecordPayment={recordDebtPayment}
@@ -2982,7 +3041,7 @@ function App() {
               {currentView === 'ROUTINE_EXPENSES' && activeAccount && (
                 <RoutineExpenseManager
                   activeAccount={activeAccount}
-                  currentUserId={user.uid}
+                  currentUserId={user?.uid || ''}
                   categories={categories}
                   onAddTransaction={addTransaction}
                   onAddCategory={addCategory}
@@ -2992,7 +3051,7 @@ function App() {
               {currentView === 'CATEGORIES' && (
                 <CategoryManager
                   categories={categories}
-                  currentUserId={user.uid}
+                  currentUserId={user?.uid || ''}
                   onAddCategory={addCategory}
                   onUpdateCategory={updateCategory}
                   onDeleteCategory={deleteCategory}

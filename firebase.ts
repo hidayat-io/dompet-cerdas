@@ -63,7 +63,11 @@ try {
             localCache: persistentLocalCache({
                 tabManager: persistentMultipleTabManager(),
             }),
-            experimentalForceLongPolling: true,
+            // Auto-detect: SDK memakai WebChannel streaming bila jaringan/browser
+            // mendukung (jauh lebih responsif dari long polling), dan otomatis
+            // fallback ke long polling di environment yang memblokirnya
+            // (dulu experimentalForceLongPolling dipaksa true untuk semua kasus).
+            experimentalAutoDetectLongPolling: true,
         });
     } catch (firestoreInitError) {
         console.warn("Firestore persistence fallback:", firestoreInitError);

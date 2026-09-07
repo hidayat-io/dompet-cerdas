@@ -70,10 +70,26 @@ const Dashboard: React.FC<DashboardProps> = ({
     onScanReceipt,
 }) => {
     const { theme } = useTheme();
+    const [renderChart, setRenderChart] = useState(false);
     const [hideBalance, setHideBalance] = useState(() => {
         if (typeof window === 'undefined') return false;
         return localStorage.getItem('dompetcerdas_hide_balance') === 'true';
     });
+
+    useEffect(() => {
+        // Tunda pemuatan modul grafis (recharts 300KB) sampai setelah first paint dashboard selesai.
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            const idleId = (window as unknown as { requestIdleCallback: (cb: () => void, opts: { timeout: number }) => number }).requestIdleCallback(
+                () => setRenderChart(true),
+                { timeout: 800 }
+            );
+            return () => {
+                (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(idleId);
+            };
+        }
+        const timer = setTimeout(() => setRenderChart(true), 250);
+        return () => clearTimeout(timer);
+    }, []);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -584,19 +600,26 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <Typography variant="h6" fontWeight={700} mb={2}>
                             Statistik Pengeluaran
                         </Typography>
-                        <Suspense
-                            fallback={(
-                                <Box sx={{ height: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, color: 'text.secondary' }}>
-                                    <IconDisplay name="PieChart" size={40} sx={{ opacity: 0.3 }} />
-                                    <Typography variant="body2">Menyiapkan grafik pengeluaran...</Typography>
-                                </Box>
-                            )}
-                        >
-                            <DashboardExpenseChart
-                                expenseByCategory={expenseByCategory}
-                                totalExpense={totalExpense}
-                            />
-                        </Suspense>
+                        {renderChart ? (
+                            <Suspense
+                                fallback={(
+                                    <Box sx={{ height: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, color: 'text.secondary' }}>
+                                        <IconDisplay name="PieChart" size={40} sx={{ opacity: 0.3 }} />
+                                        <Typography variant="body2">Menyiapkan grafik pengeluaran...</Typography>
+                                    </Box>
+                                )}
+                            >
+                                <DashboardExpenseChart
+                                    expenseByCategory={expenseByCategory}
+                                    totalExpense={totalExpense}
+                                />
+                            </Suspense>
+                        ) : (
+                            <Box sx={{ height: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, color: 'text.secondary' }}>
+                                <IconDisplay name="PieChart" size={40} sx={{ opacity: 0.3 }} />
+                                <Typography variant="body2">Menyiapkan grafik pengeluaran...</Typography>
+                            </Box>
+                        )}
                     </CardContent>
                 </Card>
             )}
