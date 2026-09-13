@@ -19,6 +19,8 @@ const PRECACHE_URLS = [
   '/icon-512.png',
   '/icon-192.webp',
   '/icon-512.webp',
+  '/fonts/space-grotesk-variable.woff2',
+  '/fonts/material-symbols-outlined.woff2',
 ];
 
 const CACHEABLE_DESTINATIONS = new Set(['script', 'style', 'font', 'image']);
@@ -106,27 +108,49 @@ const trimRuntimeCache = async () => {
   await Promise.all(keys.slice(0, keys.length - MAX_RUNTIME_ENTRIES).map((key) => cache.delete(key)));
 };
 
-// Tanpa event.waitUntil, SW dapat di-terminate begitu respondWith selesai
-// sehingga revalidasi background tidak pernah tersimpan (cache beku selamanya).
-const staleWhileRevalidate = async (event, request, cacheName) => {
+// Stale-while-revalidate untuk aset non-hashed yang bisa berubah
+const staleWhileRevalidate = async (request, cacheName) => {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
-  const networkPromise = fetch(request)
+  const fetchPromise = fetch(request)
     .then((response) => {
       if (isCacheableResponse(response)) {
-        cache.put(request, response.clone());
-        if (cacheName === RUNTIME_CACHE) void trimRuntimeCache();
+        void cache.put(request, response.clone()).then(() => {
+          if (cacheName === RUNTIME_CACHE) void trimRuntimeCache();
+        }).catch(() => {});
       }
       return response;
     })
     .catch(() => cached);
 
   if (cached) {
-    event.waitUntil(networkPromise.then(() => {}).catch(() => {}));
+    // Revalidasi di background tanpa memanggil event.waitUntil setelah await (menghindari InvalidStateError)
+    void fetchPromise.catch(() => {});
     return cached;
   }
-  return networkPromise;
+  return fetchPromise;
+};
+
+// Cache-first untuk aset immutable bertanda hash (/assets/*)
+const cacheFirst = async (request, cacheName) => {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  if (cacheName !== STATIC_CACHE) {
+    const staticCache = await caches.open(STATIC_CACHE);
+    const staticMatch = await staticCache.match(request);
+    if (staticMatch) return staticMatch;
+  }
+
+  const networkResponse = await fetch(request);
+  if (isCacheableResponse(networkResponse)) {
+    void cache.put(request, networkResponse.clone()).then(() => {
+      if (cacheName === RUNTIME_CACHE) void trimRuntimeCache();
+    }).catch(() => {});
+  }
+  return networkResponse;
 };
 
 self.addEventListener('fetch', (event) => {
@@ -142,8 +166,7 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      // Stale-while-revalidate: Cek cache terlebih dahulu (APP_SHELL_CACHE atau STATIC_CACHE)
-      // agar buka ulang PWA terasa instan tanpa jeda jaringan sedetik pun.
+      // Prioritas mutlak: Sajikan App Shell seketika (0 ms) dari cache
       const appShellCache = await caches.open(APP_SHELL_CACHE);
       const staticCache = await caches.open(STATIC_CACHE);
 
@@ -152,49 +175,59 @@ self.addEventListener('fetch', (event) => {
         (await appShellCache.match('/')) ||
         (await staticCache.match('/index.html')) ||
         (await staticCache.match('/')) ||
-        (await staticCache.match(request));
-
-      const networkPromise = (async () => {
-        try {
-          const networkResponse = await fetch(request);
-          if (networkResponse && networkResponse.ok) {
-            await appShellCache.put('/index.html', networkResponse.clone());
-            await appShellCache.put('/', networkResponse.clone());
-          }
-          return networkResponse;
-        } catch (error) {
-          if (cachedShell) return cachedShell;
-          return (
-            (await staticCache.match('/index.html')) ||
-            (await staticCache.match('/offline.html')) ||
-            Response.error()
-          );
-        }
-      })();
+        (await staticCache.match(request, { ignoreSearch: true })) ||
+        (await appShellCache.match(request, { ignoreSearch: true }));
 
       if (cachedShell) {
-        event.waitUntil(networkPromise.then(() => {}).catch(() => {}));
         return cachedShell;
       }
-      return networkPromise;
+
+      // Fallback jika belum pernah ada cache sama sekali (mis. install pertama kali)
+      try {
+        const networkResponse = await fetch(request);
+        if (networkResponse && networkResponse.ok) {
+          await appShellCache.put('/index.html', networkResponse.clone());
+          await appShellCache.put('/', networkResponse.clone());
+        }
+        return networkResponse;
+      } catch (error) {
+        return (
+          (await staticCache.match('/index.html')) ||
+          (await staticCache.match('/offline.html')) ||
+          Response.error()
+        );
+      }
     })());
     return;
   }
 
+  const isHashedAsset =
+    url.origin === self.location.origin && url.pathname.startsWith('/assets/');
+
+  if (isHashedAsset) {
+    event.respondWith(cacheFirst(request, STATIC_CACHE));
+    return;
+  }
+
+  const isFontAsset =
+    (url.origin === self.location.origin && (url.pathname.startsWith('/fonts/') || request.destination === 'font')) ||
+    (FONT_ORIGINS.has(url.origin) &&
+      (request.destination === 'style' || request.destination === 'font'));
+
+  if (isFontAsset) {
+    event.respondWith(cacheFirst(request, STATIC_CACHE));
+    return;
+  }
+
   const isSameOriginAsset =
-    url.origin === self.location.origin &&
-    (CACHEABLE_DESTINATIONS.has(request.destination) || url.pathname.startsWith('/assets/'));
+    url.origin === self.location.origin && CACHEABLE_DESTINATIONS.has(request.destination);
 
-  const isFontRequest =
-    FONT_ORIGINS.has(url.origin) &&
-    (request.destination === 'style' || request.destination === 'font');
-
-  if (isSameOriginAsset || isFontRequest) {
-    event.respondWith(staleWhileRevalidate(event, request, RUNTIME_CACHE));
+  if (isSameOriginAsset) {
+    event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
     return;
   }
 
   if (url.origin === self.location.origin && PRECACHE_URLS.includes(url.pathname)) {
-    event.respondWith(staleWhileRevalidate(event, request, STATIC_CACHE));
+    event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
   }
 });

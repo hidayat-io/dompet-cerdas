@@ -37,8 +37,6 @@ const boot = async () => {
     initialCached = await readCachedSnapshot(lastUserId);
   }
 
-  document.getElementById('initial-loader')?.remove();
-
   root.render(
     <React.StrictMode>
       <ThemeProvider>

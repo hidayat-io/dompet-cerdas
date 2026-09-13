@@ -265,7 +265,17 @@ interface AppProps {
 }
 
 function App({ initialCached, cachedProfile }: AppProps = {}) {
-  useEffect(() => { perfMark('dc-app-mount'); }, []);
+  useEffect(() => {
+    perfMark('dc-app-mount');
+    requestAnimationFrame(() => {
+      const loader = document.getElementById('initial-loader');
+      if (loader) {
+        loader.style.transition = 'opacity 0.15s ease-out';
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 160);
+      }
+    });
+  }, []);
   const { theme, isDark, toggleTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
