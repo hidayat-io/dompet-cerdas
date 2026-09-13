@@ -62,7 +62,12 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
     const [amount, setAmount] = useState(initialAmount === undefined ? '' : String(initialAmount));
     const [description, setDescription] = useState(initialDescription || '');
     const [categoryId, setCategoryId] = useState(initialCategoryId || '');
-    const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
+    const getTodayDateString = (): string => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    };
+
+    const [date, setDate] = useState(initialDate || getTodayDateString());
     const [attachment, setAttachment] = useState<{ file: File; type: 'image' | 'pdf' } | null>(null);
     const [existingAttachment, setExistingAttachment] = useState(
         initialData?.attachment || (initialData?.attachmentUrl
@@ -107,11 +112,6 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
             .slice(0, 5);
     }, [transactions]);
 
-    const validateScanDate = (dateStr: string): string => {
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-        const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    };
 
     const matchCategoryFromSuggestion = (suggestion: string): string => {
         const normalized = suggestion.toLowerCase().trim();
@@ -205,7 +205,8 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
                 return;
             }
             setAmount(String(Math.abs(Math.round(scanResult.totalAmount))));
-            if (scanResult.date) setDate(validateScanDate(scanResult.date));
+            // NOTE: Tanggal struk diabaikan agar tidak salah tahun/kadaluarsa.
+            // Tanggal tetap hari ini kecuali diubah manual oleh pengguna di form.
             let humanDescription = '';
             if (scanResult.notes && scanResult.notes.trim()) {
                 humanDescription = scanResult.notes.trim();
@@ -279,7 +280,7 @@ const QuickAddSheetLoader: React.FC<QuickAddSheetLoaderProps> = ({
         setError('');
 
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getTodayDateString();
             const finalDesc = description.trim();
             const finalDate = date || today;
             if (isEditMode && onUpdate && initialData) {
