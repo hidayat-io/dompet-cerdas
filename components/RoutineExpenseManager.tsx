@@ -74,10 +74,11 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
   const [reminderDate, setReminderDate] = useState<number>(1);
   const [reminderTime, setReminderTime] = useState<string>('08:00');
 
-  // Transaction integration
-  const [selectedExpenseForTx, setSelectedExpenseForTx] = useState<RoutineExpense | null>(null);
-  const [showConfirmAddTx, setShowConfirmAddTx] = useState(false);
+  // Payment integration
+  const [selectedExpenseForPay, setSelectedExpenseForPay] = useState<RoutineExpense | null>(null);
+  const [recordTransaction, setRecordTransaction] = useState(false);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [expenseToUnmark, setExpenseToUnmark] = useState<RoutineExpense | null>(null);
 
   // --- Firestore listeners (shared-account aware) ---
   useEffect(() => {
@@ -142,10 +143,33 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
   const handleTogglePaid = (expense: RoutineExpense) => {
     const record = records.find(r => r.expenseId === expense.id && r.month === currentMonth);
     if (record) {
-      onShowNotification?.('info', 'Sudah Dibayar', 'Pengeluaran ini sudah ditandai dibayar bulan ini.', true);
+      setExpenseToUnmark(expense);
     } else {
-      setSelectedExpenseForTx(expense);
-      setShowConfirmAddTx(true);
+      setSelectedExpenseForPay(expense);
+      setRecordTransaction(false);
+    }
+  };
+
+  // --- Mark as paid only (without transaction) ---
+  const handleMarkAsPaidOnly = async (expense: RoutineExpense) => {
+    try {
+      const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
+        db, currentUserId, activeAccount, 'routine_expense_records'
+      );
+      const recordId = `${expense.id}_${currentMonth}`;
+      await setDoc(doc(recordsRef, recordId), {
+        id: recordId,
+        expenseId: expense.id,
+        month: currentMonth,
+        paidAt: new Date().toISOString(),
+        createdByUserId: currentUserId,
+      } as RoutineExpenseRecord);
+      onShowNotification?.('success', 'Berhasil', `"${expense.name}" ditandai lunas.`, true);
+    } catch (error) {
+      console.error('Failed to mark routine expense as paid:', error);
+      onShowNotification?.('error', 'Gagal', 'Terjadi kesalahan saat menandai lunas.', true);
+    } finally {
+      setSelectedExpenseForPay(null);
     }
   };
 
@@ -154,26 +178,51 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
     amount: number, categoryId: string, date: string, description: string,
     attachment?: { file: File; type: 'image' | 'pdf' }
   ) => {
-    if (!selectedExpenseForTx) return;
+    if (!selectedExpenseForPay) return;
 
-    // 1. Save Transaction via parent callback
-    await onAddTransaction(amount, categoryId, date, description, attachment);
+    try {
+      // 1. Save Transaction via parent callback
+      await onAddTransaction(amount, categoryId, date, description, attachment);
 
-    // 2. Mark as paid in records
-    const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
-      db, currentUserId, activeAccount, 'routine_expense_records'
-    );
-    const recordId = `${selectedExpenseForTx.id}_${currentMonth}`;
-    await setDoc(doc(recordsRef, recordId), {
-      id: recordId,
-      expenseId: selectedExpenseForTx.id,
-      month: currentMonth,
-      paidAt: new Date().toISOString(),
-      createdByUserId: currentUserId,
-    } as RoutineExpenseRecord);
+      // 2. Mark as paid in records
+      const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
+        db, currentUserId, activeAccount, 'routine_expense_records'
+      );
+      const recordId = `${selectedExpenseForPay.id}_${currentMonth}`;
+      await setDoc(doc(recordsRef, recordId), {
+        id: recordId,
+        expenseId: selectedExpenseForPay.id,
+        month: currentMonth,
+        paidAt: new Date().toISOString(),
+        createdByUserId: currentUserId,
+      } as RoutineExpenseRecord);
 
-    setShowTransactionForm(false);
-    setSelectedExpenseForTx(null);
+      onShowNotification?.('success', 'Berhasil', `"${selectedExpenseForPay.name}" ditandai lunas dan transaksi dicatat.`, true);
+    } catch (error) {
+      console.error('Failed to save transaction and mark paid:', error);
+      onShowNotification?.('error', 'Gagal', 'Terjadi kesalahan saat mencatat transaksi.', true);
+    } finally {
+      setShowTransactionForm(false);
+      setSelectedExpenseForPay(null);
+    }
+  };
+
+  // --- Unmark paid ---
+  const handleUnmarkPaid = async () => {
+    if (!expenseToUnmark) return;
+    try {
+      const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
+        db, currentUserId, activeAccount, 'routine_expense_records'
+      );
+      const recordId = `${expenseToUnmark.id}_${currentMonth}`;
+      await deleteDoc(doc(recordsRef, recordId));
+      onShowNotification?.('success', 'Berhasil', `Status lunas "${expenseToUnmark.name}" telah dibatalkan.`, true);
+    } catch (error) {
+      console.error('Failed to unmark routine expense:', error);
+      onShowNotification?.('error', 'Gagal', 'Terjadi kesalahan saat membatalkan status lunas.', true);
+    } finally {
+      setExpenseToUnmark(null);
+    }
   };
 
   // --- CRUD for expense components ---
@@ -258,7 +307,7 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
   };
 
   // --- If TransactionForm is showing, render it as a standalone fullscreen dialog ---
-  if (showTransactionForm && selectedExpenseForTx) {
+  if (showTransactionForm && selectedExpenseForPay) {
     const todayStr = (() => {
       const now = new Date();
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -270,16 +319,16 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
         categories={categories}
         transactions={[]}
         prefill={{
-          amount: selectedExpenseForTx.amount,
-          categoryId: selectedExpenseForTx.categoryId,
+          amount: selectedExpenseForPay.amount,
+          categoryId: selectedExpenseForPay.categoryId,
           date: todayStr,
-          description: `Pembayaran ${selectedExpenseForTx.name} - ${monthLabel}`,
+          description: `Pembayaran ${selectedExpenseForPay.name} - ${monthLabel}`,
         }}
         onAdd={handleSaveTransaction}
         onAddCategory={onAddCategory}
         onClose={() => {
           setShowTransactionForm(false);
-          setSelectedExpenseForTx(null);
+          setSelectedExpenseForPay(null);
         }}
         onShowNotification={onShowNotification}
       />
@@ -642,22 +691,88 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
         type="danger"
       />
 
-      {/* Confirm Add to Transaction */}
+      {/* Pay Routine Expense Dialog */}
+      <Dialog
+        open={Boolean(selectedExpenseForPay) && !showTransactionForm}
+        onClose={() => setSelectedExpenseForPay(null)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+          Set Lunas - {selectedExpenseForPay?.name}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Tandai tagihan &ldquo;<strong>{selectedExpenseForPay?.name}</strong>&rdquo; ({formatRp(selectedExpenseForPay?.amount || 0)}) sebagai lunas untuk bulan {monthLabel}.
+          </Typography>
+          <Divider sx={{ my: 1.5 }} />
+          <Box
+            onClick={() => setRecordTransaction(!recordTransaction)}
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 1.5,
+              p: 1.5,
+              borderRadius: 2,
+              border: `1px solid ${recordTransaction ? theme.colors.income : theme.colors.border}`,
+              bgcolor: recordTransaction ? `${theme.colors.income}10` : 'transparent',
+              cursor: 'pointer',
+              userSelect: 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Checkbox
+              checked={recordTransaction}
+              onChange={(e) => setRecordTransaction(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              sx={{ p: 0.5, mt: 0.25 }}
+            />
+            <Box>
+              <Typography variant="body2" fontWeight={600} color={theme.colors.textPrimary}>
+                Catat ke Transaksi Pengeluaran
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Buka form transaksi untuk mencatat pengeluaran ini
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setSelectedExpenseForPay(null)}
+            sx={{ borderRadius: 2 }}
+          >
+            Batal
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (!selectedExpenseForPay) return;
+              if (recordTransaction) {
+                setShowTransactionForm(true);
+              } else {
+                handleMarkAsPaidOnly(selectedExpenseForPay);
+              }
+            }}
+            sx={{ borderRadius: 2, fontWeight: 600 }}
+          >
+            {recordTransaction ? 'Lanjut Catat Transaksi' : 'Set Lunas'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Unmark Confirmation */}
       <ConfirmDialog
-        isOpen={showConfirmAddTx}
-        onClose={() => {
-          setShowConfirmAddTx(false);
-          setSelectedExpenseForTx(null);
-        }}
-        onConfirm={() => {
-          setShowConfirmAddTx(false);
-          setShowTransactionForm(true);
-        }}
-        title="Catat Pembayaran"
-        message={`Tandai "${selectedExpenseForTx?.name}" sudah dibayar dan tambahkan ke daftar transaksi bulan ini?`}
-        confirmText="Ya, Tambahkan"
-        cancelText="Batal"
-        type="info"
+        isOpen={Boolean(expenseToUnmark)}
+        onClose={() => setExpenseToUnmark(null)}
+        onConfirm={handleUnmarkPaid}
+        title="Batalkan Status Lunas?"
+        message={`Kembalikan status tagihan "${expenseToUnmark?.name}" menjadi belum dibayar untuk bulan ${monthLabel}?`}
+        confirmText="Ya, Batalkan Lunas"
+        cancelText="Tutup"
+        type="danger"
       />
     </Box>
   );
