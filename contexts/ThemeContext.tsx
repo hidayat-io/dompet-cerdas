@@ -405,7 +405,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return (
         <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme }}>
             <MuiThemeProvider theme={muiTheme}>
-                <CssBaseline />
+                {/* enableColorScheme: kontrol native (ikon kalender input tanggal, scrollbar)
+                    mengikuti tema app, bukan tema OS. Tanpa ini ikonnya bisa putih di atas putih. */}
+                <CssBaseline enableColorScheme />
                 {children}
             </MuiThemeProvider>
         </ThemeContext.Provider>

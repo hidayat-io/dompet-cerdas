@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -69,6 +69,129 @@ interface QuickAddSheetProps {
     latestData?: Transaction;
 }
 
+// Ikon kategori di "Sering dipakai" dan "Semua kategori" wajib berukuran sama.
+// Glyph 14px: di 12px beberapa ikon (mis. receipt) jadi kotak polos di layar DPR 1.
+const CATEGORY_BADGE_SIZE = 24;
+const CATEGORY_ICON_SIZE = 14;
+
+// Layar < 360px: label tile grid cuma ±76px (di 320px), jadi font label dikecilkan supaya
+// kata panjang (mis. "Perlengkapan", "Telekomunikasi") tidak pecah di tengah kata.
+const NARROW_GRID_MEDIA = '@media (max-width: 359.95px)';
+// Layar < 316px (mis. layar luar HP lipat 280px): grid jadi 2 kolom.
+const TWO_COLUMN_GRID_MEDIA = '@media (max-width: 315.95px)';
+const getNarrowGridLabelFontSize = (name: string) =>
+    Math.max(...name.split(/[\s/]+/).map((word) => word.length)) >= 13 ? '0.625rem' : '0.6875rem';
+
+// Browser tidak memberi titik wrap setelah "/" yang langsung diikuti huruf, jadi nama seperti
+// "Sumbangan/Donasi" akan dipecah di tengah kata. <wbr> setelah "/" memberi titik wrap yang wajar.
+const withSlashBreaks = (name: string) =>
+    name.split('/').map((part, index) => (
+        <React.Fragment key={index}>
+            {index > 0 && <>/<wbr /></>}
+            {part}
+        </React.Fragment>
+    ));
+
+// className diteruskan karena Chip menyisipkan class MuiChip-icon ke elemen icon-nya.
+// Warna sengaja bernama `bgColor`: Chip membaca prop `color` milik icon untuk variant warnanya.
+const CategoryIconBadge: React.FC<{ icon: string; bgColor: string; className?: string }> = ({ icon, bgColor, className }) => (
+    <Box
+        className={className}
+        sx={{
+            width: CATEGORY_BADGE_SIZE,
+            height: CATEGORY_BADGE_SIZE,
+            flexShrink: 0,
+            borderRadius: '50%',
+            bgcolor: bgColor,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+        }}
+    >
+        <IconDisplay name={icon} size={CATEGORY_ICON_SIZE} sx={{ color: '#fff' }} />
+    </Box>
+);
+
+// Selisih tinggi layout viewport vs visual viewport di atas angka ini dianggap
+// keyboard. Selisih kecil biasanya scrollbar/pembulatan, bukan keyboard.
+const KEYBOARD_MIN_HEIGHT = 80;
+// Keyboard yang membesar lebih dari ini (mis. animasi bertahap) memicu scroll
+// ulang ke input yang fokus. Perubahan kecil diabaikan supaya scroll user tidak ditarik.
+const KEYBOARD_GROW_RESCROLL = 48;
+// iOS kadang baru memperbarui offsetTop ~50ms SETELAH event resize, tanpa event lanjutan
+// (WebKit bug 237851). Ukur ulang sekali lagi setelah event berhenti sejenak.
+const VIEWPORT_SETTLE_MS = 250;
+// Area terlihat di atas keyboard yang lebih pendek dari ini (praktis hanya landscape)
+// tidak cukup untuk header + input + button Simpan: header disembunyikan dan bar dipadatkan.
+const COMPACT_SHEET_HEIGHT = 220;
+
+// Teks dari user (nama kategori, nama file, catatan) boleh pecah di mana saja kalau satu kata pun tidak muat.
+// `wordBreak: 'break-word'` jadi fallback untuk Safari < 15.4 yang belum mengenal `overflowWrap: 'anywhere'`.
+const WRAP_ANYWHERE_SX = { overflowWrap: 'anywhere', wordBreak: 'break-word' } as const;
+
+type VisualViewportBox = { bottomInset: number; height: number; keyboardOpen: boolean };
+
+// Saat keyboard virtual terbuka, Chrome Android & iOS Safari hanya mengecilkan
+// visual viewport. Elemen `position: fixed; bottom: 0` tetap menempel di bawah
+// layout viewport sehingga tertutup keyboard. Hook ini mengukur jarak bawah
+// visual viewport ke bawah layout viewport supaya sheet (dan button Simpan)
+// bisa diangkat tepat di atas keyboard.
+const useVisualViewportBox = (
+    active: boolean,
+    layoutRef: React.RefObject<HTMLElement | null>
+): VisualViewportBox | null => {
+    const [box, setBox] = useState<VisualViewportBox | null>(null);
+
+    useEffect(() => {
+        const viewport = typeof window !== 'undefined' ? window.visualViewport : null;
+        if (!active || !viewport) return undefined;
+
+        let frame = 0;
+        let settleTimer = 0;
+        const measure = () => {
+            // Pinch-zoom juga mengecilkan visual viewport, tapi itu bukan keyboard.
+            if (Math.abs(viewport.scale - 1) > 0.01) {
+                setBox(null);
+                return;
+            }
+            // Tinggi containing block elemen fixed = tinggi backdrop (fixed; inset 0).
+            // Lebih tepat daripada innerHeight yang ikut menghitung scrollbar.
+            const layoutHeight = layoutRef.current?.getBoundingClientRect().height || window.innerHeight;
+            const bottomInset = Math.max(0, Math.round(layoutHeight - viewport.height - viewport.offsetTop));
+            const height = Math.round(viewport.height);
+            // Ditentukan dari tinggi saja (bukan bottomInset): saat iOS menggeser visual
+            // viewport sampai mentok bawah, bottomInset = 0 padahal keyboard masih terbuka.
+            const keyboardOpen = layoutHeight - viewport.height > KEYBOARD_MIN_HEIGHT;
+            setBox((prev) => (
+                prev && prev.bottomInset === bottomInset && prev.height === height && prev.keyboardOpen === keyboardOpen
+                    ? prev
+                    : { bottomInset, height, keyboardOpen }
+            ));
+        };
+        const measureOnFrame = () => {
+            frame = 0;
+            measure();
+        };
+        const scheduleMeasure = () => {
+            window.clearTimeout(settleTimer);
+            settleTimer = window.setTimeout(measure, VIEWPORT_SETTLE_MS);
+            if (!frame) frame = window.requestAnimationFrame(measureOnFrame);
+        };
+
+        measure();
+        viewport.addEventListener('resize', scheduleMeasure);
+        viewport.addEventListener('scroll', scheduleMeasure);
+        return () => {
+            if (frame) window.cancelAnimationFrame(frame);
+            window.clearTimeout(settleTimer);
+            viewport.removeEventListener('resize', scheduleMeasure);
+            viewport.removeEventListener('scroll', scheduleMeasure);
+        };
+    }, [active, layoutRef]);
+
+    return box;
+};
+
 const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
     open,
     type,
@@ -118,10 +241,71 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
     onCategorySaved,
     latestData,
 }) => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const [displayAmount, setDisplayAmount] = useState('');
-    const [showDetails, setShowDetails] = useState(false);
     const scanInputRef = useRef<HTMLInputElement>(null);
+    // ID unik per sheet: dua sheet bisa ter-mount bersamaan (mis. edit + quick add),
+    // dan ID duplicate membuat label lampiran membuka input milik sheet lain.
+    const scanInputId = useId();
+    const attachmentInputId = useId();
+    const backdropRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const viewportBox = useVisualViewportBox(open, backdropRef);
+    const keyboardOpen = viewportBox?.keyboardOpen ?? false;
+    const keyboardInset = viewportBox?.bottomInset ?? 0;
+    const visibleHeight = viewportBox?.height ?? 0;
+
+    // Header disembunyikan di area terlihat yang sangat pendek, dan baru muncul lagi setelah
+    // keyboard ditutup: kalau header muncul di tengah mengetik (mis. keyboard memendek),
+    // konten bergeser turun dan input yang sedang diketik bisa tertutup bar Simpan.
+    const viewportTooShort = keyboardOpen && visibleHeight < COMPACT_SHEET_HEIGHT;
+    const [headerHiddenUntilKeyboardCloses, setHeaderHiddenUntilKeyboardCloses] = useState(false);
+    if (viewportTooShort && !headerHiddenUntilKeyboardCloses) setHeaderHiddenUntilKeyboardCloses(true);
+    if (!keyboardOpen && headerHiddenUntilKeyboardCloses) setHeaderHiddenUntilKeyboardCloses(false);
+    const hideHeader = keyboardOpen && (viewportTooShort || headerHiddenUntilKeyboardCloses);
+
+    // Saat keyboard muncul atau area terlihat menyusut, input yang fokus bisa tertutup bar Simpan:
+    // area konten digulir supaya input itu ke tengah lagi. Pengecualian: kalau user sendiri yang
+    // menggulir input fokus keluar layar (mis. untuk memilih kategori), perubahan kecil (pan, bar
+    // saran keyboard) tidak menarik scroll-nya balik; hanya keyboard yang membesar jauh.
+    const scrolledAtHeightRef = useRef<number | null>(null);
+    // Input fokus yang terakhir di-scroll keluar layar oleh user. Disimpan elemennya (bukan flag)
+    // supaya pindah fokus ke input lain otomatis membatalkannya tanpa bergantung event focus
+    // (WebKit tidak mengirim focusin saat <input type="date"> difokus).
+    const scrolledAwayFocusRef = useRef<Element | null>(null);
+    const getFocusedInsideContent = () => {
+        const container = contentRef.current;
+        const focused = document.activeElement;
+        if (!container || !(focused instanceof HTMLElement) || !container.contains(focused)) return null;
+        const target = focused.getBoundingClientRect();
+        const visible = container.getBoundingClientRect();
+        return { container, focused, target, visible, covered: target.top < visible.top || target.bottom > visible.bottom };
+    };
+    const handleContentScroll = () => {
+        const focus = getFocusedInsideContent();
+        scrolledAwayFocusRef.current = focus?.covered ? focus.focused : null;
+    };
+    useEffect(() => {
+        if (!keyboardOpen) {
+            scrolledAtHeightRef.current = null;
+            scrolledAwayFocusRef.current = null;
+            return;
+        }
+        const focus = getFocusedInsideContent();
+        if (!focus) return;
+        const lastHeight = scrolledAtHeightRef.current;
+        if (!focus.covered) {
+            scrolledAtHeightRef.current = visibleHeight;
+            return;
+        }
+        const userScrolledItAway = scrolledAwayFocusRef.current === focus.focused;
+        if (userScrolledItAway && lastHeight !== null && visibleHeight > lastHeight - KEYBOARD_GROW_RESCROLL) return;
+        scrolledAtHeightRef.current = visibleHeight;
+        const { container, target, visible } = focus;
+        // Yang digulir hanya area konten, bukan scrollIntoView: scrollIntoView ikut
+        // menggeser visual viewport sehingga sheet terlihat meloncat.
+        container.scrollTop += (target.top + target.height / 2) - (visible.top + visible.height / 2);
+    }, [keyboardOpen, visibleHeight, hideHeader]);
 
     const hasAttachment = !!(attachment || (existingAttachment && !isAttachmentDeleted));
 
@@ -150,6 +334,8 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
 
     const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        // Reset supaya memilih file yang sama lagi (mis. setelah "Hapus lampiran") tetap memicu change.
+        e.target.value = '';
         if (!file) return;
         onAttachmentChange({ file, type: file.type === 'application/pdf' ? 'pdf' : 'image' });
     };
@@ -167,6 +353,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
         <>
             {/* Backdrop */}
             <Box
+                ref={backdropRef}
                 sx={{
                     position: 'fixed',
                     top: 0,
@@ -188,41 +375,60 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
             <Box
                 sx={{
                     position: 'fixed',
-                    bottom: 0,
                     left: 0,
                     right: 0,
                     zIndex: 1201,
                     bgcolor: 'background.paper',
-                    borderTopLeftRadius: 24,
-                    borderTopRightRadius: 24,
+                    // Saat keyboard terbuka sheet mengisi penuh area terlihat; sudut membulat
+                    // hanya akan memperlihatkan backdrop di dua sudut atas.
+                    borderTopLeftRadius: keyboardOpen ? 0 : 24,
+                    borderTopRightRadius: keyboardOpen ? 0 : 24,
                     boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
-                    maxHeight: '85vh',
                     display: 'flex',
                     flexDirection: 'column',
+                    // Kalau tinggi tidak cukup (landscape + keyboard), kelebihannya dibuang ke atas,
+                    // jadi yang tetap terlihat di atas keyboard adalah button Simpan, bukan header.
+                    justifyContent: 'flex-end',
                     animation: 'slideUp 0.25s ease-out',
                     '@keyframes slideUp': {
                         from: { transform: 'translateY(100%)' },
                         to: { transform: 'translateY(0)' },
                     },
                 }}
+                // Nilai yang berubah mengikuti visual viewport sengaja lewat `style`, bukan sx:
+                // tiap nilai sx baru membuat class CSS baru yang tidak pernah dibuang.
+                style={{
+                    bottom: keyboardInset,
+                    maxHeight: keyboardOpen ? visibleHeight : '85vh',
+                }}
             >
-                {/* Handle */}
-                <Box sx={{ pt: 1.5, pb: 1, display: 'flex', justifyContent: 'center' }}>
-                    <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
-                </Box>
+                {/* Handle (disembunyikan saat keyboard terbuka supaya ruang sempit dipakai untuk isi form) */}
+                {!keyboardOpen && (
+                    <Box sx={{ pt: 1.5, pb: 1, display: 'flex', justifyContent: 'center' }}>
+                        <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
+                    </Box>
+                )}
 
-                {/* Header */}
-                <Box sx={{ px: 3, pb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" fontWeight={700}>
-                        {isEditMode ? (isReadOnly ? 'Detail Transaksi' : 'Edit Transaksi') : 'Catat Transaksi'}
-                    </Typography>
-                    <IconButton size="small" onClick={onClose} aria-label="Tutup">
-                        <IconDisplay name="X" size={18} />
-                    </IconButton>
-                </Box>
+                {/* Header (disembunyikan di layar sangat pendek + keyboard supaya input yang diketik tetap terlihat) */}
+                {!hideHeader && (
+                    <Box sx={{ px: 3, pt: keyboardOpen ? 1 : 0, pb: keyboardOpen ? 1 : 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="h6" fontWeight={700}>
+                            {isEditMode ? (isReadOnly ? 'Detail Transaksi' : 'Edit Transaksi') : 'Catat Transaksi'}
+                        </Typography>
+                        <IconButton size="small" onClick={onClose} aria-label="Tutup">
+                            <IconDisplay name="X" size={18} />
+                        </IconButton>
+                    </Box>
+                )}
 
             {/* Content */}
-            <Box sx={{ flex: 1, overflow: 'auto', px: 3, pb: 2 }}>
+            {/* overscrollBehavior contain: scroll konten tidak merambat ke halaman di belakang
+                (di iOS, drag yang merambat saat keyboard terbuka membuat sheet goyang). */}
+            <Box
+                ref={contentRef}
+                onScroll={handleContentScroll}
+                sx={{ flex: 1, overflow: 'auto', overscrollBehavior: 'contain', px: 3, pb: keyboardOpen ? 1 : 2 }}
+            >
                 {isReadOnly && initialData && (
                     <Alert severity="info" sx={{ mb: 2 }}>
                         <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
@@ -344,7 +550,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                 {/* AI Scan Struk — selalu terlihat */}
                 <Box sx={{ mb: 2.5 }}>
                     <input
-                        id="quick-add-scan-input"
+                        id={scanInputId}
                         ref={scanInputRef}
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -395,30 +601,22 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                             {recentCats.map((cat) => (
                                 <Chip
                                     key={cat.id}
-                                    icon={
-                                        <Box
-                                            sx={{
-                                                width: 24,
-                                                height: 24,
-                                                borderRadius: '50%',
-                                                bgcolor: cat.color,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                            }}
-                                        >
-                                            <IconDisplay name={cat.icon} size={12} sx={{ color: '#fff' }} />
-                                        </Box>
-                                    }
+                                    icon={<CategoryIconBadge icon={cat.icon} bgColor={cat.color} />}
                                     label={cat.name}
                                     onClick={() => !isReadOnly && onCategoryChange(cat.id)}
                                     disabled={isReadOnly}
                                     sx={{
-                                        height: 40,
+                                        // Tinggi ikut isi: nama kategori panjang di-wrap, bukan dipotong ellipsis.
+                                        height: 'auto',
+                                        minHeight: 40,
+                                        '& .MuiChip-label': { whiteSpace: 'normal', py: 0.75, ...WRAP_ANYWHERE_SX },
                                         px: 1,
                                         bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.hover',
                                         color: categoryId === cat.id ? theme.colors.accent : 'text.primary',
-                                        border: categoryId === cat.id ? `2px solid ${theme.colors.accent}` : '1px solid transparent',
+                                        // Border selalu 2px (transparan kalau tidak dipilih): chip yang label-nya
+                                        // wrap tidak berubah ukuran saat dipilih.
+                                        border: '2px solid',
+                                        borderColor: categoryId === cat.id ? theme.colors.accent : 'transparent',
                                         fontWeight: 600,
                                         '&:hover': {
                                             bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.selected',
@@ -445,7 +643,9 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                     <Box
                         sx={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            // minmax(0, 1fr): nama kategori panjang tidak melebarkan kolom keluar sheet.
+                            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                            [TWO_COLUMN_GRID_MEDIA]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
                             gap: 1,
                             overflow: 'visible',
                         }}
@@ -457,7 +657,10 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                                 onClick={() => !isReadOnly && onCategoryChange(cat.id)}
                                 disabled={isReadOnly}
                                 sx={{
-                                    p: 1.5,
+                                    py: 1.5,
+                                    // Padding samping kecil di HP supaya nama umum (mis. "Pendidikan",
+                                    // "Transportasi") tetap muat satu baris di layar 320px.
+                                    px: { xs: 0.5, sm: 1.5 },
                                     border: 'none',
                                     borderRadius: 2.5,
                                     cursor: 'pointer',
@@ -471,53 +674,49 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                                     '&:hover': {
                                         bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.selected',
                                     },
+                                    // Read-only: tile tampil pudar seperti chip "Sering dipakai" yang disabled.
+                                    '&:disabled': { opacity: 0.38, cursor: 'default', pointerEvents: 'none' },
                                 }}
                             >
-                                <Box
-                                    sx={{
-                                        width: 36,
-                                        height: 36,
-                                        borderRadius: '50%',
-                                        bgcolor: cat.color,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}
-                                >
-                                    <IconDisplay name={cat.icon} size={18} sx={{ color: '#fff' }} />
-                                </Box>
+                                <CategoryIconBadge icon={cat.icon} bgColor={cat.color} />
+                                {/* Nama yang tidak muat di-wrap ke baris berikutnya, bukan dipotong. */}
                                 <Typography
                                     variant="caption"
                                     fontWeight={600}
                                     textAlign="center"
-                                    noWrap
                                     sx={{
                                         width: '100%',
+                                        ...WRAP_ANYWHERE_SX,
+                                        [NARROW_GRID_MEDIA]: { fontSize: getNarrowGridLabelFontSize(cat.name) },
                                         color: categoryId === cat.id ? theme.colors.accent : 'text.primary',
                                     }}
                                 >
-                                    {cat.name}
+                                    {withSlashBreaks(cat.name)}
                                 </Typography>
                             </Box>
                         ))}
                     </Box>
                 </Box>
 
-                {showDetails && (
-                    <Box sx={{ mt: 2.5, display: 'grid', gap: 2 }}>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            label="Tanggal"
-                            type="date"
-                            value={date}
-                            onChange={(e) => onDateChange(e.target.value)}
-                            disabled={isReadOnly}
-                            slotProps={{ inputLabel: { shrink: true } }}
-                        />
+                {/* Detail (tanggal, lampiran) — selalu tampil. Nama lampiran di bawah di-wrap: teks nowrap yang
+                    panjang dulu melebarkan kolom grid sehingga field Tanggal & button hapus lampiran keluar layar. */}
+                <Box sx={{ mt: 2.5, display: 'grid', gap: 2 }}>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        label="Tanggal"
+                        type="date"
+                        value={date}
+                        onChange={(e) => onDateChange(e.target.value)}
+                        disabled={isReadOnly}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                    />
+                    {/* Mode read-only tanpa lampiran: baris lampiran tidak dirender sama sekali (button tambah
+                        pun tidak), jadi tidak ada baris grid kosong yang menambah jarak ke bar Simpan. */}
+                    {(!isReadOnly || (existingAttachment && !isAttachmentDeleted)) && (
                         <Box>
                             <input
-                                id="quick-add-attachment"
+                                id={attachmentInputId}
                                 type="file"
                                 accept="image/*,application/pdf"
                                 onChange={handleAttachmentChange}
@@ -525,9 +724,10 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                             />
                             {existingAttachment && !isAttachmentDeleted && !attachment ? (
                                 <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflow: 'hidden', minWidth: 0 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                                         <IconDisplay name={existingAttachment.type === 'image' ? 'Image' : 'FileText'} size={20} sx={{ color: theme.colors.textMuted, flexShrink: 0 }} />
-                                        <Typography variant="body2" noWrap sx={{ flex: 1 }}>{existingAttachment.name}</Typography>
+                                        {/* Nama file tampil utuh (wrap), sama seperti lampiran baru. */}
+                                        <Typography variant="body2" sx={{ flex: 1, minWidth: 0, ...WRAP_ANYWHERE_SX }}>{existingAttachment.name}</Typography>
                                     </Box>
                                     {!isReadOnly && (
                                         <IconButton size="small" onClick={() => onAttachmentChange(null)} disabled={isSaving || isScanning} aria-label="Hapus lampiran">
@@ -535,34 +735,45 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                                         </IconButton>
                                     )}
                                 </Paper>
-                            ) : (
+                            ) : !isReadOnly ? (
                                 <>
-                                    <Button component="label" htmlFor="quick-add-attachment" variant="outlined" fullWidth disabled={isScanning || isSaving || isReadOnly}>
+                                    {/* Nama file dari kamera/WhatsApp sering panjang tanpa spasi: dibiarkan pecah di mana saja. */}
+                                    <Button component="label" htmlFor={attachmentInputId} variant="outlined" fullWidth disabled={isScanning || isSaving} sx={WRAP_ANYWHERE_SX}>
                                         {attachment ? `Lampiran: ${attachment.file.name}` : 'Tambah foto atau PDF'}
                                     </Button>
-                                    {attachment && !isReadOnly && (
+                                    {attachment && (
                                         <Button size="small" color="inherit" onClick={() => onAttachmentChange(null)} sx={{ mt: 0.5 }}>
                                             Hapus lampiran
                                         </Button>
                                     )}
                                 </>
-                            )}
+                            ) : null}
                         </Box>
-                    </Box>
-                )}
+                    )}
+                </Box>
             </Box>
 
-            {/* Sticky Action Bar */}
+            {/* Floating Action Bar — selalu terlihat di bawah sheet, termasuk saat keyboard terbuka.
+                Saat header disembunyikan (area terlihat sangat pendek) bar ikut dipadatkan supaya
+                input setinggi 40px tetap muat di atasnya. */}
             <Box
                 sx={{
+                    position: 'relative',
+                    zIndex: 1,
                     px: 3,
-                    py: 2,
+                    pt: hideHeader ? 0.75 : 1.5,
+                    // Safe-area hanya relevan saat sheet menempel di tepi bawah layar (keyboard tertutup).
+                    pb: hideHeader ? 0.75 : keyboardOpen ? 1.5 : 'calc(12px + env(safe-area-inset-bottom, 0px))',
                     borderTop: '1px solid',
-                    borderColor: 'divider',
+                    // Di dark mode garis divider & shadow tipis nyaris tidak terlihat di atas paper gelap,
+                    // jadi bar tidak terkesan floating: pakai garis lebih terang + shadow lebih pekat.
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.24)' : 'divider',
                     bgcolor: 'background.paper',
+                    boxShadow: isDark ? '0 -10px 24px rgba(0, 0, 0, 0.55)' : '0 -8px 20px rgba(0, 0, 0, 0.08)',
                 }}
             >
-                {isEditMode && onRequestDelete && !isReadOnly && (
+                {/* Saat keyboard terbuka, Hapus disembunyikan supaya ruang sempit tetap cukup untuk button Update. */}
+                {isEditMode && onRequestDelete && !isReadOnly && !keyboardOpen && (
                     <Button
                         fullWidth
                         variant="outlined"
@@ -578,29 +789,22 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                 <Button
                     fullWidth
                     variant="contained"
-                    onClick={onSave}
+                    // Jangan `onClick={onSave}`: click event akan masuk sebagai argumen pertama
+                    // handleSave (forceSave) sehingga conflict check versi terlewati.
+                    onClick={() => onSave()}
                     disabled={isSaving || isReadOnly || !displayAmount || !categoryId}
                     sx={{
-                        py: 1.5,
+                        py: hideHeader ? 1 : 1.5,
                         borderRadius: 3,
                         fontSize: 16,
                         fontWeight: 700,
                         bgcolor: theme.colors.accent,
+                        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.18)',
                         '&:hover': { bgcolor: theme.colors.accentHover },
                     }}
                 >
                     {isSaving ? 'Menyimpan...' : isEditMode ? 'Update' : 'Simpan'}
                 </Button>
-                {!isReadOnly && (
-                    <Button
-                        fullWidth
-                        variant="text"
-                        onClick={() => setShowDetails((current) => !current)}
-                        sx={{ mt: 1, color: 'text.secondary' }}
-                    >
-                        {showDetails ? 'Sembunyikan detail' : 'Tambah detail (tanggal, lampiran)'}
-                    </Button>
-                )}
             </Box>
         </Box>
 
@@ -613,6 +817,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Ada perubahan dari tab atau perangkat lain sejak form ini dibuka. Pilih versi mana yang ingin kamu lanjutkan.
                 </Typography>
+                {/* Catatan di-wrap di mana saja: catatan panjang tanpa spasi (mis. URL) tidak melebarkan dialog ke samping. */}
                 <Box sx={{ display: 'grid', gap: 1.5 }}>
                     <Paper variant="outlined" sx={{ p: 1.5 }}>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
@@ -620,7 +825,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                         </Typography>
                         <Typography variant="body2">Jumlah: {latestData ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(latestData.amount) : '-'}</Typography>
                         <Typography variant="body2">Tanggal: {latestData?.date || '-'}</Typography>
-                        <Typography variant="body2">Catatan: {latestData?.description || '-'}</Typography>
+                        <Typography variant="body2" sx={WRAP_ANYWHERE_SX}>Catatan: {latestData?.description || '-'}</Typography>
                     </Paper>
                     <Paper variant="outlined" sx={{ p: 1.5 }}>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
@@ -628,7 +833,7 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                         </Typography>
                         <Typography variant="body2">Jumlah: {displayAmount ? `Rp ${displayAmount}` : '-'}</Typography>
                         <Typography variant="body2">Tanggal: {date || '-'}</Typography>
-                        <Typography variant="body2">Catatan: {description || '-'}</Typography>
+                        <Typography variant="body2" sx={WRAP_ANYWHERE_SX}>Catatan: {description || '-'}</Typography>
                     </Paper>
                 </Box>
             </DialogContent>
