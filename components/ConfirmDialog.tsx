@@ -5,7 +5,6 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import CircularProgress from '@mui/material/CircularProgress';
 import IconDisplay from './IconDisplay';
 import { IconName } from '../types';
 
@@ -38,6 +37,21 @@ const defaultIcons: Record<DialogType, IconName> = {
     info: 'Info'
 };
 
+// Pesan sering memuat nama dari user (kategori, tagihan, anggaran): nama panjang tanpa spasi
+// dibiarkan pecah di mana saja supaya tidak overflow keluar dialog.
+const WRAP_ANYWHERE_SX = { overflowWrap: 'anywhere', wordBreak: 'break-word' } as const;
+
+// Label button berada di sel grid yang sama dengan label button satunya (disembunyikan), jadi lebar
+// alami kedua button = label terpanjang: selalu sama lebar saat berdampingan, dan turun ke baris
+// kedua bersamaan kalau tidak muat (mis. "Ya, Batalkan Lunas" di HP 360px), bukan teksnya overflow.
+const ButtonLabel: React.FC<{ visible: React.ReactNode; other: React.ReactNode }> = ({ visible, other }) => (
+    <Box component="span" sx={{ display: 'inline-grid', justifyItems: 'center', alignItems: 'center', '& > *': { gridArea: '1 / 1' } }}>
+        {/* Rata kiri: kalau label terpaksa wrap (layar sangat sempit), ikon tetap menempel ke teks. */}
+        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', textAlign: 'left' }}>{visible}</Box>
+        <Box component="span" aria-hidden="true" sx={{ display: 'inline-flex', alignItems: 'center', visibility: 'hidden' }}>{other}</Box>
+    </Box>
+);
+
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     isOpen,
     onClose,
@@ -52,6 +66,14 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
     const color = typeColors[type];
     const displayIcon = icon || defaultIcons[type];
+    // mr 0.75 = 6px (dulu `marginRight: 6` di sx terbaca 6 spacing unit = 48px). Warna ikon ikut
+    // warna teks button, jadi ikut transparan bersama label saat loading.
+    const confirmLabel = (
+        <>
+            <IconDisplay name={displayIcon} size={18} sx={{ mr: 0.75 }} />
+            {confirmText}
+        </>
+    );
 
     return (
         <Dialog
@@ -69,46 +91,49 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     {title}
                 </Typography>
                 {typeof message === 'string' ? (
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={WRAP_ANYWHERE_SX}>
                         {message}
                     </Typography>
                 ) : (
-                    <Box sx={{ textAlign: 'left' }}>
+                    <Box sx={{ textAlign: 'left', ...WRAP_ANYWHERE_SX }}>
                         {message}
                     </Box>
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ px: 3, pb: 3, gap: 1.5 }}>
+            {/* minWidth fit-content: button selebar label satu baris (lihat ButtonLabel); flexWrap: kalau tidak
+                muat berdampingan, kedua button bertumpuk dengan lebar penuh. disableSpacing: margin bawaan MUI
+                diganti gap supaya baris kedua tetap sejajar (jarak antar-button tetap 20px seperti sebelumnya).
+                Bentuk & ukuran kedua button disamakan: radius & padding sama (padding bawaan MUI outlined 15px
+                vs contained 16px), border transparan di button contained.
+                Loading pakai prop `loading` MUI: label tetap memakan tempat (transparan), jadi layout tidak
+                lompat, dan spinner tampil di tengah. */}
+            <DialogActions disableSpacing sx={{ px: 3, pb: 3, columnGap: 2.5, rowGap: 1.5, flexWrap: 'wrap' }}>
                 <Button
-                    fullWidth
                     variant="outlined"
                     onClick={onClose}
                     disabled={isLoading}
-                    sx={{ borderRadius: 2, py: 1.25, fontWeight: 600 }}
+                    sx={{ flex: '1 1 0', minWidth: 'fit-content', borderRadius: 2, px: 2, py: 1.25, fontWeight: 600 }}
                 >
-                    {cancelText}
+                    <ButtonLabel visible={cancelText} other={confirmLabel} />
                 </Button>
                 <Button
-                    fullWidth
                     variant="contained"
                     onClick={onConfirm}
-                    disabled={isLoading}
+                    loading={isLoading}
                     sx={{
+                        flex: '1 1 0',
+                        minWidth: 'fit-content',
+                        borderRadius: 2,
+                        border: '1px solid transparent',
+                        px: 2,
                         py: 1.25,
                         fontWeight: 600,
                         bgcolor: color,
                         '&:hover': { bgcolor: color, filter: 'brightness(0.9)' },
                     }}
                 >
-                    {isLoading ? (
-                        <CircularProgress size={18} sx={{ color: '#fff' }} />
-                    ) : (
-                        <>
-                            <IconDisplay name={displayIcon} size={18} sx={{ color: '#fff', marginRight: 6 }} />
-                            {confirmText}
-                        </>
-                    )}
+                    <ButtonLabel visible={confirmLabel} other={cancelText} />
                 </Button>
             </DialogActions>
         </Dialog>
