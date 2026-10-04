@@ -1,3 +1,5 @@
+import type { WriteBatch } from 'firebase/firestore';
+
 export type TransactionType = 'INCOME' | 'EXPENSE';
 export type AccountRole = 'OWNER' | 'MEMBER';
 
@@ -168,6 +170,13 @@ export interface RoutineExpense {
   reminderType?: 'AWAL_BULAN' | 'AKHIR_BULAN' | 'CUSTOM';
   reminderDate?: number; // 1-31
   reminderTime?: string; // e.g. "08:00"
+}
+
+// Opsi tambahan saat mencatat transaksi.
+export interface AddTransactionOptions {
+  // Write tambahan yang di-commit ATOMIC bersama transaksi (satu batch, setelah upload
+  // lampiran selesai): keduanya tersimpan atau keduanya tidak.
+  extraWrites?: (batch: WriteBatch) => void;
 }
 
 export interface RoutineExpenseRecord {

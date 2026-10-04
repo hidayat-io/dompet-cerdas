@@ -25,7 +25,7 @@ import Divider from '@mui/material/Divider';
 import { onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getScopedCollectionRefForAccount } from '../services/accountService';
-import { RoutineExpense, RoutineExpenseRecord, Category, FinancialAccount } from '../types';
+import { AddTransactionOptions, RoutineExpense, RoutineExpenseRecord, Category, FinancialAccount } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import IconDisplay from './IconDisplay';
 import ConfirmDialog from './ConfirmDialog';
@@ -38,13 +38,20 @@ interface RoutineExpenseManagerProps {
   activeAccount: Pick<FinancialAccount, 'id' | 'sharedAccountId'>;
   currentUserId: string;
   categories: Category[];
-  onAddTransaction: (amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' }) => Promise<void>;
+  onAddTransaction: (amount: number, categoryId: string, date: string, description: string, attachment?: { file: File; type: 'image' | 'pdf' }, options?: AddTransactionOptions) => Promise<void>;
   onAddCategory?: (category: Omit<Category, 'id'>) => Promise<string | undefined>;
   onShowNotification?: (type: NotificationType, title: string, message: string, autoClose?: boolean) => void;
 }
 
+// Nama tagihan dari user bisa panjang tanpa spasi: dibiarkan pecah di mana saja supaya tidak
+// terpotong di list atau membuat dialog overflow ke samping.
+const WRAP_ANYWHERE_SX = { overflowWrap: 'anywhere', wordBreak: 'break-word' } as const;
+
 const getMonthString = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+// Alur bayar tagihan: dialog Set Lunas → (opsional) form transaksi.
+type PayFlow = { expense: RoutineExpense; step: 'confirm' | 'form' };
 
 const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
   activeAccount,
@@ -75,10 +82,20 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
   const [reminderTime, setReminderTime] = useState<string>('08:00');
 
   // Payment integration
-  const [selectedExpenseForPay, setSelectedExpenseForPay] = useState<RoutineExpense | null>(null);
+  // Alur bayar disimpan dalam SATU state. Proses async yang selesai belakangan hanya
+  // boleh menutup alur yang memicunya (dibandingkan per objek), bukan alur lain yang
+  // sedang dibuka user — termasuk alur baru untuk tagihan yang sama.
+  const [payFlow, setPayFlow] = useState<PayFlow | null>(null);
   const [recordTransaction, setRecordTransaction] = useState(false);
-  const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [expenseToUnmark, setExpenseToUnmark] = useState<RoutineExpense | null>(null);
+  // Isi dialog dipertahankan setelah dialog ditutup, supaya selama animasi tutup tidak
+  // berkedip kosong ("Set Lunas - ", "undefined").
+  const [payDialogExpense, setPayDialogExpense] = useState<RoutineExpense | null>(null);
+  const [unmarkDialogExpense, setUnmarkDialogExpense] = useState<RoutineExpense | null>(null);
+
+  const closePayFlow = (flow: PayFlow) => {
+    setPayFlow((current) => (current === flow ? null : current));
+  };
 
   // --- Firestore listeners (shared-account aware) ---
   useEffect(() => {
@@ -144,85 +161,93 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
     const record = records.find(r => r.expenseId === expense.id && r.month === currentMonth);
     if (record) {
       setExpenseToUnmark(expense);
+      setUnmarkDialogExpense(expense);
     } else {
-      setSelectedExpenseForPay(expense);
+      setPayFlow({ expense, step: 'confirm' });
+      setPayDialogExpense(expense);
       setRecordTransaction(false);
     }
   };
 
+  const getPaidRecordRef = (expense: RoutineExpense) => {
+    const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
+      db, currentUserId, activeAccount, 'routine_expense_records'
+    );
+    return doc(recordsRef, `${expense.id}_${currentMonth}`);
+  };
+
+  const buildPaidRecord = (expense: RoutineExpense): RoutineExpenseRecord => ({
+    id: `${expense.id}_${currentMonth}`,
+    expenseId: expense.id,
+    month: currentMonth,
+    paidAt: new Date().toISOString(),
+    createdByUserId: currentUserId,
+  });
+
   // --- Mark as paid only (without transaction) ---
-  const handleMarkAsPaidOnly = async (expense: RoutineExpense) => {
-    try {
-      const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
-        db, currentUserId, activeAccount, 'routine_expense_records'
-      );
-      const recordId = `${expense.id}_${currentMonth}`;
-      await setDoc(doc(recordsRef, recordId), {
-        id: recordId,
-        expenseId: expense.id,
-        month: currentMonth,
-        paidAt: new Date().toISOString(),
-        createdByUserId: currentUserId,
-      } as RoutineExpenseRecord);
-      onShowNotification?.('success', 'Berhasil', `"${expense.name}" ditandai lunas.`, true);
-    } catch (error) {
-      console.error('Failed to mark routine expense as paid:', error);
-      onShowNotification?.('error', 'Gagal', 'Terjadi kesalahan saat menandai lunas.', true);
-    } finally {
-      setSelectedExpenseForPay(null);
-    }
+  // Dialog langsung ditutup: Firestore menerapkan write secara lokal seketika (list langsung
+  // "Lunas"), sedangkan ack server bisa lama atau baru datang setelah online lagi. Toast
+  // menunggu ack supaya tidak bilang "berhasil" untuk write yang akhirnya ditolak server.
+  const handleMarkAsPaidOnly = (flow: PayFlow) => {
+    const { expense } = flow;
+    closePayFlow(flow);
+    setDoc(getPaidRecordRef(expense), buildPaidRecord(expense))
+      .then(() => onShowNotification?.('success', 'Berhasil', `"${expense.name}" ditandai lunas.`, true))
+      .catch((error) => {
+        console.error('Failed to mark routine expense as paid:', error);
+        onShowNotification?.('error', 'Gagal', `"${expense.name}" gagal ditandai lunas. Coba lagi.`, true);
+      });
   };
 
   // --- Save transaction + mark paid ---
+  // Transaksi dan tanda lunas di-commit dalam SATU batch atomic (setelah upload lampiran
+  // selesai): keduanya tersimpan atau keduanya tidak, tanpa keadaan setengah jadi
+  // ("lunas tanpa transaksi" / "transaksi tanpa lunas") dan tanpa rollback manual.
+  // Kalau gagal, error dilempar ke form supaya form tetap terbuka dan user bisa coba lagi.
   const handleSaveTransaction = async (
     amount: number, categoryId: string, date: string, description: string,
     attachment?: { file: File; type: 'image' | 'pdf' }
   ) => {
-    if (!selectedExpenseForPay) return;
+    const flow = payFlow;
+    if (!flow) return;
+    const { expense } = flow;
+    const recordRef = getPaidRecordRef(expense);
+    const record = buildPaidRecord(expense);
 
     try {
-      // 1. Save Transaction via parent callback
-      await onAddTransaction(amount, categoryId, date, description, attachment);
-
-      // 2. Mark as paid in records
-      const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
-        db, currentUserId, activeAccount, 'routine_expense_records'
-      );
-      const recordId = `${selectedExpenseForPay.id}_${currentMonth}`;
-      await setDoc(doc(recordsRef, recordId), {
-        id: recordId,
-        expenseId: selectedExpenseForPay.id,
-        month: currentMonth,
-        paidAt: new Date().toISOString(),
-        createdByUserId: currentUserId,
-      } as RoutineExpenseRecord);
-
-      onShowNotification?.('success', 'Berhasil', `"${selectedExpenseForPay.name}" ditandai lunas dan transaksi dicatat.`, true);
+      await onAddTransaction(amount, categoryId, date, description, attachment, {
+        extraWrites: (batch) => batch.set(recordRef, record),
+      });
     } catch (error) {
       console.error('Failed to save transaction and mark paid:', error);
-      onShowNotification?.('error', 'Gagal', 'Terjadi kesalahan saat mencatat transaksi.', true);
-    } finally {
-      setShowTransactionForm(false);
-      setSelectedExpenseForPay(null);
+      throw error;
     }
+
+    onShowNotification?.('success', 'Berhasil', `"${expense.name}" ditandai lunas dan transaksi dicatat.`, true);
+    closePayFlow(flow);
+  };
+
+  // Form transaksi punya toast sukses generik ("Tersimpan!") yang muncul SETELAH
+  // handleSaveTransaction selesai dan akan menimpa pesan di atas. Notifikasi sukses
+  // dari form diredam di sini; error dari form tetap diteruskan.
+  const notifyFromTransactionForm = (type: NotificationType, title: string, message: string, autoClose?: boolean) => {
+    if (type === 'success') return;
+    onShowNotification?.(type, title, message, autoClose);
   };
 
   // --- Unmark paid ---
-  const handleUnmarkPaid = async () => {
-    if (!expenseToUnmark) return;
-    try {
-      const recordsRef = getScopedCollectionRefForAccount<RoutineExpenseRecord>(
-        db, currentUserId, activeAccount, 'routine_expense_records'
-      );
-      const recordId = `${expenseToUnmark.id}_${currentMonth}`;
-      await deleteDoc(doc(recordsRef, recordId));
-      onShowNotification?.('success', 'Berhasil', `Status lunas "${expenseToUnmark.name}" telah dibatalkan.`, true);
-    } catch (error) {
-      console.error('Failed to unmark routine expense:', error);
-      onShowNotification?.('error', 'Gagal', 'Terjadi kesalahan saat membatalkan status lunas.', true);
-    } finally {
-      setExpenseToUnmark(null);
-    }
+  // Sama seperti Set Lunas: dialog langsung ditutup, penghapusan jalan di belakang,
+  // toast menunggu ack server.
+  const handleUnmarkPaid = () => {
+    const expense = expenseToUnmark;
+    if (!expense) return;
+    setExpenseToUnmark(null);
+    deleteDoc(getPaidRecordRef(expense))
+      .then(() => onShowNotification?.('success', 'Berhasil', `Status lunas "${expense.name}" telah dibatalkan.`, true))
+      .catch((error) => {
+        console.error('Failed to unmark routine expense:', error);
+        onShowNotification?.('error', 'Gagal', `Status lunas "${expense.name}" gagal dibatalkan. Coba lagi.`, true);
+      });
   };
 
   // --- CRUD for expense components ---
@@ -307,7 +332,9 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
   };
 
   // --- If TransactionForm is showing, render it as a standalone fullscreen dialog ---
-  if (showTransactionForm && selectedExpenseForPay) {
+  if (payFlow?.step === 'form') {
+    const formFlow = payFlow;
+    const formExpense = formFlow.expense;
     const todayStr = (() => {
       const now = new Date();
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -319,18 +346,15 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
         categories={categories}
         transactions={[]}
         prefill={{
-          amount: selectedExpenseForPay.amount,
-          categoryId: selectedExpenseForPay.categoryId,
+          amount: formExpense.amount,
+          categoryId: formExpense.categoryId,
           date: todayStr,
-          description: `Pembayaran ${selectedExpenseForPay.name} - ${monthLabel}`,
+          description: `Pembayaran ${formExpense.name} - ${monthLabel}`,
         }}
         onAdd={handleSaveTransaction}
         onAddCategory={onAddCategory}
-        onClose={() => {
-          setShowTransactionForm(false);
-          setSelectedExpenseForPay(null);
-        }}
-        onShowNotification={onShowNotification}
+        onClose={() => closePayFlow(formFlow)}
+        onShowNotification={notifyFromTransactionForm}
       />
     );
   }
@@ -448,6 +472,7 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
                         sx={{
                           textDecoration: isPaid ? 'line-through' : 'none',
                           color: theme.colors.textPrimary,
+                          ...WRAP_ANYWHERE_SX,
                         }}
                       >
                         {expense.name}
@@ -519,7 +544,7 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
                     <ListItemText
                       primary={exp.name}
                       secondary={formatRp(exp.amount)}
-                      primaryTypographyProps={{ fontWeight: 600 }}
+                      primaryTypographyProps={{ fontWeight: 600, sx: WRAP_ANYWHERE_SX }}
                     />
                     <Button
                       size="small"
@@ -693,18 +718,18 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
 
       {/* Pay Routine Expense Dialog */}
       <Dialog
-        open={Boolean(selectedExpenseForPay) && !showTransactionForm}
-        onClose={() => setSelectedExpenseForPay(null)}
+        open={payFlow?.step === 'confirm'}
+        onClose={() => setPayFlow(null)}
         maxWidth="xs"
         fullWidth
         slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } } }}
       >
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
-          Set Lunas - {selectedExpenseForPay?.name}
+        <DialogTitle sx={{ fontWeight: 700, pb: 1, ...WRAP_ANYWHERE_SX }}>
+          Set Lunas - {payDialogExpense?.name}
         </DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Tandai tagihan &ldquo;<strong>{selectedExpenseForPay?.name}</strong>&rdquo; ({formatRp(selectedExpenseForPay?.amount || 0)}) sebagai lunas untuk bulan {monthLabel}.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, ...WRAP_ANYWHERE_SX }}>
+            Tandai tagihan &ldquo;<strong>{payDialogExpense?.name}</strong>&rdquo; ({formatRp(payDialogExpense?.amount || 0)}) sebagai lunas untuk bulan {monthLabel}.
           </Typography>
           <Divider sx={{ my: 1.5 }} />
           <Box
@@ -741,7 +766,7 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
           <Button
             variant="outlined"
-            onClick={() => setSelectedExpenseForPay(null)}
+            onClick={() => setPayFlow(null)}
             sx={{ borderRadius: 2 }}
           >
             Batal
@@ -749,11 +774,11 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
           <Button
             variant="contained"
             onClick={() => {
-              if (!selectedExpenseForPay) return;
+              if (!payFlow) return;
               if (recordTransaction) {
-                setShowTransactionForm(true);
+                setPayFlow({ expense: payFlow.expense, step: 'form' });
               } else {
-                handleMarkAsPaidOnly(selectedExpenseForPay);
+                handleMarkAsPaidOnly(payFlow);
               }
             }}
             sx={{ borderRadius: 2, fontWeight: 600 }}
@@ -769,7 +794,7 @@ const RoutineExpenseManager: React.FC<RoutineExpenseManagerProps> = ({
         onClose={() => setExpenseToUnmark(null)}
         onConfirm={handleUnmarkPaid}
         title="Batalkan Status Lunas?"
-        message={`Kembalikan status tagihan "${expenseToUnmark?.name}" menjadi belum dibayar untuk bulan ${monthLabel}?`}
+        message={`Kembalikan status tagihan "${unmarkDialogExpense?.name}" menjadi belum dibayar untuk bulan ${monthLabel}?`}
         confirmText="Ya, Batalkan Lunas"
         cancelText="Tutup"
         type="danger"

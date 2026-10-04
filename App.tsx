@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
 
 import { INITIAL_CATEGORIES, APP_VERSION } from './constants';
-import { Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, SharedAccountMember, Transaction } from './types';
+import { AddTransactionOptions, Budget, Category, DebtPayment, DebtRecord, DebtStatus, FinancialAccount, Plan, PlanItem, PlanItemStatus, SharedAccountMember, Transaction } from './types';
 import type { NotificationType } from './components/NotificationModal';
 
 import IconDisplay from './components/IconDisplay';
@@ -81,6 +81,7 @@ import {
   getUserDocRef
 } from './services/accountService';
 import { callCloudFunction, deleteFileFromStorage, getLegacyStoragePathFromUrl, uploadFileToStorage } from './services/firebaseRuntime';
+import { commitTransactionWrite } from './services/transactionWrite';
 import {
   readCachedSnapshot,
   writeCachedSnapshot,
@@ -1925,7 +1926,8 @@ function App({ initialCached, cachedProfile }: AppProps = {}) {
     categoryId: string,
     date: string,
     description: string,
-    attachment?: { file: File; type: 'image' | 'pdf' }
+    attachment?: { file: File; type: 'image' | 'pdf' },
+    options?: AddTransactionOptions
   ) => {
     if (!user || !activeAccount) return;
 
@@ -1969,7 +1971,7 @@ function App({ initialCached, cachedProfile }: AppProps = {}) {
       }
     }
 
-    await setDoc(txRef as any, {
+    const transactionData = {
       amount,
       categoryId,
       date,
@@ -1979,7 +1981,9 @@ function App({ initialCached, cachedProfile }: AppProps = {}) {
       createdAt: new Date().toISOString(),
       source: 'app',
       attachment: attachmentData
-    });
+    };
+
+    await commitTransactionWrite(db, txRef as any, transactionData, options);
   };
 
   const updateTransaction = async (
