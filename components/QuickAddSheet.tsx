@@ -74,24 +74,6 @@ interface QuickAddSheetProps {
 const CATEGORY_BADGE_SIZE = 24;
 const CATEGORY_ICON_SIZE = 14;
 
-// Layar < 360px: label tile grid cuma ±76px (di 320px), jadi font label dikecilkan supaya
-// kata panjang (mis. "Perlengkapan", "Telekomunikasi") tidak pecah di tengah kata.
-const NARROW_GRID_MEDIA = '@media (max-width: 359.95px)';
-// Layar < 316px (mis. layar luar HP lipat 280px): grid jadi 2 kolom.
-const TWO_COLUMN_GRID_MEDIA = '@media (max-width: 315.95px)';
-const getNarrowGridLabelFontSize = (name: string) =>
-    Math.max(...name.split(/[\s/]+/).map((word) => word.length)) >= 13 ? '0.625rem' : '0.6875rem';
-
-// Browser tidak memberi titik wrap setelah "/" yang langsung diikuti huruf, jadi nama seperti
-// "Sumbangan/Donasi" akan dipecah di tengah kata. <wbr> setelah "/" memberi titik wrap yang wajar.
-const withSlashBreaks = (name: string) =>
-    name.split('/').map((part, index) => (
-        <React.Fragment key={index}>
-            {index > 0 && <>/<wbr /></>}
-            {part}
-        </React.Fragment>
-    ));
-
 // className diteruskan karena Chip menyisipkan class MuiChip-icon ke elemen icon-nya.
 // Warna sengaja bernama `bgColor`: Chip membaca prop `color` milik icon untuk variant warnanya.
 const CategoryIconBadge: React.FC<{ icon: string; bgColor: string; className?: string }> = ({ icon, bgColor, className }) => (
@@ -347,6 +329,34 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
         .slice(0, 5);
     const otherCats = filteredCategories.filter(c => !recentCategoryIds.includes(c.id));
 
+    // "Sering dipakai" dan "Semua kategori" memakai chip yang sama persis (ukuran ikon, bentuk, warna).
+    const renderCategoryChip = (cat: Category) => (
+        <Chip
+            key={cat.id}
+            icon={<CategoryIconBadge icon={cat.icon} bgColor={cat.color} />}
+            label={cat.name}
+            onClick={() => !isReadOnly && onCategoryChange(cat.id)}
+            disabled={isReadOnly}
+            sx={{
+                // Tinggi ikut isi: nama kategori panjang di-wrap, bukan dipotong ellipsis.
+                height: 'auto',
+                minHeight: 40,
+                '& .MuiChip-label': { whiteSpace: 'normal', py: 0.75, ...WRAP_ANYWHERE_SX },
+                px: 1,
+                bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.hover',
+                color: categoryId === cat.id ? theme.colors.accent : 'text.primary',
+                // Border selalu 2px (transparan kalau tidak dipilih): chip yang label-nya
+                // wrap tidak berubah ukuran saat dipilih.
+                border: '2px solid',
+                borderColor: categoryId === cat.id ? theme.colors.accent : 'transparent',
+                fontWeight: 600,
+                '&:hover': {
+                    bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.selected',
+                },
+            }}
+        />
+    );
+
     if (!open) return null;
 
     return (
@@ -598,37 +608,12 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                             Sering dipakai
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {recentCats.map((cat) => (
-                                <Chip
-                                    key={cat.id}
-                                    icon={<CategoryIconBadge icon={cat.icon} bgColor={cat.color} />}
-                                    label={cat.name}
-                                    onClick={() => !isReadOnly && onCategoryChange(cat.id)}
-                                    disabled={isReadOnly}
-                                    sx={{
-                                        // Tinggi ikut isi: nama kategori panjang di-wrap, bukan dipotong ellipsis.
-                                        height: 'auto',
-                                        minHeight: 40,
-                                        '& .MuiChip-label': { whiteSpace: 'normal', py: 0.75, ...WRAP_ANYWHERE_SX },
-                                        px: 1,
-                                        bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.hover',
-                                        color: categoryId === cat.id ? theme.colors.accent : 'text.primary',
-                                        // Border selalu 2px (transparan kalau tidak dipilih): chip yang label-nya
-                                        // wrap tidak berubah ukuran saat dipilih.
-                                        border: '2px solid',
-                                        borderColor: categoryId === cat.id ? theme.colors.accent : 'transparent',
-                                        fontWeight: 600,
-                                        '&:hover': {
-                                            bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.selected',
-                                        },
-                                    }}
-                                />
-                            ))}
+                            {recentCats.map(renderCategoryChip)}
                         </Box>
                     </Box>
                 )}
 
-                {/* All Categories */}
+                {/* All Categories — chip yang sama persis dengan "Sering dipakai" */}
                 <Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                         <Typography variant="caption" fontWeight={600} color="text.secondary">
@@ -640,61 +625,8 @@ const QuickAddSheet: React.FC<QuickAddSheetProps> = ({
                             </Button>
                         )}
                     </Box>
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            // minmax(0, 1fr): nama kategori panjang tidak melebarkan kolom keluar sheet.
-                            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                            [TWO_COLUMN_GRID_MEDIA]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
-                            gap: 1,
-                            overflow: 'visible',
-                        }}
-                    >
-                        {otherCats.map((cat) => (
-                            <Box
-                                key={cat.id}
-                                component="button"
-                                onClick={() => !isReadOnly && onCategoryChange(cat.id)}
-                                disabled={isReadOnly}
-                                sx={{
-                                    py: 1.5,
-                                    // Padding samping kecil di HP supaya nama umum (mis. "Pendidikan",
-                                    // "Transportasi") tetap muat satu baris di layar 320px.
-                                    px: { xs: 0.5, sm: 1.5 },
-                                    border: 'none',
-                                    borderRadius: 2.5,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: 0.75,
-                                    bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.hover',
-                                    boxShadow: categoryId === cat.id ? `0 0 0 2px ${theme.colors.accent}` : 'none',
-                                    transition: 'all 0.15s',
-                                    '&:hover': {
-                                        bgcolor: categoryId === cat.id ? theme.colors.accentLight : 'action.selected',
-                                    },
-                                    // Read-only: tile tampil pudar seperti chip "Sering dipakai" yang disabled.
-                                    '&:disabled': { opacity: 0.38, cursor: 'default', pointerEvents: 'none' },
-                                }}
-                            >
-                                <CategoryIconBadge icon={cat.icon} bgColor={cat.color} />
-                                {/* Nama yang tidak muat di-wrap ke baris berikutnya, bukan dipotong. */}
-                                <Typography
-                                    variant="caption"
-                                    fontWeight={600}
-                                    textAlign="center"
-                                    sx={{
-                                        width: '100%',
-                                        ...WRAP_ANYWHERE_SX,
-                                        [NARROW_GRID_MEDIA]: { fontSize: getNarrowGridLabelFontSize(cat.name) },
-                                        color: categoryId === cat.id ? theme.colors.accent : 'text.primary',
-                                    }}
-                                >
-                                    {withSlashBreaks(cat.name)}
-                                </Typography>
-                            </Box>
-                        ))}
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {otherCats.map(renderCategoryChip)}
                     </Box>
                 </Box>
 

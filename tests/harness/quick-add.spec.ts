@@ -74,40 +74,39 @@ const chipLabelProblems = (page: Page) =>
     return { count: chips.length, problems };
   });
 
-// Teks label grid "Semua kategori" yang keluar dari tile-nya sendiri (overflow menimpa tile sebelah).
-// findClippedText tidak menangkap ini karena teksnya tidak dipotong, hanya bertumpuk.
-const gridLabelsOutsideTile = (page: Page) =>
+// Chip kategori per section ("Sering dipakai" / "Semua kategori"): nama, jumlah baris label, posisi,
+// ukuran ikon & glyph, opacity, dan style dasar chip (untuk membandingkan kedua section).
+const categoryChips = (page: Page) =>
   page.evaluate(() => {
-    const header = [...document.querySelectorAll('span')].find((el) => el.textContent === 'Semua kategori');
-    const grid = header?.parentElement?.nextElementSibling;
-    if (!grid) throw new Error('grid kategori tidak ditemukan');
-    const tiles = [...grid.querySelectorAll<HTMLElement>(':scope > button')];
-    const outside = tiles
-      .filter((tile) => {
-        const range = document.createRange();
-        range.selectNodeContents(tile.lastElementChild!);
-        const text = range.getBoundingClientRect();
-        const box = tile.getBoundingClientRect();
-        return text.left < box.left - 0.5 || text.right > box.right + 0.5 || text.bottom > box.bottom + 0.5;
-      })
-      .map((tile) => tile.lastElementChild?.textContent);
-    return { count: tiles.length, outside };
-  });
-
-// Label grid per nama: jumlah baris, ukuran font, dan jumlah kolom grid.
-const gridLabelLayout = (page: Page) =>
-  page.evaluate(() => {
-    const header = [...document.querySelectorAll('span')].find((el) => el.textContent === 'Semua kategori');
-    const grid = header?.parentElement?.nextElementSibling as HTMLElement | null | undefined;
-    if (!grid) throw new Error('grid kategori tidak ditemukan');
-    const labels = Object.fromEntries([...grid.querySelectorAll<HTMLElement>(':scope > button > :last-child')].map((label) => {
-      const style = getComputedStyle(label);
-      return [label.textContent ?? '', {
-        lines: Math.round(label.getBoundingClientRect().height / parseFloat(style.lineHeight)),
-        fontSize: parseFloat(style.fontSize),
-      }];
-    }));
-    return { columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length, labels };
+    const section = (title: string) => {
+      const caption = [...document.querySelectorAll('span')].find((el) => el.textContent === title);
+      if (!caption) return [];
+      // "Sering dipakai": chip ada di sibling caption; "Semua kategori": caption ada di header, chip di sibling header.
+      const container = caption.nextElementSibling?.classList.contains('MuiBox-root')
+        ? caption.nextElementSibling
+        : caption.parentElement?.nextElementSibling;
+      return [...(container?.querySelectorAll<HTMLElement>(':scope > .MuiChip-root') ?? [])].map((chip) => {
+        const label = chip.querySelector<HTMLElement>('.MuiChip-label')!;
+        const icon = chip.querySelector<HTMLElement>('.MuiChip-icon')!;
+        const glyph = icon.querySelector('span');
+        const rect = chip.getBoundingClientRect();
+        const iconRect = icon.getBoundingClientRect();
+        const labelStyle = getComputedStyle(label);
+        // Tinggi TEKS (Range), bukan elemen label: label chip punya padding vertikal.
+        const text = document.createRange();
+        text.selectNodeContents(label);
+        return {
+          name: label.textContent ?? '',
+          lines: Math.round(text.getBoundingClientRect().height / parseFloat(labelStyle.lineHeight)),
+          top: Math.round(rect.top),
+          height: rect.height,
+          opacity: getComputedStyle(chip).opacity,
+          icon: `${Math.round(iconRect.width)}x${Math.round(iconRect.height)}/${glyph ? getComputedStyle(glyph).fontSize : '-'}`,
+          style: `${getComputedStyle(chip).borderRadius}|${labelStyle.fontSize}|${labelStyle.fontWeight}`,
+        };
+      });
+    };
+    return { recent: section('Sering dipakai'), all: section('Semua kategori') };
   });
 
 const scrollSheetContentTo = (page: Page, position: 'top' | 'bottom') =>
@@ -160,38 +159,33 @@ test.describe('Quick add sheet', () => {
 
   test('ikon "Sering dipakai" dan "Semua kategori" berukuran sama (kecil)', async ({ page }) => {
     await openScenario(page, 'quick-add');
+    const { recent, all } = await categoryChips(page);
+    expect(recent.length).toBeGreaterThan(0);
+    expect(all.length).toBeGreaterThan(0);
+    for (const chip of [...recent, ...all]) expect(chip.icon, chip.name).toBe('24x24/14px');
 
-    const sizes = await page.evaluate(() => {
-      const measure = (badge: Element) => {
-        const rect = badge.getBoundingClientRect();
-        const glyph = badge.querySelector('span');
-        return {
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-          glyphFontSize: glyph ? getComputedStyle(glyph).fontSize : null,
-        };
-      };
+    const icons = await page.evaluate(() => {
       const chipIcons = [...document.querySelectorAll('.MuiChip-root > .MuiChip-icon')];
-      const allHeader = [...document.querySelectorAll('span')].find((el) => el.textContent === 'Semua kategori');
-      const grid = allHeader?.parentElement?.nextElementSibling;
-      const gridBadges = grid ? [...grid.querySelectorAll(':scope > button > div:first-child')] : [];
-      return {
-        chip: chipIcons.map(measure),
-        chipMarginLeft: chipIcons[0] ? getComputedStyle(chipIcons[0]).marginLeft : null,
-        chipIconClasses: chipIcons.map((icon) => icon.className),
-        grid: gridBadges.map(measure),
-      };
+      return { marginLeft: chipIcons[0] ? getComputedStyle(chipIcons[0]).marginLeft : null, classes: chipIcons.map((icon) => icon.className) };
     });
-
-    expect(sizes.chip.length).toBeGreaterThan(0);
-    expect(sizes.grid.length).toBeGreaterThan(0);
-    for (const badge of [...sizes.chip, ...sizes.grid]) {
-      expect(badge).toEqual({ width: 24, height: 24, glyphFontSize: '14px' });
-    }
     // className MuiChip-icon harus tetap sampai ke badge supaya spacing chip tidak berubah.
-    expect(sizes.chipMarginLeft).toBe('5px');
+    expect(icons.marginLeft).toBe('5px');
     // Warna badge tidak boleh terbaca Chip sebagai prop `color` (muncul class MuiChip-iconColor#xxxxxx).
-    for (const className of sizes.chipIconClasses) expect(className).not.toContain('#');
+    for (const className of icons.classes) expect(className).not.toContain('#');
+  });
+
+  test('"Semua kategori" memakai chip yang sama persis dengan "Sering dipakai" (bentuk, ukuran, layout baris)', async ({ page }) => {
+    for (const width of [360, 412, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      await openScenario(page, 'quick-add');
+      const { recent, all } = await categoryChips(page);
+      expect(all.length, `${width}px`).toBeGreaterThan(1);
+      // Style dasar (radius, font label) sama di kedua section; chip satu baris sama tinggi (40px).
+      expect(new Set([...recent, ...all].map((chip) => chip.style)).size, `${width}px`).toBe(1);
+      for (const chip of [...recent, ...all].filter((item) => item.lines === 1)) expect(chip.height, `${chip.name} @${width}px`).toBe(40);
+      // Chip mengalir berdampingan dalam baris (bukan satu tile per kolom/baris).
+      expect(all[1].top, `${width}px`).toBe(all[0].top);
+    }
   });
 
   test('button Simpan selalu terlihat di bawah, termasuk saat konten di-scroll', async ({ page }) => {
@@ -235,7 +229,7 @@ test.describe('Quick add sheet', () => {
     }
   });
 
-  test('nama kategori panjang di grid tidak membuat sheet overflow ke samping', async ({ page }) => {
+  test('nama kategori panjang di chip tidak membuat sheet overflow ke samping', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 });
     await openScenario(page, 'quick-add');
     await expect(page.getByText('Semua kategori')).toBeVisible();
@@ -251,9 +245,6 @@ test.describe('Quick add sheet', () => {
       const chips = await chipLabelProblems(page);
       expect(chips.count, `${width}px`).toBeGreaterThan(0);
       expect(chips.problems, `${width}px`).toEqual([]);
-      const tiles = await gridLabelsOutsideTile(page);
-      expect(tiles.count, `${width}px`).toBeGreaterThan(0);
-      expect(tiles.outside, `${width}px`).toEqual([]);
       // Chip bernama pendek tetap setinggi semula (40px); hanya nama panjang yang menambah tinggi.
       const shortChip = page.locator('.MuiChip-root').filter({ has: page.locator('.MuiChip-label', { hasText: /^Belanja$/ }) });
       expect((await shortChip.boundingBox())?.height, `${width}px`).toBe(40);
@@ -272,7 +263,7 @@ test.describe('Quick add sheet', () => {
     expect({ width: after!.width, height: after!.height }).toEqual({ width: before!.width, height: before!.height });
   });
 
-  test('nama kategori satu kata panjang tanpa spasi (chip & grid) tetap utuh tanpa overflow', async ({ page }) => {
+  test('nama kategori satu kata panjang tanpa spasi tetap utuh tanpa overflow (kedua section)', async ({ page }) => {
     for (const width of [320, 412]) {
       await page.setViewportSize({ width, height: 740 });
       await openScenario(page, 'quick-add-long-names');
@@ -280,87 +271,35 @@ test.describe('Quick add sheet', () => {
       await expect(page.getByText(FIXTURE_TEXT.unbrokenGridCategory)).toBeVisible();
       expect(await findClippedText(page), `${width}px`).toEqual([]);
       expect((await chipLabelProblems(page)).problems, `${width}px`).toEqual([]);
-      expect((await gridLabelsOutsideTile(page)).outside, `${width}px`).toEqual([]);
       expect((await sheetMetrics(page)).scrollerHorizontalOverflow, `${width}px`).toBeLessThanOrEqual(0);
     }
   });
 
-  test('nama kategori umum di grid tetap satu baris di layar 320px; nama panjang di-wrap utuh', async ({ page }) => {
+  test('nama kategori umum, kata panjang (11–14 huruf), dan nama ber-"/" tampil utuh satu baris di 280–412px', async ({ page }) => {
+    const names = ['Pendidikan', 'Kesehatan', ...FIXTURE_TEXT.longWordCategories, ...FIXTURE_TEXT.slashCategories];
+    for (const width of [280, 320, 360, 412]) {
+      await page.setViewportSize({ width, height: 900 });
+      await openScenario(page, 'quick-add-long-names');
+      const { recent, all } = await categoryChips(page);
+      const lines = Object.fromEntries([...recent, ...all].map((chip) => [chip.name, chip.lines]));
+      for (const name of names) expect(lines[name], `${name} @${width}px`).toBe(1);
+    }
+  });
+
+  test('nama kategori yang lebih panjang dari satu baris di-wrap utuh, bukan dipotong', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 });
     await openScenario(page, 'quick-add');
-    const { labels } = await gridLabelLayout(page);
-    expect(labels['Pendidikan'].lines).toBe(1);
-    expect(labels['Kesehatan'].lines).toBe(1);
-    expect(labels[FIXTURE_TEXT.longGridCategory].lines).toBeGreaterThan(1);
+    const { all } = await categoryChips(page);
+    expect(all.find((chip) => chip.name === FIXTURE_TEXT.longGridCategory)?.lines).toBeGreaterThan(1);
+    expect((await chipLabelProblems(page)).problems).toEqual([]);
   });
 
-  test('nama kategori dengan "/" (mis. "Sumbangan/Donasi") hanya pecah setelah "/", tidak di tengah kata', async ({ page }) => {
-    for (const width of [280, 320, 360, 412]) {
-      await page.setViewportSize({ width, height: 740 });
-      await openScenario(page, 'quick-add-long-names');
-      const breaks = await page.evaluate((names: string[]) => {
-        const header = [...document.querySelectorAll('span')].find((el) => el.textContent === 'Semua kategori');
-        const grid = header?.parentElement?.nextElementSibling;
-        if (!grid) throw new Error('grid kategori tidak ditemukan');
-        const result: Record<string, string[]> = {};
-        grid.querySelectorAll<HTMLElement>(':scope > button > :last-child').forEach((label) => {
-          const name = label.textContent ?? '';
-          if (!names.includes(name)) return;
-          // Posisi vertikal tiap karakter → indeks tempat baris baru dimulai.
-          const chars: Array<{ ch: string; top: number }> = [];
-          const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
-          for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
-            for (let index = 0; index < node.length; index += 1) {
-              const range = document.createRange();
-              range.setStart(node, index);
-              range.setEnd(node, index + 1);
-              const rect = range.getClientRects()[0];
-              if (rect) chars.push({ ch: node.data[index], top: rect.top });
-            }
-          }
-          result[name] = chars
-            .map((char, index) => ({ index, lineStart: index > 0 && char.top > chars[index - 1].top + 2 }))
-            .filter(({ index, lineStart }) => lineStart && !['/', ' '].includes(chars[index - 1].ch) && chars[index].ch !== ' ')
-            .map(({ index }) => `${name.slice(0, index)}|${name.slice(index)}`);
-        });
-        return result;
-      }, [...FIXTURE_TEXT.slashCategories] as string[]);
-      for (const name of FIXTURE_TEXT.slashCategories) {
-        expect(breaks[name], `${name} @${width}px`).toEqual([]);
-      }
-      // Ukuran font dihitung dari segmen terpanjang (dipisah spasi atau "/"), bukan seluruh nama.
-      if (width < 360) {
-        const { labels } = await gridLabelLayout(page);
-        expect(labels['Zakat/Infaq/Sedekah'].fontSize, `${width}px`).toBe(11);
-      }
-    }
-  });
-
-  test('nama kategori satu kata yang panjang (11–14 huruf) tidak pecah di tengah kata, 280–412px', async ({ page }) => {
-    for (const [width, columns, fontSize] of [[280, 2, 10], [320, 3, 10], [360, 3, 12], [412, 3, 12]] as const) {
-      await page.setViewportSize({ width, height: 740 });
-      await openScenario(page, 'quick-add-long-names');
-      const layout = await gridLabelLayout(page);
-      expect(layout.columns, `${width}px`).toBe(columns);
-      for (const name of FIXTURE_TEXT.longWordCategories) {
-        expect(layout.labels[name].lines, `${name} @${width}px`).toBe(1);
-      }
-      // Font hanya dikecilkan di layar < 360px; kata ≥13 huruf paling kecil (10px).
-      expect(layout.labels['Telekomunikasi'].fontSize, `${width}px`).toBe(fontSize);
-    }
-  });
-
-  test('read-only: chip & tile kategori sama-sama tampil pudar (disabled)', async ({ page }) => {
+  test('read-only: semua chip kategori (kedua section) tampil pudar (disabled)', async ({ page }) => {
     await openScenario(page, 'quick-add-readonly');
-    const opacities = await page.evaluate(() => {
-      const chip = document.querySelector<HTMLElement>('.MuiChip-root');
-      const header = [...document.querySelectorAll('span')].find((el) => el.textContent === 'Semua kategori');
-      const tile = header?.parentElement?.nextElementSibling?.querySelector<HTMLElement>(':scope > button');
-      if (!chip || !tile) throw new Error('chip/tile tidak ditemukan');
-      return { chip: getComputedStyle(chip).opacity, tile: getComputedStyle(tile).opacity };
-    });
-    expect(opacities.chip).toBe('0.38');
-    expect(opacities.tile).toBe(opacities.chip);
+    const { recent, all } = await categoryChips(page);
+    expect(recent.length).toBeGreaterThan(0);
+    expect(all.length).toBeGreaterThan(0);
+    for (const chip of [...recent, ...all]) expect(chip.opacity, chip.name).toBe('0.38');
   });
 
   test('lampiran tersimpan bernama panjang: sheet tidak overflow ke samping, button hapus lampiran tetap di layar', async ({ page }) => {
@@ -388,8 +327,8 @@ test.describe('Quick add sheet', () => {
     await scrollSheetContentTo(page, 'bottom');
     const metrics = await sheetMetrics(page);
     const dateField = await page.getByLabel('Tanggal').evaluate((input) => input.closest('.MuiFormControl-root')!.getBoundingClientRect().bottom);
-    // Jarak = padding bawah area konten (16px) saja, tanpa tambahan gap grid untuk baris kosong.
-    expect(metrics.scrollerBottom - dateField).toBeLessThanOrEqual(16.5);
+    // Jarak = padding bawah area konten (16px, + pembulatan subpixel) saja, tanpa gap grid baris kosong (32px).
+    expect(metrics.scrollerBottom - dateField).toBeLessThanOrEqual(17);
   });
 
   test('dialog conflict: catatan panjang tanpa spasi tidak membuat dialog overflow ke samping', async ({ page }) => {
