@@ -53,7 +53,9 @@ const FullScreenDialog: React.FC<FullScreenDialogProps> = ({
                         <IconDisplay name="ArrowLeft" size={20} />
                     </IconButton>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="h6" fontWeight={700}>
+                        {/* Judul bisa berupa nama file lampiran yang panjang tanpa spasi (mis. foto kamera):
+                            dibiarkan pecah di mana saja supaya tidak overflow menimpa button di header. */}
+                        <Typography variant="h6" fontWeight={700} sx={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                             {title}
                         </Typography>
                         {description ? (

@@ -97,10 +97,11 @@ const TransactionActionSheet: React.FC<TransactionActionSheetProps> = ({
 
                 {/* Transaction Preview */}
                 <Box sx={{ px: 3, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                    <Typography variant="h6" fontWeight={700}>
+                    {/* Wrap di mana saja supaya deskripsi tanpa spasi (mis. URL) tidak overflow keluar sheet. */}
+                    <Typography variant="h6" fontWeight={700} sx={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                         {transaction.description || 'Tanpa deskripsi'}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                         {transaction.categoryName} • {transaction.date}
                     </Typography>
                     <Typography

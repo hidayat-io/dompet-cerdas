@@ -142,6 +142,28 @@ const getMonthName = (month: number): string => {
   return months[month];
 };
 
+// Deskripsi transaksi tidak boleh terpotong: makin panjang teksnya, makin kecil
+// font-nya (hanya di layar HP, < 600px), dan baris dibiarkan wrap supaya isi lengkap tetap terbaca.
+const getDescriptionFontSize = (text: string): string => {
+  const length = text.trim().length;
+  if (length > 48) return '0.75rem';
+  if (length > 24) return '0.8125rem';
+  return '0.875rem';
+};
+
+const getResponsiveDescriptionFontSize = (text: string) => ({ xs: getDescriptionFontSize(text), sm: '0.875rem' });
+
+// Teks dibiarkan pecah di mana saja kalau tidak muat (mis. URL tanpa spasi).
+// `wordBreak: 'break-word'` jadi fallback untuk Safari < 15.4 yang belum mengenal `overflowWrap: 'anywhere'`.
+const WRAP_ANYWHERE_SX = { overflowWrap: 'anywhere', wordBreak: 'break-word' } as const;
+
+// Chip filter berisi teks user (kata kunci, nama kategori): tinggi ikut isi, label wrap.
+const WRAPPING_CHIP_SX = {
+  height: 'auto',
+  minHeight: 24,
+  '& .MuiChip-label': { whiteSpace: 'normal', py: 0.25, ...WRAP_ANYWHERE_SX },
+} as const;
+
 type FilterMode = 'month' | 'range';
 
 const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, currentUserId, activeAccountRole, pendingAttachmentUploads = {}, onRetryAttachmentUpload, onCancelAttachmentUpload, onDelete, onUpdate, onAddCategory, onShowNotification }) => {
@@ -351,7 +373,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
           title="Riwayat Transaksi"
           description="Lihat, cari, dan saring transaksi dengan pola tampilan yang sama seperti menu lainnya."
           actions={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            // Wrap: di layar sempit button "Filter lanjutan" pindah ke baris berikutnya, bukan terpotong di tepi layar.
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <IconButton
                 size="small"
                 aria-label="Bulan sebelumnya"
@@ -429,10 +452,13 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                 </Box>
               </Box>
 
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 1.5, maxHeight: 220, overflowY: 'auto' }}>
+              {/* Tanpa batas tinggi/scroll dalam: label job kini tampil penuh (tidak dipotong), dan
+                  scrollbar di dalam card tidak terlihat di HP sehingga job bawah tersembunyi. */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 1.5 }}>
                 {attachmentUploadJobs.map((job) => {
                   const transaction = transactions.find((item) => item.id === job.transactionId);
                   const isFailed = job.status === 'failed';
+                  const jobLabel = transaction?.description?.trim() || job.fileName || 'Lampiran transaksi';
 
                   return (
                     <Box
@@ -440,7 +466,10 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                       data-testid={'attachment-upload-' + job.transactionId}
                       sx={{
                         display: 'flex',
-                        alignItems: 'center',
+                        // Wrap: di layar sempit button aksi turun ke baris bawah, jadi label
+                        // tetap selebar card dan tidak terjepit jadi kolom sempit.
+                        flexWrap: 'wrap',
+                        alignItems: 'flex-start',
                         justifyContent: 'space-between',
                         gap: 1,
                         p: 1,
@@ -448,15 +477,19 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                         bgcolor: 'background.paper',
                       }}
                     >
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
-                          {transaction?.description?.trim() || job.fileName || 'Lampiran transaksi'}
+                      <Box sx={{ minWidth: 0, flex: '1 1 180px' }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          sx={{ fontSize: getResponsiveDescriptionFontSize(jobLabel), lineHeight: 1.35, ...WRAP_ANYWHERE_SX }}
+                        >
+                          {jobLabel}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ...WRAP_ANYWHERE_SX }}>
                           {transaction ? 'Transaksi ' + transaction.date : 'Transaksi tidak ditemukan pada daftar saat ini'}
                         </Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, ml: 'auto' }}>
                         <Chip
                           size="small"
                           icon={<IconDisplay name={isFailed ? 'AlertCircle' : 'Loader'} size={11} />}
@@ -510,7 +543,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
               value={filterMode}
               onChange={(_, newValue) => setFilterMode(newValue)}
               variant="fullWidth"
-              sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600 } }}
+              sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, minWidth: 0, px: 1, textTransform: 'none', fontWeight: 600 } }}
             >
               <Tab value="month" label="Per Bulan" />
               <Tab value="range" label="Rentang Tanggal" />
@@ -535,7 +568,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
               value={selectedType}
               onChange={(_, newValue) => setSelectedType(newValue)}
               variant="fullWidth"
-              sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600 } }}
+              sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, minWidth: 0, px: 1, textTransform: 'none', fontWeight: 600 } }}
             >
               <Tab value="all" label="Semua" />
               <Tab value="EXPENSE" label="Keluar" />
@@ -543,7 +576,14 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
             </Tabs>
             <FormControl fullWidth size="small">
               <InputLabel>Kategori</InputLabel>
-              <Select label="Kategori" value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}>
+              <Select
+                label="Kategori"
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                // Inline style lewat SelectDisplayProps: style bawaan Select (nowrap + ellipsis) menang atas sx.
+                SelectDisplayProps={{ style: { whiteSpace: 'normal', ...WRAP_ANYWHERE_SX } }}
+                MenuProps={{ slotProps: { paper: { sx: { '& .MuiMenuItem-root': { whiteSpace: 'normal', ...WRAP_ANYWHERE_SX } } } } }}
+              >
                 <MenuItem value="all">Semua Kategori</MenuItem>
                 <MenuItem disabled sx={{ fontSize: 12, color: 'text.disabled', py: 0.25 }}>── Pengeluaran ──</MenuItem>
                 {categories.filter(c => c.type === 'EXPENSE').map(cat => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
@@ -552,9 +592,11 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
               </Select>
             </FormControl>
           </DialogContent>
-          <DialogActions sx={{ justifyContent: 'space-between' }}>
+          {/* Wrap: di layar sempit button kanan turun ke baris kedua (tetap rata kanan), bukan terpotong di
+              tepi dialog. disableSpacing + gap: margin-left bawaan MUI tidak ikut terbawa ke baris kedua. */}
+          <DialogActions disableSpacing sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
             <Button onClick={() => setShowFilters(false)}>Tutup</Button>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, flex: '1 1 auto', justifyContent: 'flex-end' }}>
               <Button onClick={() => { setSearchQuery(''); setSelectedType('all'); setSelectedCategoryId('all'); }}>Reset filter</Button>
               <Button variant="contained" onClick={() => setShowFilters(false)}>Terapkan</Button>
             </Box>
@@ -571,7 +613,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                 icon={<IconDisplay name="Search" size={12} />}
                 label={`"${searchQuery}"`}
                 onDelete={() => setSearchQuery('')}
-                sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, height: 24 }}
+                sx={{ bgcolor: theme.colors.accentLight, color: theme.colors.accent, ...WRAPPING_CHIP_SX }}
               />
             )}
             {selectedType !== 'all' && (
@@ -593,7 +635,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                 icon={<IconDisplay name="Tag" size={12} />}
                 label={categories.find(c => c.id === selectedCategoryId)?.name || 'Kategori'}
                 onDelete={() => setSelectedCategoryId('all')}
-                sx={{ height: 24 }}
+                sx={WRAPPING_CHIP_SX}
               />
             )}
             <Button
@@ -695,6 +737,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                         ? { url: t.attachment.url, path: t.attachment.path, name: t.attachment.name, type: t.attachment.type }
                         : null;
                       const pendingAttachmentUpload = pendingAttachmentUploads[t.id];
+                      const primaryText = t.description || cat?.name || 'Tanpa deskripsi';
 
                       return (
                         <React.Fragment key={t.id}>
@@ -715,13 +758,17 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                             </ListItemAvatar>
                             <ListItemText
                               primary={
-                                <Typography variant="body2" fontWeight={700} noWrap sx={{ mb: 0.25 }}>
-                                  {t.description || cat?.name || 'Tanpa deskripsi'}
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={700}
+                                  sx={{ mb: 0.25, fontSize: getResponsiveDescriptionFontSize(primaryText), lineHeight: 1.35, ...WRAP_ANYWHERE_SX }}
+                                >
+                                  {primaryText}
                                 </Typography>
                               }
                               secondary={
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                                  <Typography variant="caption" color="text.secondary" noWrap>
+                                  <Typography variant="caption" color="text.secondary" sx={WRAP_ANYWHERE_SX}>
                                     {cat?.name || 'Kategori Dihapus'}
                                   </Typography>
                                   {attachmentData && (
@@ -758,6 +805,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, categor
                                   )}
                                 </Box>
                               }
+                              // Isi secondary berupa <div> (Box); Typography default-nya <p> dan div tidak boleh di dalam p.
+                              slotProps={{ secondary: { component: 'div' } }}
                               sx={{ m: 0, pr: 2 }}
                             />
                             <Typography

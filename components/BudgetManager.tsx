@@ -502,6 +502,8 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
                                             </Avatar>
                                         </ListItemAvatar>
                                         <ListItemText 
+                                            // Isi secondary berupa <div> (Box); Typography default-nya <p> dan div tidak boleh di dalam p.
+                                            slotProps={{ secondary: { component: 'div' } }}
                                             primary={
                                                 <Typography variant="subtitle2" fontWeight={700} noWrap>
                                                     {transaction.description || 'Tanpa deskripsi'}
