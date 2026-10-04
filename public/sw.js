@@ -1,8 +1,16 @@
-const SW_VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
-const STATIC_CACHE = `dompetcerdas-static-${SW_VERSION}`;
-// Runtime & app-shell cache sengaja TANPA suffix versi supaya aset yang sudah
-// tercache tetap valid lintas rilis. Chunk hasil hash versi lama dipertahankan
-// agar HTML cache lama tidak pernah 404, dan hanya dibersihkan lewat cap entri.
+// BUILD_ID diganti otomatis saat `vite build` (lihat vite.config.ts) supaya byte
+// sw.js berubah di setiap release. Browser hanya meng-install SW baru kalau isi sw.js
+// berbeda, dan app shell di bawah hanya diperbarui saat SW baru ter-install. Tanpa
+// ini, release yang tidak mengubah isi sw.js tidak pernah sampai ke PWA (menaikkan
+// APP_VERSION saja tidak cukup: halaman lama dari cache tidak pernah menjalankan JS baru).
+// Karena itu SW di-register sebagai `/sw.js` polos (lihat utils/pwa.ts): parameter
+// versi di URL hanya memicu install ulang untuk build yang sama.
+const BUILD_ID = '__DC_BUILD_ID__';
+// Chunk /assets/* disimpan di STATIC_CACHE yang dihapus setiap SW baru aktif, jadi
+// tab yang masih memakai HTML lama WAJIB di-navigate ulang saat activate (lihat bawah).
+const STATIC_CACHE = `dompetcerdas-static-${BUILD_ID}`;
+// Runtime & app-shell cache sengaja TANPA suffix versi. Runtime cache berisi asset
+// non-hash (dibatasi MAX_RUNTIME_ENTRIES); app shell diganti saat SW baru aktif.
 const RUNTIME_CACHE = 'dompetcerdas-runtime';
 const APP_SHELL_CACHE = 'dompetcerdas-app-shell';
 const MAX_RUNTIME_ENTRIES = 150;
@@ -36,37 +44,37 @@ self.addEventListener('install', (event) => {
     const cache = await caches.open(STATIC_CACHE);
     await cache.addAll(PRECACHE_URLS);
 
-    // Precache shell ke APP_SHELL_CACHE sedini mungkin saat install
-    // agar navigasi pertama tidak pernah menunggu network.
-    const appShellCache = await caches.open(APP_SHELL_CACHE);
-    const indexResponse = (await cache.match('/index.html')) || (await cache.match('/'));
-    if (indexResponse) {
-      await appShellCache.put('/index.html', indexResponse.clone());
-      await appShellCache.put('/', indexResponse.clone());
+    // Precache SEMUA chunk hasil build (manifest di-generate Vite saat build) secara
+    // ATOMIC: kalau manifest atau satu chunk saja gagal diambil (jaringan putus-putus),
+    // install gagal dan SW lama tetap dipakai, lalu update dicoba lagi saat app dibuka
+    // berikutnya. Kalau dibiarkan sebagian, activate tetap menghapus cache lama dan
+    // reload ke HTML baru yang chunk-nya tidak lengkap: halaman blank.
+    const manifestResponse = await fetch(PRECACHE_MANIFEST_URL, { cache: 'no-cache' });
+    if (!manifestResponse.ok) {
+      throw new Error(`precache-manifest gagal diambil (${manifestResponse.status})`);
     }
-
-    // Precache SEMUA chunk hasil build (manifest di-generate Vite saat build).
-    // Ini krusial: sebelum activate, chunk milik rilis baru sudah tercache
-    // sehingga reload pascapdate langsung instan dan tidak pernah 404.
-    try {
-      const manifestResponse = await fetch(PRECACHE_MANIFEST_URL, { cache: 'no-cache' });
-      if (manifestResponse.ok) {
-        const manifest = await manifestResponse.json();
-        const urls = Array.isArray(manifest.files)
-          ? manifest.files.filter((u) => typeof u === 'string' && u.startsWith('/'))
-          : [];
-        await Promise.allSettled(urls.map((u) => cache.add(u)));
-      }
-    } catch {
-      // Manifest gagal diambil (mis. offline saat update): abaikan, runtime
-      // cache tetap mengisi aset secara lazy seperti biasa.
-    }
+    const manifest = await manifestResponse.json();
+    const urls = Array.isArray(manifest.files)
+      ? manifest.files.filter((u) => typeof u === 'string' && u.startsWith('/'))
+      : [];
+    await cache.addAll(urls);
   })());
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
+    // App shell (dipakai bersama semua versi SW) baru diganti saat SW ini AKTIF, bukan
+    // saat install: kalau install terputus, SW lama tidak boleh menyajikan HTML baru
+    // yang chunk-nya tidak ada di cache lama (blank saat offline).
+    const staticCache = await caches.open(STATIC_CACHE);
+    const indexResponse = (await staticCache.match('/index.html')) || (await staticCache.match('/'));
+    if (indexResponse) {
+      const appShellCache = await caches.open(APP_SHELL_CACHE);
+      await appShellCache.put('/index.html', indexResponse.clone());
+      await appShellCache.put('/', indexResponse.clone());
+    }
+
     const cacheNames = await caches.keys();
     const staleCaches = cacheNames.filter((cacheName) =>
       cacheName.startsWith('dompetcerdas-') && ![
@@ -82,11 +90,15 @@ self.addEventListener('activate', (event) => {
     // On update (stale caches existed): force-navigate all open tabs so they
     // reload under the new SW with fresh HTML. This handles the blank-page
     // case where JS never loaded (stale HTML referencing deleted chunks).
+    // JANGAN di-await: navigate() baru selesai setelah SW ini berstatus
+    // "activated", sedangkan activate menunggu waitUntil ini selesai. Kalau
+    // di-await terjadi deadlock (Chrome ~5 menit, WebKit ~70 detik dengan semua
+    // fetch gagal) sebelum browser menyerah.
     if (staleCaches.length > 0) {
       const windowClients = await self.clients.matchAll({ type: 'window' });
-      await Promise.all(
-        windowClients.map((client) => client.navigate(client.url).catch(() => {}))
-      );
+      windowClients.forEach((client) => {
+        client.navigate(client.url).catch(() => {});
+      });
     }
   })());
 });

@@ -7,12 +7,12 @@ const dispatchPwaUpdateEvent = () => {
   window.dispatchEvent(new CustomEvent(PWA_UPDATE_EVENT, { detail: { version: APP_VERSION } }));
 };
 
-const watchInstallingWorker = (worker: ServiceWorker | null) => {
+const watchInstallingWorker = (worker: ServiceWorker | null, notifyUpdate: () => void) => {
   if (!worker) return;
 
   worker.addEventListener('statechange', () => {
     if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-      dispatchPwaUpdateEvent();
+      notifyUpdate();
     }
   });
 };
@@ -26,20 +26,29 @@ export const registerServiceWorker = async () => {
   // dua kali). Pembaruan versi kini cukup ditangani SATU mekanisme: activate
   // di sw.js me-navigate semua client ketika ada cache versi lama.
   try {
-    const registration = await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`, {
+    // Pindah dari URL lama `/sw.js?v=...` ke `/sw.js` meng-install ulang SW yang SAMA (isi
+    // file identik) sekali. Itu bukan versi baru, jadi banner update tidak ditampilkan.
+    const previous = await navigator.serviceWorker.getRegistration();
+    const migratingFromVersionedUrl = /\/sw\.js\?v=/.test(previous?.active?.scriptURL ?? '');
+    const notifyUpdate = migratingFromVersionedUrl ? () => undefined : dispatchPwaUpdateEvent;
+
+    // Tanpa `?v=APP_VERSION`: setiap build sudah mengubah isi sw.js (BUILD_ID), dan URL
+    // yang berubah hanya memicu install ulang SW yang sama (phantom update banner).
+    const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     });
 
     if (registration.waiting && navigator.serviceWorker.controller) {
-      dispatchPwaUpdateEvent();
+      notifyUpdate();
     }
 
-    watchInstallingWorker(registration.installing);
+    watchInstallingWorker(registration.installing, notifyUpdate);
     registration.addEventListener('updatefound', () => {
-      watchInstallingWorker(registration.installing);
+      watchInstallingWorker(registration.installing, notifyUpdate);
     });
 
-    void registration.update();
+    // Gagal saat offline: abaikan, dicek lagi saat app dibuka berikutnya.
+    registration.update().catch(() => {});
   } catch (error) {
     console.error('Service worker registration failed:', error);
   }
